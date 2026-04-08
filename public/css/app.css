@@ -659,6 +659,19 @@ input, select, textarea { font: inherit; color: inherit; }
 body { background: #ffffff; }
 .pp-app--home { background: #ffffff; padding-bottom: 100px; }
 
+/* PC(태블릿 이상)에서 캐치테이블 스타일 좌우 그림자 프레임 */
+@media (min-width: 600px) {
+  body { background: #f0f1f3; }
+  .pp-app {
+    box-shadow: 0 0 24px rgba(0,0,0,0.10), 0 0 60px rgba(0,0,0,0.06);
+    border-left: 1px solid #ececef;
+    border-right: 1px solid #ececef;
+    min-height: 100vh;
+  }
+  .pp-app--home, .yg-header { background: #ffffff; }
+  .pp-nav { box-shadow: 0 0 24px rgba(0,0,0,0.10), 0 0 60px rgba(0,0,0,0.06); }
+}
+
 .yg-header {
   position: sticky; top: 0; z-index: 50;
   background: #ffffff;
