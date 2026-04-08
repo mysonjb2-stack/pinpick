@@ -676,7 +676,7 @@ body { background: #ffffff; }
 .yg-segtab {
   margin-top: 22px;
   display: flex;
-  background: #f1f2f4;
+  background: #fff0f1;
   border-radius: 999px;
   padding: 5px;
   gap: 4px;
@@ -687,14 +687,14 @@ body { background: #ffffff; }
   border-radius: 999px;
   border: none; background: transparent;
   font-size: 14px; font-weight: 700;
-  color: #8a8f98;
+  color: #c98a90;
   cursor: pointer;
   transition: background .15s, color .15s;
 }
 .yg-segtab__btn.is-active {
-  background: #1a1a1a;
+  background: var(--yg-primary);
   color: #fff;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 10px rgba(255,102,113,0.30);
 }
 .yg-pane { display: none; }
 .yg-pane.is-active { display: block; }
