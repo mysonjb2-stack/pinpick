@@ -129,5 +129,43 @@ document.querySelectorAll('.pp-seg button').forEach(b => {
         document.getElementById('visitedDateField').style.display = s === 'visited' ? 'block' : 'none';
     });
 });
+
+// 비로그인 사용자: localStorage에 저장 (최대 5개)
+@guest
+const GUEST_KEY = 'pinpick_guest_places';
+const GUEST_MAX = 5;
+const catMap = { @foreach($categories as $c) {{ $c->id }}: { name: @json($c->name), icon: @json($c->icon) }, @endforeach };
+
+document.getElementById('placeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const list = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
+    if (list.length >= GUEST_MAX) {
+        alert('비로그인 상태에서는 최대 ' + GUEST_MAX + '개까지 저장할 수 있어요.\n더 저장하려면 로그인해주세요.');
+        return;
+    }
+    const fd = new FormData(this);
+    const cid = fd.get('category_id') || null;
+    const cinfo = cid && catMap[cid] ? catMap[cid] : { name: '기타', icon: '📌' };
+    const item = {
+        id: 'g' + Date.now(),
+        name: fd.get('name'),
+        category_id: cid ? +cid : null,
+        category_name: cinfo.name,
+        category_icon: cinfo.icon,
+        phone: fd.get('phone') || '',
+        road_address: fd.get('road_address') || '',
+        address: fd.get('address') || '',
+        lat: fd.get('lat') || '',
+        lng: fd.get('lng') || '',
+        memo: fd.get('memo') || '',
+        status: fd.get('status'),
+        visited_at: fd.get('visited_at') || '',
+        created_at: Date.now(),
+    };
+    list.unshift(item);
+    localStorage.setItem(GUEST_KEY, JSON.stringify(list));
+    location.href = '/?saved=1';
+});
+@endguest
 </script>
 @endpush

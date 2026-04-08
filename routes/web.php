@@ -21,9 +21,9 @@ Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'
     ->where('provider', 'kakao|google');
 Route::post('/logout', [SocialAuthController::class, 'logout'])->name('logout');
 
-// 장소
+// 장소 (create 폼은 비로그인도 접근 가능 - 게스트는 localStorage 저장)
+Route::get('/places/create', [PlaceController::class, 'create'])->name('places.create');
 Route::middleware('auth')->group(function () {
-    Route::get('/places/create', [PlaceController::class, 'create'])->name('places.create');
     Route::post('/places', [PlaceController::class, 'store'])->name('places.store');
     Route::get('/places/{place}', [PlaceController::class, 'show'])->name('places.show');
     Route::delete('/places/{place}', [PlaceController::class, 'destroy'])->name('places.destroy');

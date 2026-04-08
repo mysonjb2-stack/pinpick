@@ -129,38 +129,35 @@
         </div>
     </div>
 
-    {{-- 내 장소 탭 --}}
+    {{-- 내 장소 탭 — 카테고리별 가로 슬라이더 --}}
     <div class="yg-pane" data-pane="mine">
-        @auth
-            @if($myPlaces->count())
-                <div class="yg-mylist">
-                    @foreach($myPlaces as $p)
-                        <a href="{{ route('places.show', $p) }}" class="yg-myitem">
-                            <div class="yg-myitem__thumb">{{ $p->category?->icon ?? '📍' }}</div>
-                            <div class="yg-myitem__body">
-                                <div class="yg-myitem__name">{{ $p->name }}</div>
-                                <div class="yg-myitem__meta">{{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit($p->road_address ?: $p->address, 24) }}@endif</div>
-                            </div>
-                            <span class="yg-myitem__badge yg-myitem__badge--{{ $p->status }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
-                        </a>
-                    @endforeach
+        @php $authPlacesByCat = $myPlaces->groupBy('category_id'); @endphp
+        @foreach($categories as $c)
+            <section class="yg-mycat" data-cat-id="{{ $c->id }}">
+                <h3 class="yg-mycat__title">나의 {{ $c->name }}</h3>
+                <div class="yg-mycat__list">
+                    @auth
+                        @foreach(($authPlacesByCat[$c->id] ?? collect()) as $p)
+                            <a href="{{ route('places.show', $p) }}" class="yg-myspot">
+                                <div class="yg-myspot__thumb">
+                                    <span class="yg-myspot__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                                </div>
+                                <div class="yg-myspot__body">
+                                    <div class="yg-myspot__name">{{ $p->name }}</div>
+                                    <div class="yg-myspot__meta">{{ $c->icon }} {{ $c->name }}@if($p->road_address || $p->address) · {{ Str::limit($p->road_address ?: $p->address, 12) }}@endif</div>
+                                    @if($p->memo)<div class="yg-myspot__memo">{{ $p->memo }}</div>@endif
+                                </div>
+                            </a>
+                        @endforeach
+                    @endauth
+                    {{-- 게스트 카드는 JS가 여기 앞에 삽입 --}}
+                    <a href="{{ route('places.create', ['category' => $c->id]) }}" class="yg-myspot yg-myspot--add">
+                        <div class="yg-myspot__plus">＋</div>
+                        <div class="yg-myspot__addtxt">{{ $c->name }} 추가하기</div>
+                    </a>
                 </div>
-            @else
-                <div class="yg-empty">
-                    <div class="yg-empty__icon">📍</div>
-                    <div class="yg-empty__title">아직 저장한 장소가 없어요</div>
-                    <div class="yg-empty__desc">하단 + 버튼을 눌러 첫 장소를 추가해보세요</div>
-                    <a href="{{ route('places.create') }}" class="yg-empty__btn">＋ 새 장소 저장</a>
-                </div>
-            @endif
-        @else
-            <div class="yg-empty">
-                <div class="yg-empty__icon">🔒</div>
-                <div class="yg-empty__title">로그인이 필요해요</div>
-                <div class="yg-empty__desc">로그인하면 내가 저장한 장소를 모아볼 수 있어요</div>
-                <a href="{{ route('login') }}" class="yg-empty__btn">로그인하기</a>
-            </div>
-        @endauth
+            </section>
+        @endforeach
     </div>
 
     {{-- 프로모 배너 --}}
@@ -184,5 +181,36 @@ document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
         document.querySelectorAll('.yg-pane').forEach(p => p.classList.toggle('is-active', p.dataset.pane === target));
     });
 });
+
+// 게스트 localStorage 장소 hydrate
+@guest
+(function() {
+    const list = JSON.parse(localStorage.getItem('pinpick_guest_places') || '[]');
+    if (!list.length) return;
+    document.querySelectorAll('.yg-mycat').forEach(sec => {
+        const cid = +sec.dataset.catId;
+        const items = list.filter(p => p.category_id === cid);
+        if (!items.length) return;
+        const listEl = sec.querySelector('.yg-mycat__list');
+        const addBtn = listEl.querySelector('.yg-myspot--add');
+        items.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'yg-myspot';
+            const badge = p.status === 'visited' ? '방문완료' : '방문예정';
+            const addr = (p.road_address || p.address || '').slice(0, 12);
+            card.innerHTML = `
+                <div class="yg-myspot__thumb"><span class="yg-myspot__badge">${badge}</span></div>
+                <div class="yg-myspot__body">
+                    <div class="yg-myspot__name">${escapeHtml(p.name)}</div>
+                    <div class="yg-myspot__meta">${p.category_icon || ''} ${escapeHtml(p.category_name || '')}${addr ? ' · ' + escapeHtml(addr) : ''}</div>
+                    ${p.memo ? `<div class="yg-myspot__memo">${escapeHtml(p.memo)}</div>` : ''}
+                </div>
+            `;
+            listEl.insertBefore(card, addBtn);
+        });
+    });
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+})();
+@endguest
 </script>
 @endpush
