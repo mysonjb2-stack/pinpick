@@ -174,3 +174,15 @@
 
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const target = btn.dataset.pane;
+        document.querySelectorAll('.yg-segtab__btn').forEach(b => b.classList.toggle('is-active', b.dataset.pane === target));
+        document.querySelectorAll('.yg-pane').forEach(p => p.classList.toggle('is-active', p.dataset.pane === target));
+    });
+});
+</script>
+@endpush
