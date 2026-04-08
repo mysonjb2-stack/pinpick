@@ -672,6 +672,71 @@ body { background: #ffffff; }
   .pp-nav { box-shadow: 0 0 24px rgba(0,0,0,0.10), 0 0 60px rgba(0,0,0,0.06); }
 }
 
+/* 세그먼트 탭 (사람들 / 내 장소) */
+.yg-segtab {
+  margin-top: 22px;
+  display: flex;
+  background: #f1f2f4;
+  border-radius: 999px;
+  padding: 5px;
+  gap: 4px;
+}
+.yg-segtab__btn {
+  flex: 1;
+  height: 42px;
+  border-radius: 999px;
+  border: none; background: transparent;
+  font-size: 14px; font-weight: 700;
+  color: #8a8f98;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.yg-segtab__btn.is-active {
+  background: #1a1a1a;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.yg-pane { display: none; }
+.yg-pane.is-active { display: block; }
+
+/* 내 장소 리스트 카드 */
+.yg-mylist { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.yg-myitem {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px; background: #fff;
+  border: 1px solid #f0f1f3; border-radius: 16px;
+  text-decoration: none; color: #1a1a1a;
+}
+.yg-myitem__thumb {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: linear-gradient(135deg,#ffd4d8 0%,#fff2f3 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; flex: 0 0 auto;
+}
+.yg-myitem__body { flex: 1; min-width: 0; }
+.yg-myitem__name { font-size: 14px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 3px; }
+.yg-myitem__meta { font-size: 12px; color: #8a8f98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yg-myitem__badge {
+  font-size: 11px; font-weight: 700;
+  padding: 5px 9px; border-radius: 999px;
+  flex: 0 0 auto;
+}
+.yg-myitem__badge--visited { background: #e8f5e9; color: #2e7d32; }
+.yg-myitem__badge--planned { background: #fff0f1; color: var(--yg-primary); }
+.yg-empty {
+  text-align: center; padding: 40px 20px;
+  color: #8a8f98;
+}
+.yg-empty__icon { font-size: 44px; margin-bottom: 10px; }
+.yg-empty__title { font-size: 15px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px; }
+.yg-empty__desc { font-size: 13px; }
+.yg-empty__btn {
+  display: inline-block; margin-top: 14px;
+  padding: 10px 20px; border-radius: 999px;
+  background: var(--yg-primary); color: #fff;
+  font-size: 13px; font-weight: 700; text-decoration: none;
+}
+
 .yg-header {
   position: sticky; top: 0; z-index: 50;
   background: #ffffff;

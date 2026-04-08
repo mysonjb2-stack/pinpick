@@ -65,85 +65,102 @@
         </div>
     </div>
 
-    @auth
-        @if($myPlaces->count())
+    {{-- 세그먼트 탭: 사람들 / 내 장소 --}}
+    <div class="yg-segtab">
+        <button type="button" class="yg-segtab__btn is-active" data-pane="people">사람들</button>
+        <button type="button" class="yg-segtab__btn" data-pane="mine">내 장소</button>
+    </div>
+
+    {{-- 사람들 탭 (큐레이션) --}}
+    <div class="yg-pane is-active" data-pane="people">
         <div class="yg-section">
             <div class="yg-section__head">
-                <div class="yg-section__title">최근 저장한 <em>장소</em></div>
-                <a href="{{ route('map') }}" class="yg-section__more">더보기 ›</a>
+                <div class="yg-section__title">이번주 <em>핫한 저장</em></div>
+                <a href="#" class="yg-section__more">더보기 ›</a>
             </div>
             <div class="yg-hscroll">
-                @foreach($myPlaces->take(10) as $p)
-                    <a href="{{ route('places.show', $p) }}" class="yg-prod">
+                @foreach($curation['weekly'] as $p)
+                    <div class="yg-prod">
                         <div class="yg-prod__thumb">
-                            {{ $p->category?->icon ?? '📍' }}
-                            <span class="yg-prod__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                            {{ $p['icon'] }}
+                            <span class="yg-prod__rate">⭐ {{ number_format($p['saves']) }}</span>
                         </div>
-                        <div class="yg-prod__name">{{ $p->name }}</div>
-                        <div class="yg-prod__meta">{{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit($p->road_address ?: $p->address, 14) }}@endif</div>
-                    </a>
+                        <div class="yg-prod__name">{{ $p['name'] }}</div>
+                        <div class="yg-prod__meta">{{ $p['category'] }} · {{ $p['area'] }}</div>
+                        <div class="yg-prod__price">📌 {{ number_format($p['saves']) }} 저장</div>
+                    </div>
                 @endforeach
             </div>
         </div>
-        @endif
-    @endauth
 
-    {{-- 이번주 핫한 저장 --}}
-    <div class="yg-section">
-        <div class="yg-section__head">
-            <div class="yg-section__title">이번주 <em>핫한 저장</em></div>
-            <a href="#" class="yg-section__more">더보기 ›</a>
-        </div>
-        <div class="yg-hscroll">
-            @foreach($curation['weekly'] as $p)
-                <div class="yg-prod">
-                    <div class="yg-prod__thumb">
-                        {{ $p['icon'] }}
-                        <span class="yg-prod__rate">⭐ {{ number_format($p['saves']) }}</span>
+        <div class="yg-section">
+            <div class="yg-section__head">
+                <div class="yg-section__title">요즘 많이 찾는 <em>맛집</em></div>
+                <a href="#" class="yg-section__more">더보기 ›</a>
+            </div>
+            <div class="yg-rank">
+                @foreach(array_slice($curation['trending_food'], 0, 5) as $i => $p)
+                    <div class="yg-rank__item">
+                        <div class="yg-rank__num">{{ $i + 1 }}</div>
+                        <div class="yg-rank__main">
+                            <strong>{{ $p['name'] }}</strong>
+                            <p>{{ $p['category'] }} · {{ $p['area'] }}</p>
+                        </div>
+                        <div class="yg-rank__chip">저장 많음</div>
                     </div>
-                    <div class="yg-prod__name">{{ $p['name'] }}</div>
-                    <div class="yg-prod__meta">{{ $p['category'] }} · {{ $p['area'] }}</div>
-                    <div class="yg-prod__price">📌 {{ number_format($p['saves']) }} 저장</div>
-                </div>
-            @endforeach
+                @endforeach
+            </div>
+        </div>
+
+        <div class="yg-section">
+            <div class="yg-section__head">
+                <div class="yg-section__title">여행자들의 <em>서울 핀픽</em></div>
+                <a href="#" class="yg-section__more">더보기 ›</a>
+            </div>
+            <div class="yg-hscroll">
+                @foreach($curation['seoul_trip'] as $p)
+                    <div class="yg-prod">
+                        <div class="yg-prod__thumb">{{ $p['icon'] }}</div>
+                        <div class="yg-prod__name">{{ $p['name'] }}</div>
+                        <div class="yg-prod__meta">{{ $p['category'] }} · {{ $p['area'] }}</div>
+                    </div>
+                @endforeach
+            </div>
         </div>
     </div>
 
-    {{-- 카테고리 인기 랭킹 --}}
-    <div class="yg-section">
-        <div class="yg-section__head">
-            <div class="yg-section__title">요즘 많이 찾는 <em>맛집</em></div>
-            <a href="#" class="yg-section__more">더보기 ›</a>
-        </div>
-        <div class="yg-rank">
-            @foreach(array_slice($curation['trending_food'], 0, 5) as $i => $p)
-                <div class="yg-rank__item">
-                    <div class="yg-rank__num">{{ $i + 1 }}</div>
-                    <div class="yg-rank__main">
-                        <strong>{{ $p['name'] }}</strong>
-                        <p>{{ $p['category'] }} · {{ $p['area'] }}</p>
-                    </div>
-                    <div class="yg-rank__chip">저장 많음</div>
+    {{-- 내 장소 탭 --}}
+    <div class="yg-pane" data-pane="mine">
+        @auth
+            @if($myPlaces->count())
+                <div class="yg-mylist">
+                    @foreach($myPlaces as $p)
+                        <a href="{{ route('places.show', $p) }}" class="yg-myitem">
+                            <div class="yg-myitem__thumb">{{ $p->category?->icon ?? '📍' }}</div>
+                            <div class="yg-myitem__body">
+                                <div class="yg-myitem__name">{{ $p->name }}</div>
+                                <div class="yg-myitem__meta">{{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit($p->road_address ?: $p->address, 24) }}@endif</div>
+                            </div>
+                            <span class="yg-myitem__badge yg-myitem__badge--{{ $p->status }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                        </a>
+                    @endforeach
                 </div>
-            @endforeach
-        </div>
-    </div>
-
-    {{-- 추천 큐레이션 (서울 여행) --}}
-    <div class="yg-section">
-        <div class="yg-section__head">
-            <div class="yg-section__title">여행자들의 <em>서울 핀픽</em></div>
-            <a href="#" class="yg-section__more">더보기 ›</a>
-        </div>
-        <div class="yg-hscroll">
-            @foreach($curation['seoul_trip'] as $p)
-                <div class="yg-prod">
-                    <div class="yg-prod__thumb">{{ $p['icon'] }}</div>
-                    <div class="yg-prod__name">{{ $p['name'] }}</div>
-                    <div class="yg-prod__meta">{{ $p['category'] }} · {{ $p['area'] }}</div>
+            @else
+                <div class="yg-empty">
+                    <div class="yg-empty__icon">📍</div>
+                    <div class="yg-empty__title">아직 저장한 장소가 없어요</div>
+                    <div class="yg-empty__desc">하단 + 버튼을 눌러 첫 장소를 추가해보세요</div>
+                    <a href="{{ route('places.create') }}" class="yg-empty__btn">＋ 새 장소 저장</a>
                 </div>
-            @endforeach
-        </div>
+            @endif
+        @else
+            <div class="yg-empty">
+                <div class="yg-empty__icon">🔒</div>
+                <div class="yg-empty__title">로그인이 필요해요</div>
+                <div class="yg-empty__desc">로그인하면 내가 저장한 장소를 모아볼 수 있어요</div>
+                <a href="{{ route('login') }}" class="yg-empty__btn">로그인하기</a>
+            </div>
+        @endauth
     </div>
 
     {{-- 프로모 배너 --}}
