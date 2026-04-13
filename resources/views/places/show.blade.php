@@ -7,11 +7,26 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     </button>
     <div class="pp-header__title">장소 상세</div>
+    <div class="pp-header__spacer"></div>
+    <a href="{{ route('places.edit', $place) }}" class="pp-header__icon" aria-label="수정">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+    </a>
 </header>
 @endsection
 
 @section('content')
 <div style="padding:16px">
+    {{-- 이미지 갤러리 --}}
+    @if($place->images->count())
+    <div class="pp-show-images">
+        @foreach($place->images as $img)
+        <div class="pp-show-images__item">
+            <img src="{{ asset('storage/' . $img->path) }}" alt="{{ $place->name }}">
+        </div>
+        @endforeach
+    </div>
+    @endif
+
     <div class="pp-card">
         <div class="pp-card__top">
             <div class="pp-card__icon">{{ $place->category?->icon ?? '📌' }}</div>
@@ -30,11 +45,71 @@
         @if($place->memo)
             <div style="margin-top:12px;padding:12px;background:var(--pp-bg-soft);border-radius:10px;font-size:13.5px">{{ $place->memo }}</div>
         @endif
+        @if($place->visited_at)
+            <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)">방문일: {{ $place->visited_at->format('Y.m.d') }}</div>
+        @endif
     </div>
 
-    <form method="POST" action="{{ route('places.destroy', $place) }}" onsubmit="return confirm('삭제할까요?')" style="margin-top:16px">
-        @csrf @method('DELETE')
-        <button type="submit" class="pp-btn pp-btn--ghost">삭제</button>
-    </form>
+    {{-- 순서 변경 --}}
+    @if($place->category_id)
+    <div class="pp-reorder" id="reorderBox">
+        <div class="pp-reorder__label">카테고리 내 순서</div>
+        <div class="pp-reorder__btns">
+            <button type="button" class="pp-reorder__btn" id="reorderUp" aria-label="위로 올리기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m18 15-6-6-6 6"/></svg>
+                위로 올리기
+            </button>
+            <button type="button" class="pp-reorder__btn" id="reorderDown" aria-label="아래로 내리기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+                아래로 내리기
+            </button>
+        </div>
+    </div>
+    @endif
+
+    <div style="display:flex;gap:10px;margin-top:16px">
+        <a href="{{ route('places.edit', $place) }}" class="pp-btn pp-btn--outline" style="flex:1;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">수정</a>
+        <form method="POST" action="{{ route('places.destroy', $place) }}" onsubmit="return confirm('삭제할까요?')" style="flex:1">
+            @csrf @method('DELETE')
+            <button type="submit" class="pp-btn pp-btn--ghost" style="width:100%">삭제</button>
+        </form>
+    </div>
 </div>
+
+@push('scripts')
+<script>
+(function() {
+    const csrf = '{{ csrf_token() }}';
+    const placeId = {{ $place->id }};
+    const upBtn = document.getElementById('reorderUp');
+    const downBtn = document.getElementById('reorderDown');
+    if (!upBtn || !downBtn) return;
+
+    async function reorder(direction) {
+        const btn = direction === 'up' ? upBtn : downBtn;
+        btn.disabled = true;
+        try {
+            const r = await fetch(`/api/places/${placeId}/reorder`, {
+                method: 'PATCH',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ direction })
+            });
+            const j = await r.json();
+            if (j.ok) {
+                const label = document.querySelector('.pp-reorder__label');
+                label.textContent = direction === 'up' ? '위로 이동했어요' : '아래로 이동했어요';
+                label.style.color = '#2f6fed';
+                setTimeout(() => { label.textContent = '카테고리 내 순서'; label.style.color = ''; }, 1500);
+            } else if (j.error === 'already_at_edge') {
+                alert(direction === 'up' ? '이미 맨 위입니다.' : '이미 맨 아래입니다.');
+            }
+        } catch (e) { alert('네트워크 오류'); }
+        btn.disabled = false;
+    }
+
+    upBtn.addEventListener('click', () => reorder('up'));
+    downBtn.addEventListener('click', () => reorder('down'));
+})();
+</script>
+@endpush
 @endsection
