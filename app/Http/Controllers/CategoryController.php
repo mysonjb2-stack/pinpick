@@ -110,6 +110,41 @@ class CategoryController extends Controller
     }
 
     /**
+     * 카테고리 전체보기 (목록/지도)
+     */
+    public function show(Request $request, Category $category)
+    {
+        abort_unless($category->user_id === $request->user()->id, 403);
+
+        $view = in_array($request->input('view'), ['list', 'map']) ? $request->input('view') : 'list';
+        $status = in_array($request->input('status'), ['all', 'planned', 'visited']) ? $request->input('status') : 'all';
+        $sort = in_array($request->input('sort'), ['recent', 'name', 'visit']) ? $request->input('sort') : 'recent';
+
+        $q = Place::with('images')
+            ->where('user_id', $request->user()->id)
+            ->where('category_id', $category->id)
+            ->where('is_visible', true);
+
+        if ($status === 'planned') $q->where('status', 'planned');
+        if ($status === 'visited') $q->where('status', 'visited');
+
+        match ($sort) {
+            'name' => $q->orderBy('name'),
+            'visit' => $q->orderByDesc('visited_at')->orderByDesc('created_at'),
+            default => $q->orderByDesc('created_at'),
+        };
+
+        $places = $q->get();
+        $totalCount = Place::where('user_id', $request->user()->id)
+            ->where('category_id', $category->id)
+            ->where('is_visible', true)->count();
+
+        $naverClientId = config('services.naver_map.client_id');
+
+        return view('categories.show', compact('category', 'places', 'view', 'status', 'sort', 'totalCount', 'naverClientId'));
+    }
+
+    /**
      * 사용자가 자기 카테고리가 없으면 시스템 기본을 복제
      */
     public static function ensureUserCategories($user): void

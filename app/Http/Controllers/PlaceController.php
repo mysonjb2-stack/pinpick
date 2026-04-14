@@ -46,6 +46,16 @@ class PlaceController extends Controller
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
         $data['user_id'] = $request->user()->id;
 
+        // 좌표가 비어있으면 주소로 forward geocoding
+        if (empty($data['lat']) || empty($data['lng'])) {
+            $addr = $data['road_address'] ?? $data['address'] ?? '';
+            if ($addr !== '') {
+                [$lat, $lng] = $this->forwardGeocode($addr, $data['is_overseas']);
+                $data['lat'] = $lat;
+                $data['lng'] = $lng;
+            }
+        }
+
         $images = $request->file('images', []);
         unset($data['images']);
 
@@ -106,6 +116,16 @@ class PlaceController extends Controller
         ]);
 
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
+
+        if (empty($data['lat']) || empty($data['lng'])) {
+            $addr = $data['road_address'] ?? $data['address'] ?? '';
+            if ($addr !== '') {
+                [$lat, $lng] = $this->forwardGeocode($addr, $data['is_overseas']);
+                $data['lat'] = $lat;
+                $data['lng'] = $lng;
+            }
+        }
+
         $images = $request->file('images', []);
         unset($data['images']);
 
@@ -301,6 +321,47 @@ class PlaceController extends Controller
         ]);
     }
 
+    // 주소 → 좌표 (forward geocoding) 프록시
+    public function forwardGeocodeApi(Request $request)
+    {
+        $q = trim((string) $request->input('q', ''));
+        $isOverseas = filter_var($request->input('overseas'), FILTER_VALIDATE_BOOLEAN);
+        if ($q === '') return response()->json(['lat' => null, 'lng' => null]);
+
+        [$lat, $lng] = $this->forwardGeocode($q, $isOverseas);
+        return response()->json(['lat' => $lat, 'lng' => $lng]);
+    }
+
+    // 내부용: 주소 문자열을 좌표 [lat, lng]로 변환. 실패 시 [null, null].
+    private function forwardGeocode(string $address, bool $isOverseas): array
+    {
+        if ($isOverseas) {
+            $key = config('services.google_maps.api_key');
+            if (!$key) return [null, null];
+            $res = \Illuminate\Support\Facades\Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
+                'address' => $address,
+                'key' => $key,
+                'language' => 'ko',
+            ]);
+            $data = $res->json();
+            $loc = $data['results'][0]['geometry']['location'] ?? null;
+            if (!$loc) return [null, null];
+            return [(float) $loc['lat'], (float) $loc['lng']];
+        }
+
+        $key = config('services.kakao_local.rest_api_key');
+        if (!$key) return [null, null];
+        $res = \Illuminate\Support\Facades\Http::withHeaders([
+            'Authorization' => 'KakaoAK ' . $key,
+        ])->get('https://dapi.kakao.com/v2/local/search/address.json', [
+            'query' => $address,
+        ]);
+        $data = $res->json();
+        $doc = $data['documents'][0] ?? null;
+        if (!$doc) return [null, null];
+        return [(float) $doc['y'], (float) $doc['x']];
+    }
+
     // 역지오코딩 통합 프록시 (?provider=google|naver)
     public function reverseGeocode(Request $request)
     {
@@ -312,7 +373,28 @@ class PlaceController extends Controller
         if ($provider === 'google') {
             return $this->reverseGeocodeGoogle($lat, $lng);
         }
-        return $this->reverseGeocodeNaver($lat, $lng);
+        return $this->reverseGeocodeKakao($lat, $lng);
+    }
+
+    private function reverseGeocodeKakao($lat, $lng)
+    {
+        $key = config('services.kakao_local.rest_api_key');
+        if (!$key) return response()->json(['address' => '']);
+
+        $res = \Illuminate\Support\Facades\Http::withHeaders([
+            'Authorization' => 'KakaoAK ' . $key,
+        ])->get('https://dapi.kakao.com/v2/local/geo/coord2address.json', [
+            'x' => $lng,
+            'y' => $lat,
+        ]);
+
+        $data = $res->json();
+        $doc = $data['documents'][0] ?? null;
+        if (!$doc) return response()->json(['address' => '']);
+
+        $road = $doc['road_address']['address_name'] ?? '';
+        $jibun = $doc['address']['address_name'] ?? '';
+        return response()->json(['address' => $road ?: $jibun]);
     }
 
     private function reverseGeocodeGoogle($lat, $lng)

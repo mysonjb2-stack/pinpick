@@ -46,6 +46,9 @@ class HomeController extends Controller
 
         // 카테고리별 가장 최근 저장 장소 (홈 슬라이더용 — 필터 무관)
         $categoryLatest = collect();
+        $recentPlaces = collect();
+        $savedCount = 0;
+        $weekNewCount = 0;
         if ($request->user()) {
             $categoryLatest = Place::where('user_id', $request->user()->id)
                 ->where('is_visible', true)
@@ -54,12 +57,26 @@ class HomeController extends Controller
                 ->get()
                 ->groupBy('category_id')
                 ->map(fn($g) => $g->first());
+
+            $recentPlaces = Place::where('user_id', $request->user()->id)
+                ->where('is_visible', true)
+                ->with(['category', 'images'])
+                ->latest()
+                ->limit(20)
+                ->get();
+
+            $savedCount = Place::where('user_id', $request->user()->id)
+                ->where('is_visible', true)->count();
+            $weekNewCount = Place::where('user_id', $request->user()->id)
+                ->where('is_visible', true)
+                ->where('created_at', '>=', now()->subDays(7))->count();
         }
 
         $curation = $this->curation();
 
         return view('home.index', compact(
-            'categories', 'myPlaces', 'selectedCategory', 'q', 'curation', 'categoryLatest'
+            'categories', 'myPlaces', 'selectedCategory', 'q', 'curation', 'categoryLatest',
+            'recentPlaces', 'savedCount', 'weekNewCount'
         ));
     }
 

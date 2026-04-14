@@ -51,7 +51,12 @@
 
         <div class="pp-field">
             <label class="pp-label">주소</label>
-            <input class="pp-input" name="road_address" id="f_road" value="{{ $editMode ? $place->road_address : '' }}">
+            <div class="pp-addr-wrap">
+                <input class="pp-input pp-addr-input" name="road_address" id="f_road" placeholder="주소 또는 건물명 검색" value="{{ $editMode ? $place->road_address : '' }}" readonly>
+                <button type="button" class="pp-addr-search-btn" id="addrSearchBtn" aria-label="주소 검색">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                </button>
+            </div>
             <input type="hidden" name="address" id="f_addr" value="{{ $editMode ? $place->address : '' }}">
             <input type="hidden" name="lat" id="f_lat" value="{{ $editMode ? $place->lat : '' }}">
             <input type="hidden" name="lng" id="f_lng" value="{{ $editMode ? $place->lng : '' }}">
@@ -177,6 +182,17 @@
     </div>
 </div>
 
+{{-- 주소 검색 임베드 레이어 --}}
+<div id="addrSearchLayer" class="pp-addr-layer" style="display:none">
+    <div class="pp-addr-layer__panel">
+        <div class="pp-addr-layer__head">
+            <span class="pp-addr-layer__title">주소 검색</span>
+            <button type="button" class="pp-addr-layer__close" id="addrSearchClose" aria-label="닫기">&times;</button>
+        </div>
+        <div class="pp-addr-layer__body" id="addrSearchLayerInner"></div>
+    </div>
+</div>
+
 {{-- 카테고리 관리 레이어 --}}
 <div class="pp-catmgr" id="catmgrLayer" hidden>
     <div class="pp-catmgr__backdrop" data-catmgr-close></div>
@@ -199,6 +215,7 @@
 @if($naverClientId)
 <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={{ $naverClientId }}&submodules=geocoder"></script>
 @endif
+<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 @if($googleMapsKey)
 <script>
 var _gmReady = new Promise(function(resolve) { window.__gmcb = resolve; });
@@ -475,6 +492,73 @@ function pickPlace(d) {
 document.getElementById('slManual').addEventListener('click', () => { closeSL(); document.getElementById('f_name').focus(); });
 
 // =========================================
+// 주소 직접입력 / 다음 우편번호 검색
+// =========================================
+const fRoad = document.getElementById('f_road');
+const fAddr = document.getElementById('f_addr');
+const fLat = document.getElementById('f_lat');
+const fLng = document.getElementById('f_lng');
+const fKpid = document.getElementById('f_kpid');
+
+let addrLayerOpen = false;
+function openAddressSearch() {
+    if (currentRegion === 'overseas') {
+        alert('해외 주소 검색은 지원하지 않아요. 상단 "장소 검색"을 이용해주세요.');
+        return;
+    }
+    if (typeof daum === 'undefined' || !daum.Postcode) {
+        alert('주소 검색을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+        return;
+    }
+    if (addrLayerOpen) return;
+    addrLayerOpen = true;
+
+    const wrap = document.getElementById('addrSearchLayer');
+    const inner = document.getElementById('addrSearchLayerInner');
+    inner.innerHTML = '';
+    wrap.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    new daum.Postcode({
+        oncomplete: function (data) {
+            const road = data.roadAddress || '';
+            const jibun = data.jibunAddress || data.autoJibunAddress || '';
+            const addr = road || jibun;
+            fRoad.value = road || jibun;
+            fAddr.value = jibun;
+            fKpid.value = '';
+            fLat.value = '';
+            fLng.value = '';
+            fetch('/api/geocode/forward?q=' + encodeURIComponent(addr) + '&overseas=0')
+                .then(r => r.json())
+                .then(d => {
+                    if (d.lat && d.lng) {
+                        fLat.value = d.lat;
+                        fLng.value = d.lng;
+                    }
+                })
+                .catch(() => {});
+            closeAddressSearch();
+        },
+        width: '100%',
+        height: '100%',
+    }).embed(inner);
+}
+function closeAddressSearch() {
+    document.getElementById('addrSearchLayer').style.display = 'none';
+    document.body.style.overflow = '';
+    addrLayerOpen = false;
+    fRoad.blur();
+}
+document.getElementById('addrSearchBtn').addEventListener('click', openAddressSearch);
+fRoad.addEventListener('mousedown', (e) => { e.preventDefault(); openAddressSearch(); });
+fRoad.style.cursor = 'pointer';
+document.getElementById('addrSearchClose').addEventListener('click', closeAddressSearch);
+document.getElementById('addrSearchLayer').addEventListener('click', (e) => {
+    if (e.target.id === 'addrSearchLayer') closeAddressSearch();
+});
+
+// =========================================
 // 3) 지도에서 찍기 탭
 // =========================================
 let mappinMap = null;      // 네이버 (국내)
@@ -482,20 +566,21 @@ let mappinInited = false;
 let gMappinMap = null;     // 구글 (해외)
 let gMappinInited = false;
 let geoTimer = null;
+let mappinMarkers = [];    // 네이버 검색 결과 마커
+let gMappinMarkers = [];   // 구글 검색 결과 마커
 
-// 검색창 키워드로 첫 결과 좌표를 가져오는 헬퍼
-async function getQueryLocation() {
+// 검색창 키워드로 검색 결과 전체를 가져오는 헬퍼
+async function getQueryResults() {
     const q = slInput.value.trim();
-    if (q.length < 2) return null;
+    if (q.length < 2) return [];
     const isOverseas = currentRegion === 'overseas';
     const endpoint = isOverseas ? '/api/search/overseas' : '/api/search';
     try {
         const r = await fetch(endpoint + '?q=' + encodeURIComponent(q));
         const data = await r.json();
-        const docs = data.documents || [];
-        if (docs.length) return { lat: +docs[0].y, lng: +docs[0].x };
+        return (data.documents || []).filter(d => d.x && d.y);
     } catch (e) {}
-    return null;
+    return [];
 }
 
 async function switchMappinMap() {
@@ -503,29 +588,110 @@ async function switchMappinMap() {
     document.getElementById('slMappinMap').style.display = isOverseas ? 'none' : 'block';
     document.getElementById('slMappinMapGoogle').style.display = isOverseas ? 'block' : 'none';
 
-    // 키워드가 있으면 검색 좌표를 먼저 확보
-    const loc = await getQueryLocation();
+    const docs = await getQueryResults();
+    const loc = docs.length ? { lat: +docs[0].y, lng: +docs[0].x } : null;
 
     if (isOverseas) {
         await initGoogleMappinMap(loc);
+        if (gMappinMap) renderGMappinMarkers(docs);
     } else {
         initNaverMappinMap(loc);
+        if (mappinMap) renderNaverMappinMarkers(docs);
     }
+}
 
-    // 이미 초기화된 지도에 검색 좌표로 이동
-    if (loc) {
-        if (isOverseas && gMappinMap) {
-            gMappinMap.setCenter({ lat: loc.lat, lng: loc.lng });
-            gMappinMap.setZoom(15);
-        } else if (!isOverseas && mappinMap) {
-            mappinMap.setCenter(new naver.maps.LatLng(loc.lat, loc.lng));
-            mappinMap.setZoom(15);
-        }
+function clearNaverMarkers() {
+    mappinMarkers.forEach(m => m.setMap(null));
+    mappinMarkers = [];
+}
+
+function buildPinpickMarkerHtml(name) {
+    const label = escapeHtml(name || '');
+    return `
+        <div class="pp-mappin">
+            <div class="pp-mappin__bubble">
+                <span class="pp-mappin__pin"></span>
+                <span class="pp-mappin__label">${label}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderNaverMappinMarkers(docs) {
+    clearNaverMarkers();
+    if (!docs.length) return;
+    const bounds = new naver.maps.LatLngBounds();
+    docs.forEach(d => {
+        const pos = new naver.maps.LatLng(+d.y, +d.x);
+        const marker = new naver.maps.Marker({
+            position: pos,
+            map: mappinMap,
+            title: d.place_name || '',
+            icon: {
+                content: buildPinpickMarkerHtml(d.place_name),
+                anchor: new naver.maps.Point(0, 0),
+            },
+            zIndex: 100,
+        });
+        naver.maps.Event.addListener(marker, 'click', () => pickPlace(d));
+        mappinMarkers.push(marker);
+        bounds.extend(pos);
+    });
+    if (docs.length === 1) {
+        mappinMap.setCenter(new naver.maps.LatLng(+docs[0].y, +docs[0].x));
+        mappinMap.setZoom(16);
+    } else {
+        mappinMap.fitBounds(bounds);
+    }
+}
+
+function clearGMarkers() {
+    gMappinMarkers.forEach(m => m.setMap(null));
+    gMappinMarkers = [];
+}
+
+const PP_PIN_SVG = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.25"/></filter></defs><path filter="url(#s)" d="M16 2C8.27 2 2 8.27 2 16c0 9.5 14 24 14 24s14-14.5 14-24c0-7.73-6.27-14-14-14z" fill="#FF3D77" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="#fff"/></svg>`);
+
+function renderGMappinMarkers(docs) {
+    clearGMarkers();
+    if (!docs.length) return;
+    const bounds = new google.maps.LatLngBounds();
+    docs.forEach(d => {
+        const pos = { lat: +d.y, lng: +d.x };
+        const marker = new google.maps.Marker({
+            position: pos, map: gMappinMap, title: d.place_name || '',
+            icon: {
+                url: 'data:image/svg+xml;charset=UTF-8,' + PP_PIN_SVG,
+                scaledSize: new google.maps.Size(32, 42),
+                anchor: new google.maps.Point(16, 42),
+                labelOrigin: new google.maps.Point(16, -8),
+            },
+            label: {
+                text: d.place_name || '',
+                color: '#1a1a1a',
+                fontSize: '12px',
+                fontWeight: '600',
+                className: 'pp-gmarker-label',
+            },
+        });
+        marker.addListener('click', () => pickPlace(d));
+        gMappinMarkers.push(marker);
+        bounds.extend(pos);
+    });
+    if (docs.length === 1) {
+        gMappinMap.setCenter({ lat: +docs[0].y, lng: +docs[0].x });
+        gMappinMap.setZoom(16);
+    } else {
+        gMappinMap.fitBounds(bounds);
     }
 }
 
 function initNaverMappinMap(initialLoc) {
-    if (mappinInited || typeof naver === 'undefined') return;
+    if (typeof naver === 'undefined') return;
+    if (mappinInited) {
+        if (mappinMap) setTimeout(() => naver.maps.Event.trigger(mappinMap, 'resize'), 50);
+        return;
+    }
     mappinInited = true;
 
     const center = initialLoc

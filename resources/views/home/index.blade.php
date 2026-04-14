@@ -31,41 +31,76 @@
 @section('content')
 <div class="yg-content">
 
-    {{-- 히어로 카드 + 카테고리 가로 슬라이더 --}}
-    <div class="yg-hero">
-        <div class="yg-hero__head">
-            <div>
+    {{-- 상단 히어로 카드 (요약 + 카테고리 탭 + 최근 장소) --}}
+    <div class="pp-hero2">
+        <div class="pp-hero2__head">
+            <div class="pp-hero2__titles">
                 @auth
-                    <div class="yg-hero__title">{{ auth()->user()->name }}님의 지도</div>
-                    <div class="yg-hero__desc">카테고리별로 저장한 장소를 한눈에 모아보세요</div>
+                    <h2 class="pp-hero2__title">{{ auth()->user()->name }}님의 지도</h2>
                 @else
-                    <div class="yg-hero__title">나만의 지도를 시작해보세요</div>
-                    <div class="yg-hero__desc">로그인 없이 5개까지 저장 가능.<br>저장한 장소는 로그인하면 그대로 이어집니다.</div>
+                    <h2 class="pp-hero2__title">나만의 지도를 시작해보세요</h2>
                 @endauth
             </div>
+            @auth
+            <div class="pp-hero2__stats">
+                <span class="pp-hero2__stat">저장 {{ $savedCount }}</span>
+                <span class="pp-hero2__stat-dot">·</span>
+                <span class="pp-hero2__stat">카테고리 {{ $categories->count() }}</span>
+            </div>
+            @endauth
         </div>
-        <div class="yg-catslide">
+
+        <div class="pp-hero2__tabs" id="ppHeroTabs">
+            <button type="button" class="pp-hero2__tab is-active" data-cat="all">전체</button>
             @foreach($categories as $c)
-                @php $latest = ($categoryLatest ?? collect())->get($c->id); @endphp
-                @if($latest)
-                    <a href="{{ route('map', ['category' => $c->id]) }}" class="yg-catcard2 yg-catcard2--filled">
-                        <div class="yg-catcard2__thumb"@if($latest->images->first()) style="background-image:url('{{ asset('storage/' . $latest->images->first()->path) }}');background-size:cover;background-position:center"@endif>
-                            @unless($latest->images->first())<span style="font-size:18px">{{ $c->icon ?? '📌' }}</span>@endunless
-                        </div>
-                        <div class="yg-catcard2__body">
-                            <div class="yg-catcard2__cat">{{ $c->name }}</div>
-                            <div class="yg-catcard2__name">{{ Str::limit($latest->name, 12) }}</div>
-                            <div class="yg-catcard2__meta">{{ Str::limit($latest->road_address ?: $latest->address ?: '주소 없음', 16) }}</div>
-                        </div>
-                    </a>
-                @else
-                    <a href="{{ route('places.create', ['category' => $c->id]) }}" class="yg-catcard2 yg-catcard2--empty">
-                        <div class="yg-catcard2__plus">＋</div>
-                        <div class="yg-catcard2__cat">{{ $c->name }}</div>
-                        <div class="yg-catcard2__meta">새 장소 저장하기</div>
-                    </a>
-                @endif
+                <button type="button" class="pp-hero2__tab" data-cat="{{ $c->id }}">{{ $c->name }}</button>
             @endforeach
+        </div>
+
+        <div class="pp-hero2__section-head">
+            <h3 class="pp-hero2__section-title">최근 등록된 장소</h3>
+            <a href="{{ route('map') }}" class="pp-hero2__more">전체보기 ›</a>
+        </div>
+
+        <div class="pp-hero2__slide" id="ppHeroSlide">
+            @auth
+                @php $emptyCreateUrl = route('places.create'); @endphp
+                @forelse($recentPlaces as $p)
+                    <a href="{{ route('places.show', $p) }}" class="pp-rspot" data-cat="{{ $p->category_id }}">
+                        <div class="pp-rspot__thumb"@if($p->images->first()) style="background-image:url('{{ asset('storage/' . $p->images->first()->path) }}');background-size:cover;background-position:center"@endif>
+                            @unless($p->images->first())<span class="pp-rspot__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
+                            <span class="pp-rspot__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                        </div>
+                        <div class="pp-rspot__body">
+                            <div class="pp-rspot__name">{{ $p->name }}</div>
+                            <div class="pp-rspot__meta pp-rspot__meta--all">
+                                {{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit(preg_replace('/^(\S+\s+\S+).*/', '$1', $p->road_address ?: $p->address), 10) }}@endif
+                            </div>
+                            <div class="pp-rspot__sub">
+                                @if($p->road_address || $p->address)
+                                    {{ Str::limit($p->road_address ?: $p->address, 18) }}
+                                @else
+                                    최근 저장 {{ $p->created_at->diffForHumans(null, true) }} 전
+                                @endif
+                            </div>
+                        </div>
+                    </a>
+                @empty
+                    <div class="pp-rspot pp-rspot--empty">
+                        <div class="pp-rspot__plus">＋</div>
+                        <div class="pp-rspot__empty-title">첫 장소를 추가해보세요</div>
+                        <p class="pp-rspot__empty-desc">맛집, 카페, 여행지처럼 다시 찾고<br>싶은 장소를 저장하면 여기서<br>바로 꺼내볼 수 있어요.</p>
+                        <a href="{{ $emptyCreateUrl }}" class="pp-rspot__empty-btn">장소 추가하기</a>
+                    </div>
+                @endforelse
+            @else
+                <div class="pp-rspot pp-rspot--empty">
+                    <div class="pp-rspot__plus">＋</div>
+                    <div class="pp-rspot__empty-title">첫 장소를 추가해보세요</div>
+                    <p class="pp-rspot__empty-desc">맛집, 카페, 여행지처럼 다시 찾고<br>싶은 장소를 저장하면 여기서<br>바로 꺼내볼 수 있어요.</p>
+                    <a href="{{ route('places.create') }}" class="pp-rspot__empty-btn">장소 추가하기</a>
+                </div>
+            @endauth
         </div>
     </div>
 
@@ -145,7 +180,10 @@
         <div class="yg-catorder-panel" id="catOrderPanel" hidden>
             <div class="yg-catorder-panel__head">
                 <span class="yg-catorder-panel__title">카테고리 관리</span>
-                <button type="button" class="yg-catorder-panel__done" id="catOrderDone">완료</button>
+                <div class="yg-catorder-panel__actions">
+                    <button type="button" class="yg-catorder-panel__cancel" id="catOrderCancel">취소</button>
+                    <button type="button" class="yg-catorder-panel__done" id="catOrderDone">저장</button>
+                </div>
             </div>
             <ul class="yg-catorder-panel__list" id="catOrderList"></ul>
             <button type="button" class="yg-catorder-panel__add" id="catOrderAdd">＋ 새 카테고리 추가</button>
@@ -157,14 +195,17 @@
             <section class="yg-mycat" data-cat-id="{{ $c->id }}" data-sort="{{ $c->sort_order }}">
                 <div class="yg-mycat__head">
                     <h3 class="yg-mycat__title"><span class="yg-mycat__catname">{{ $c->name }}</span></h3>
-                    <button type="button" class="yg-mycat__edit" aria-label="카테고리 이름 편집" data-cat-id="{{ $c->id }}" data-cat-name="{{ $c->name }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-                        <span>편집</span>
-                    </button>
+                    @auth
+                    <a href="{{ route('categories.show', $c) }}" class="yg-mycat__more">
+                        <span>전체보기</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="m9 18 6-6-6-6"/></svg>
+                    </a>
+                    @endauth
                 </div>
                 <div class="yg-mycat__list">
                     @auth
-                        @foreach(($authPlacesByCat[$c->id] ?? collect()) as $p)
+                        @php $catPlaces = $authPlacesByCat[$c->id] ?? collect(); @endphp
+                        @foreach($catPlaces as $p)
                             <a href="{{ route('places.show', $p) }}" class="yg-myspot">
                                 <div class="yg-myspot__thumb"@if($p->images->first()) style="background-image:url('{{ asset('storage/' . $p->images->first()->path) }}');background-size:cover;background-position:center"@endif>
                                     <span class="yg-myspot__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
@@ -176,12 +217,19 @@
                                 </div>
                             </a>
                         @endforeach
+                        @if($catPlaces->isEmpty())
+                            <a href="{{ route('places.create', ['category' => $c->id]) }}" class="yg-myspot yg-myspot--add">
+                                <div class="yg-myspot__plus">＋</div>
+                                <div class="yg-myspot__addtxt">첫 장소를 추가해보세요</div>
+                            </a>
+                        @endif
+                    @else
+                        {{-- 게스트 카드는 JS가 여기 앞에 삽입 --}}
+                        <a href="{{ route('places.create', ['category' => $c->id]) }}" class="yg-myspot yg-myspot--add" data-guest-add>
+                            <div class="yg-myspot__plus">＋</div>
+                            <div class="yg-myspot__addtxt">첫 장소를 추가해보세요</div>
+                        </a>
                     @endauth
-                    {{-- 게스트 카드는 JS가 여기 앞에 삽입 --}}
-                    <a href="{{ route('places.create', ['category' => $c->id]) }}" class="yg-myspot yg-myspot--add">
-                        <div class="yg-myspot__plus">＋</div>
-                        <div class="yg-myspot__addtxt">장소 추가하기</div>
-                    </a>
                 </div>
             </section>
         @endforeach
@@ -215,13 +263,60 @@
 
 @push('scripts')
 <script>
-document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const target = btn.dataset.pane;
+(function() {
+    const STORAGE_KEY = 'pp_home_pane';
+    function setPane(target) {
         document.querySelectorAll('.yg-segtab__btn').forEach(b => b.classList.toggle('is-active', b.dataset.pane === target));
         document.querySelectorAll('.yg-pane').forEach(p => p.classList.toggle('is-active', p.dataset.pane === target));
+        const tip = document.getElementById('ppFabTip');
+        if (tip) tip.classList.toggle('is-visible', target === 'mine');
+    }
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === 'people' || saved === 'mine') setPane(saved);
+
+    // 히어로 카테고리 탭 필터
+    const heroTabs = document.getElementById('ppHeroTabs');
+    const heroSlide = document.getElementById('ppHeroSlide');
+    if (heroTabs && heroSlide) {
+        const createUrlBase = @json(route('places.create'));
+        let emptyEl = null;
+        function applyCatFilter(cat, catName) {
+            let visibleCount = 0;
+            heroSlide.querySelectorAll('.pp-rspot:not(.pp-rspot--empty-filter)').forEach(el => {
+                const show = cat === 'all' || el.dataset.cat === cat;
+                el.style.display = show ? '' : 'none';
+                el.classList.toggle('is-all', cat === 'all');
+                if (show) visibleCount++;
+            });
+            if (emptyEl) { emptyEl.remove(); emptyEl = null; }
+            if (visibleCount === 0 && cat !== 'all') {
+                emptyEl = document.createElement('div');
+                emptyEl.className = 'pp-rspot pp-rspot--empty pp-rspot--empty-filter';
+                const href = createUrlBase + '?category=' + encodeURIComponent(cat);
+                emptyEl.innerHTML = '<div class="pp-rspot__plus">＋</div>'
+                    + '<div class="pp-rspot__empty-title">첫 장소를 추가해보세요</div>'
+                    + '<p class="pp-rspot__empty-desc">맛집, 카페, 여행지처럼 다시 찾고<br>싶은 장소를 저장하면 여기서<br>바로 꺼내볼 수 있어요.</p>'
+                    + '<a href="' + href + '" class="pp-rspot__empty-btn">장소 추가하기</a>';
+                heroSlide.appendChild(emptyEl);
+            }
+            heroSlide.scrollLeft = 0;
+        }
+        heroTabs.addEventListener('click', (e) => {
+            const btn = e.target.closest('.pp-hero2__tab');
+            if (!btn) return;
+            heroTabs.querySelectorAll('.pp-hero2__tab').forEach(b => b.classList.toggle('is-active', b === btn));
+            applyCatFilter(btn.dataset.cat, btn.textContent.trim());
+        });
+    }
+
+    document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.pane;
+            setPane(target);
+            try { localStorage.setItem(STORAGE_KEY, target); } catch(e) {}
+        });
     });
-});
+})();
 
 // ── 카테고리 관리 (순서 + 이름편집 + 추가 + 삭제) ──
 (function() {
@@ -229,17 +324,6 @@ document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
     const isGuest = {{ auth()->check() ? 'false' : 'true' }};
 
     function escHtml(s) { return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-    // 각 카테고리 섹션의 "편집" 버튼 → 패널 열기로 연결
-    document.querySelectorAll('.yg-mycat__edit').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (isGuest) {
-                if (confirm('카테고리 편집은 로그인 후 사용할 수 있어요. 로그인하시겠어요?')) location.href = '{{ route('login') }}';
-                return;
-            }
-            openCatPanel();
-        });
-    });
 
     if (isGuest) return;
     const orderPanel = document.getElementById('catOrderPanel');
@@ -249,10 +333,14 @@ document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
     // 상단 버튼으로 열기
     document.getElementById('catOrderEditBtn').addEventListener('click', openCatPanel);
 
+    // 취소 버튼 — 저장 없이 패널 닫기
+    document.getElementById('catOrderCancel').addEventListener('click', () => {
+        orderPanel.hidden = true;
+    });
+
     function openCatPanel() {
         orderPanel.hidden = false;
         renderCatOrderList();
-        orderPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // 완료 버튼
@@ -405,6 +493,7 @@ document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
         if (!items.length) return;
         const listEl = sec.querySelector('.yg-mycat__list');
         const addBtn = listEl.querySelector('.yg-myspot--add');
+        if (addBtn) addBtn.remove();
         items.forEach(p => {
             const card = document.createElement('div');
             card.className = 'yg-myspot';
@@ -418,7 +507,7 @@ document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
                     ${p.memo ? `<div class="yg-myspot__memo">${escapeHtml(p.memo)}</div>` : ''}
                 </div>
             `;
-            listEl.insertBefore(card, addBtn);
+            listEl.appendChild(card);
         });
     });
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

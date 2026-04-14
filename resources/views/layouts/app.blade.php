@@ -17,11 +17,21 @@
     @endif
 
     @if(session('success'))
-        <div class="pp-flash">{{ session('success') }}</div>
+        <div class="pp-flash" data-autodismiss>{{ session('success') }}</div>
     @endif
     @if(session('error'))
-        <div class="pp-flash pp-flash--error">{{ session('error') }}</div>
+        <div class="pp-flash pp-flash--error" data-autodismiss>{{ session('error') }}</div>
     @endif
+    <script>
+        document.querySelectorAll('.pp-flash[data-autodismiss]').forEach(el => {
+            setTimeout(() => {
+                el.style.transition = 'opacity .4s, transform .4s';
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(-6px)';
+                setTimeout(() => el.remove(), 450);
+            }, 3000);
+        });
+    </script>
 
     @yield('content')
 

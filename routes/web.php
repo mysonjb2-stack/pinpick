@@ -33,6 +33,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/api/place-images/{placeImage}', [PlaceController::class, 'destroyImage'])->name('api.place-images.destroy');
     Route::patch('/api/places/{place}/reorder', [PlaceController::class, 'reorder'])->name('api.places.reorder');
 
+    // 카테고리 전체보기
+    Route::get('/categories/{category}', [CategoryController::class, 'show'])->name('categories.show');
+
     // 사용자 카테고리 관리
     Route::get('/api/categories', [CategoryController::class, 'index'])->name('api.categories.index');
     Route::post('/api/categories', [CategoryController::class, 'store'])->name('api.categories.store');
@@ -47,3 +50,4 @@ Route::get('/api/search/overseas', [PlaceController::class, 'searchOverseas'])->
 Route::get('/api/search', [PlaceController::class, 'search'])->name('api.search');
 Route::get('/api/place/detail', [PlaceController::class, 'placeDetail'])->name('api.place.detail');
 Route::get('/api/geocode/reverse', [PlaceController::class, 'reverseGeocode'])->name('api.geocode.reverse');
+Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi'])->name('api.geocode.forward');

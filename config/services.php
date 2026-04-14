@@ -42,6 +42,7 @@ return [
 
     'kakao_local' => [
         'rest_api_key' => env('KAKAO_REST_API_KEY'),
+        'js_key' => env('KAKAO_JS_KEY'),
     ],
 
     'naver_map' => [

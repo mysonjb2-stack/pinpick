@@ -50,6 +50,32 @@
         @endif
     </div>
 
+    {{-- 액션 버튼 (전화/길찾기) --}}
+    @php
+        $hasCoord = $place->lat && $place->lng;
+        $addrText = $place->road_address ?: $place->address;
+    @endphp
+    @if($place->phone || $hasCoord)
+    <div class="pp-actions">
+        @if($place->phone)
+            <a href="tel:{{ preg_replace('/[^0-9+]/', '', $place->phone) }}" class="pp-actions__btn pp-actions__btn--call">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+                전화 예약
+            </a>
+        @endif
+        @if($hasCoord)
+            <button type="button" onclick="ppOpenRoute('kakao', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-actions__btn pp-actions__btn--kakao">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                카카오 길찾기
+            </button>
+            <button type="button" onclick="ppOpenRoute('naver', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-actions__btn pp-actions__btn--naver">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                네이버 길찾기
+            </button>
+        @endif
+    </div>
+    @endif
+
     {{-- 순서 변경 --}}
     @if($place->category_id)
     <div class="pp-reorder" id="reorderBox">
@@ -78,6 +104,32 @@
 
 @push('scripts')
 <script>
+// 길찾기 (내 위치 → 목적지). 모바일: 앱스킴 → 1초 내 앱 미실행 시 웹 폴백. 데스크톱: 바로 웹.
+window.ppOpenRoute = function(provider, lat, lng, name) {
+    const ua = navigator.userAgent || '';
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
+    const encName = encodeURIComponent(name);
+    let webUrl, appUrl;
+
+    if (provider === 'kakao') {
+        appUrl = `kakaomap://route?ep=${lat},${lng}&by=CAR`;
+        webUrl = `https://map.kakao.com/link/to/${encName},${lat},${lng}`;
+    } else {
+        appUrl = `nmap://route/car?dlat=${lat}&dlng=${lng}&dname=${encName}&appname=net.mypinpick`;
+        webUrl = `https://map.naver.com/p/directions/-/${lng},${lat},${encName},,PLACE_POI/-/car`;
+    }
+
+    if (isMobile) {
+        let t = Date.now();
+        window.location.href = appUrl;
+        setTimeout(() => {
+            if (Date.now() - t < 1600 && !document.hidden) window.open(webUrl, '_blank');
+        }, 1200);
+    } else {
+        window.open(webUrl, '_blank');
+    }
+};
+
 (function() {
     const csrf = '{{ csrf_token() }}';
     const placeId = {{ $place->id }};

@@ -9,6 +9,7 @@
         <span>탐색</span>
     </a>
     <div class="pp-nav__fab">
+        <span class="pp-nav__fab-tip" id="ppFabTip">장소 추가하기</span>
         <a href="{{ route('places.create') }}" class="pp-nav__fab-inner" aria-label="장소 추가">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
         </a>
