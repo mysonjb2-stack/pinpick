@@ -60,9 +60,6 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
                     카테고리 추가/수정
                 </button>
-                <a href="{{ route('places.create') }}" class="pp-hero2__quickadd" aria-label="장소 추가">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                </a>
             </div>
             @endauth
         </div>
@@ -258,14 +255,6 @@
         @else
         <div class="pp-mine-grid" id="ppMineGrid"></div>
         @endauth
-    </div>
-
-    {{-- 프로모 배너 --}}
-    <div class="yg-promo">
-        <div>
-            <div class="yg-promo__title">나만의 지도를 시작해보세요</div>
-            <div class="yg-promo__big">로그인 없이도<br>5개까지 저장 OK</div>
-        </div>
     </div>
 
     {{-- 푸터 사업자정보 --}}

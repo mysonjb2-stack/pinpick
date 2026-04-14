@@ -1873,8 +1873,8 @@ body { background: #f8f5f2; }
 /* ── 푸터 사업자정보 ── */
 .pp-footer {
   margin-top: 24px;
-  padding: 28px 20px calc(var(--pp-nav-h) + 20px);
-  background: #f5ede3;
+  padding: 28px 4px calc(var(--pp-nav-h) + 20px);
+  background: transparent;
   text-align: left;
   font-size: 11px;
   color: #999;
@@ -2319,6 +2319,130 @@ body { background: #f8f5f2; }
   grid-template-columns: 1fr 1fr;
 }
 
+/* 전화 예약 단독 버튼 */
+.pp-callbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid #2b211e;
+  background: #2b211e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.pp-callbtn:active { transform: scale(0.99); }
+
+/* 길찾기 버튼 (카드 스타일) */
+.pp-dirs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pp-dirs--solo { grid-template-columns: 1fr; }
+.pp-dirs__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--pp-line, #eee1d5);
+  background: #fff;
+  color: #2b211e;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pp-dirs__btn:active { transform: scale(0.99); }
+.pp-dirs__ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  flex: 0 0 auto;
+}
+.pp-dirs__ico--naver { background: #03c75a; }
+.pp-dirs__ico--kakao { background: #fee500; color: #3c1e1e; }
+.pp-dirs__ico--google { background: #4285f4; }
+.pp-dirs__lab { line-height: 1.2; }
+
+/* 위치 카드 (지도 + 길찾기 + 주소복사) */
+.pp-loc {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--pp-line, #eee1d5);
+}
+.pp-loc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.pp-loc__title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #2b211e;
+}
+.pp-loc__addr {
+  font-size: 13px;
+  color: #2b211e;
+  line-height: 1.45;
+  margin-bottom: 10px;
+  white-space: pre-line;
+}
+.pp-loc__map {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--pp-bg-soft, #f8f5f2);
+  margin-bottom: 10px;
+}
+.pp-loc__map-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pp-loc .pp-dirs { margin-top: 0; }
+.pp-loc__copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--pp-line, #eee1d5);
+  background: #fff;
+  color: #2b211e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pp-loc__copy:active { transform: scale(0.99); }
+.pp-loc__copy.is-done {
+  border-color: #2b211e;
+  background: #2b211e;
+  color: #fff;
+}
+
 /* ===== FAB 툴팁 (장소 추가하기) ===== */
 .pp-nav__fab { position: relative; }
 .pp-nav__fab-tip {
@@ -2584,9 +2708,13 @@ body { background: #f8f5f2; }
 .pp-hero2__section-head,
 .pp-hero2__slide {
     transition: opacity .3s ease, max-height .35s ease, margin .3s ease, padding .3s ease;
-    overflow: hidden;
 }
-.pp-hero2__slide { max-height: 420px; }
+.pp-hero2__section-head { overflow: hidden; }
+.pp-hero2__slide {
+    max-height: 420px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
 .pp-hero2--compact .pp-hero2__section-head,
 .pp-hero2--compact .pp-hero2__slide {
     opacity: 0;
@@ -2603,7 +2731,6 @@ body { background: #f8f5f2; }
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
-    padding: 0 16px;
     margin-top: 14px;
 }
 .pp-mine-grid__item {
@@ -2717,7 +2844,7 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 16px 6px;
+    padding: 18px 0 6px;
 }
 .pp-mine-sechead__title {
     font-size: 16px;

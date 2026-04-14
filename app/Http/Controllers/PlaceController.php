@@ -81,7 +81,9 @@ class PlaceController extends Controller
     {
         abort_unless($place->user_id === request()->user()?->id, 403);
         $place->load('images');
-        return view('places.show', compact('place'));
+        $naverClientId = config('services.naver_map.client_id');
+        $googleMapsKey = config('services.google_maps.api_key');
+        return view('places.show', compact('place', 'naverClientId', 'googleMapsKey'));
     }
 
     public function edit(Place $place, Request $request)

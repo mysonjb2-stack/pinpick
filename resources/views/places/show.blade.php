@@ -56,30 +56,60 @@
         @endif
     </div>
 
-    {{-- 액션 버튼 (전화/길찾기) --}}
+    {{-- 전화 예약 --}}
     @php
         $hasCoord = $place->lat && $place->lng;
-        $addrText = $place->road_address ?: $place->address;
     @endphp
-    @if($place->phone || $hasCoord)
-    <div class="pp-actions">
-        @if($place->phone)
-            <a href="tel:{{ preg_replace('/[^0-9+]/', '', $place->phone) }}" class="pp-actions__btn pp-actions__btn--call">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
-                전화 예약
-            </a>
+    @if($place->phone)
+    <a href="tel:{{ preg_replace('/[^0-9+]/', '', $place->phone) }}" class="pp-callbtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+        전화 예약
+    </a>
+    @endif
+
+    {{-- 위치 (지도 + 길찾기 + 주소복사) --}}
+    @if($hasCoord)
+    @php $addrText = $place->road_address ?: ($place->address ?: ''); @endphp
+    <section class="pp-loc">
+        <div class="pp-loc__head">
+            <div class="pp-loc__title">위치</div>
+        </div>
+        @if($addrText)
+        <div class="pp-loc__addr">{{ $addrText }}</div>
         @endif
-        @if($hasCoord)
-            <button type="button" onclick="ppOpenRoute('kakao', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-actions__btn pp-actions__btn--kakao">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                카카오 길찾기
-            </button>
-            <button type="button" onclick="ppOpenRoute('naver', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-actions__btn pp-actions__btn--naver">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                네이버 길찾기
-            </button>
+        <div class="pp-loc__map" id="ppLocMap"
+             data-lat="{{ $place->lat }}"
+             data-lng="{{ $place->lng }}"
+             data-name="{{ $place->name }}"
+             data-overseas="{{ $place->is_overseas ? '1' : '0' }}">
+            @if($place->thumbnail)
+                <img src="{{ asset('storage/' . $place->thumbnail) }}" alt="{{ $place->name }} 위치" class="pp-loc__map-fallback">
+            @endif
+        </div>
+        <div class="pp-dirs {{ $place->is_overseas ? 'pp-dirs--solo' : '' }}">
+            @if($place->is_overseas)
+                <button type="button" onclick="ppOpenRoute('google', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-dirs__btn">
+                    <span class="pp-dirs__ico pp-dirs__ico--google">G</span>
+                    <span class="pp-dirs__lab">구글지도 길찾기</span>
+                </button>
+            @else
+                <button type="button" onclick="ppOpenRoute('naver', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-dirs__btn">
+                    <span class="pp-dirs__ico pp-dirs__ico--naver">N</span>
+                    <span class="pp-dirs__lab">네이버지도 길찾기</span>
+                </button>
+                <button type="button" onclick="ppOpenRoute('kakao', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-dirs__btn">
+                    <span class="pp-dirs__ico pp-dirs__ico--kakao">K</span>
+                    <span class="pp-dirs__lab">카카오맵 길찾기</span>
+                </button>
+            @endif
+        </div>
+        @if($addrText)
+        <button type="button" class="pp-loc__copy" data-addr="{{ $addrText }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            <span>주소복사</span>
+        </button>
         @endif
-    </div>
+    </section>
     @endif
 
     {{-- 순서 변경 --}}
@@ -109,6 +139,17 @@
 </div>
 
 @push('scripts')
+@if($hasCoord ?? false)
+    @if($place->is_overseas)
+        @if($googleMapsKey ?? null)
+        <script src="https://maps.googleapis.com/maps/api/js?key={{ $googleMapsKey }}&callback=ppInitLocMap" async defer></script>
+        @endif
+    @else
+        @if($naverClientId ?? null)
+        <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={{ $naverClientId }}"></script>
+        @endif
+    @endif
+@endif
 <script>
 function ppShowBack(){
     var r = document.referrer || '';
@@ -128,6 +169,9 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
     if (provider === 'kakao') {
         appUrl = `kakaomap://route?ep=${lat},${lng}&by=CAR`;
         webUrl = `https://map.kakao.com/link/to/${encName},${lat},${lng}`;
+    } else if (provider === 'google') {
+        appUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
+        webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${encName}`;
     } else {
         appUrl = `nmap://route/car?dlat=${lat}&dlng=${lng}&dname=${encName}&appname=net.mypinpick`;
         webUrl = `https://map.naver.com/p/directions/-/${lng},${lat},${encName},,PLACE_POI/-/car`;
@@ -143,6 +187,67 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
         window.open(webUrl, '_blank');
     }
 };
+
+// 위치 지도 초기화
+(function(){
+    const el = document.getElementById('ppLocMap');
+    if (!el) return;
+    const lat = parseFloat(el.dataset.lat);
+    const lng = parseFloat(el.dataset.lng);
+    const name = el.dataset.name || '';
+    const overseas = el.dataset.overseas === '1';
+    if (!lat || !lng) return;
+
+    function initNaver(){
+        if (typeof naver === 'undefined' || !naver.maps) return;
+        const pos = new naver.maps.LatLng(lat, lng);
+        const map = new naver.maps.Map(el, {
+            center: pos, zoom: 16, minZoom: 10,
+            draggable: true, pinchZoom: true, scrollWheel: false, disableDoubleTapZoom: false,
+            mapTypeControl: false, zoomControl: false, logoControlOptions: { position: naver.maps.Position.BOTTOM_RIGHT }
+        });
+        new naver.maps.Marker({ position: pos, map: map, title: name });
+    }
+    function initGoogle(){
+        if (typeof google === 'undefined' || !google.maps) return;
+        const pos = { lat, lng };
+        const map = new google.maps.Map(el, {
+            center: pos, zoom: 16,
+            disableDefaultUI: true, zoomControl: false, gestureHandling: 'cooperative'
+        });
+        new google.maps.Marker({ position: pos, map, title: name });
+    }
+
+    if (overseas) {
+        window.ppInitLocMap = initGoogle;
+        if (typeof google !== 'undefined' && google.maps) initGoogle();
+    } else {
+        if (typeof naver !== 'undefined' && naver.maps) initNaver();
+        else window.addEventListener('load', initNaver, { once: true });
+    }
+})();
+
+// 주소 복사
+document.querySelectorAll('.pp-loc__copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const addr = btn.dataset.addr || '';
+        if (!addr) return;
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(addr);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = addr; ta.style.position='fixed'; ta.style.opacity='0';
+                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+            }
+            const lab = btn.querySelector('span');
+            const old = lab.textContent;
+            lab.textContent = '복사됨';
+            btn.classList.add('is-done');
+            setTimeout(() => { lab.textContent = old; btn.classList.remove('is-done'); }, 1500);
+        } catch (e) { alert('복사에 실패했어요'); }
+    });
+});
 
 (function() {
     const csrf = '{{ csrf_token() }}';
