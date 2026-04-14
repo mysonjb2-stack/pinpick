@@ -32,8 +32,9 @@
         <div class="pp-field">
             <div class="pp-label-row">
                 <label class="pp-label">카테고리</label>
-                <button type="button" class="pp-cat-manage" id="catTrigger">
-                    <span>＋ 카테고리 추가</span>
+                <button type="button" class="yg-catorder__btn" id="catTrigger">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                    카테고리 추가/수정
                 </button>
             </div>
             <input type="hidden" name="category_id" id="f_category" value="{{ $editMode ? $place->category_id : '' }}">
@@ -41,6 +42,19 @@
             <div class="pp-cat-selected" id="catSelected" hidden>
                 <span class="pp-cat-selected__name" id="catSelectedName"></span>
                 <button type="button" class="pp-cat-selected__edit" id="catSelectedEdit">수정</button>
+            </div>
+
+            {{-- 카테고리 관리 패널 (홈과 동일) --}}
+            <div class="yg-catorder-panel" id="catOrderPanel" hidden>
+                <div class="yg-catorder-panel__head">
+                    <span class="yg-catorder-panel__title">카테고리 관리</span>
+                    <div class="yg-catorder-panel__actions">
+                        <button type="button" class="yg-catorder-panel__cancel" id="catOrderCancel">취소</button>
+                        <button type="button" class="yg-catorder-panel__done" id="catOrderDone">저장</button>
+                    </div>
+                </div>
+                <ul class="yg-catorder-panel__list" id="catOrderList"></ul>
+                <button type="button" class="yg-catorder-panel__add" id="catOrderAdd">＋ 새 카테고리 추가</button>
             </div>
         </div>
 
@@ -190,21 +204,6 @@
             <button type="button" class="pp-addr-layer__close" id="addrSearchClose" aria-label="닫기">&times;</button>
         </div>
         <div class="pp-addr-layer__body" id="addrSearchLayerInner"></div>
-    </div>
-</div>
-
-{{-- 카테고리 관리 레이어 --}}
-<div class="pp-catmgr" id="catmgrLayer" hidden>
-    <div class="pp-catmgr__backdrop" data-catmgr-close></div>
-    <div class="pp-catmgr__sheet">
-        <div class="pp-catmgr__head">
-            <h3>카테고리 관리</h3>
-            <button type="button" class="pp-catmgr__done" data-catmgr-close>완료</button>
-        </div>
-        <div class="pp-catmgr__body">
-            <ul class="pp-catmgr__list" id="catmgrList"></ul>
-            <button type="button" class="pp-catmgr__add" id="catmgrAdd">＋ 새 카테고리 추가</button>
-        </div>
     </div>
 </div>
 
@@ -668,7 +667,7 @@ function renderGMappinMarkers(docs) {
             },
             label: {
                 text: d.place_name || '',
-                color: '#1a1a1a',
+                color: '#2b211e',
                 fontSize: '12px',
                 fontWeight: '600',
                 className: 'pp-gmarker-label',
@@ -802,14 +801,16 @@ function reverseGeocodeGoogle() {
 }
 
 // =========================================
-// 4) 카테고리 관리 (기존 로직 유지)
+// 4) 카테고리 관리 (홈과 동일한 yg-catorder-panel 패턴)
 // =========================================
 const catHidden = document.getElementById('f_category');
 const catTrigger = document.getElementById('catTrigger');
 const catChipsBox = document.getElementById('catChips');
-const catLayer = document.getElementById('catmgrLayer');
-const catList = document.getElementById('catmgrList');
-const catAddBtn = document.getElementById('catmgrAdd');
+const catPanel = document.getElementById('catOrderPanel');
+const catList = document.getElementById('catOrderList');
+const catAddBtn = document.getElementById('catOrderAdd');
+const catCancelBtn = document.getElementById('catOrderCancel');
+const catDoneBtn = document.getElementById('catOrderDone');
 
 let catState = JSON.parse(document.getElementById('initialCategories').textContent);
 
@@ -839,78 +840,129 @@ function selectCategory(id) {
     else { sel.hidden = true; }
 }
 
-function openCatLayer() {
-    renderCatList();
-    catLayer.hidden = false;
-    document.body.style.overflow = 'hidden';
+function openCatPanel() {
+    renderCatOrderList();
+    catPanel.hidden = false;
 }
-function closeCatLayer() {
-    catLayer.hidden = true;
-    document.body.style.overflow = '';
-    renderChips();
+function closeCatPanel() {
+    catPanel.hidden = true;
 }
 
-catTrigger.addEventListener('click', openCatLayer);
-document.getElementById('catSelectedEdit').addEventListener('click', openCatLayer);
+catTrigger.addEventListener('click', openCatPanel);
+document.getElementById('catSelectedEdit').addEventListener('click', openCatPanel);
+catCancelBtn.addEventListener('click', closeCatPanel);
+
 renderChips();
 if (catHidden.value) selectCategory(catHidden.value);
-catLayer.querySelectorAll('[data-catmgr-close]').forEach(el => el.addEventListener('click', closeCatLayer));
-
-function renderCatList() {
-    catList.innerHTML = '';
-    catState.forEach(c => catList.appendChild(buildRow(c)));
-}
-
-function buildRow(c) {
-    const li = document.createElement('li');
-    li.className = 'pp-catmgr__row';
-    li.dataset.id = c.id;
-    if (String(catHidden.value) === String(c.id)) li.classList.add('is-selected');
-    li.innerHTML = `
-        <div class="pp-catmgr__grab">≡</div>
-        <div class="pp-catmgr__main">
-            <input class="pp-catmgr__input" type="text" value="${escapeHtml(c.name)}" maxlength="30">
-            <div class="pp-catmgr__caption">${c.is_default ? '기본 카테고리 · 이름 수정 가능' : '사용자 카테고리'}</div>
-        </div>
-        <div class="pp-catmgr__actions">
-            <button type="button" class="pp-catmgr__save">저장</button>
-            ${c.is_default ? '' : '<button type="button" class="pp-catmgr__del">삭제</button>'}
-        </div>
-    `;
-    li.querySelector('.pp-catmgr__save').addEventListener('click', async () => {
-        if (isGuest) return guestAlert();
-        const name = li.querySelector('.pp-catmgr__input').value.trim();
-        if (!name || name === c.name) return;
-        try {
-            const r = await fetch(`/api/categories/${c.id}`, { method: 'PATCH', headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ name }) });
-            const j = await r.json();
-            if (!j.ok) { alert(j.error || '저장 실패'); return; }
-            c.name = name;
-            const sb = li.querySelector('.pp-catmgr__save');
-            sb.textContent = '저장됨'; setTimeout(() => sb.textContent = '저장', 1200);
-        } catch (e) { alert('네트워크 오류'); }
-    });
-    const delBtn = li.querySelector('.pp-catmgr__del');
-    if (delBtn) {
-        delBtn.addEventListener('click', async () => {
-            if (isGuest) return guestAlert();
-            if (!confirm(`'${c.name}' 카테고리를 삭제할까요?`)) return;
-            try {
-                const r = await fetch(`/api/categories/${c.id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } });
-                const j = await r.json();
-                if (!j.ok) { alert(j.error || '삭제 실패'); return; }
-                catState = catState.filter(x => x.id != c.id);
-                if (String(catHidden.value) === String(c.id)) selectCategory('');
-                renderCatList();
-            } catch (e) { alert('네트워크 오류'); }
-        });
-    }
-    return li;
-}
 
 function guestAlert() {
     if (confirm('카테고리 편집은 로그인 후 사용할 수 있어요. 로그인하시겠어요?')) location.href = '{{ route('login') }}';
 }
+
+function renderCatOrderList() {
+    catList.innerHTML = '';
+    catState.forEach((c, i) => {
+        const li = document.createElement('li');
+        li.className = 'yg-catorder-item';
+        li.dataset.id = c.id;
+        li.dataset.origName = c.name;
+        li.innerHTML = `
+            <span class="yg-catorder-item__grip">☰</span>
+            <input class="yg-catorder-item__input" type="text" value="${escapeHtml(c.name)}" maxlength="30">
+            <div class="yg-catorder-item__btns">
+                <button type="button" class="yg-catorder-item__up" ${i === 0 ? 'disabled' : ''} aria-label="위로">↑</button>
+                <button type="button" class="yg-catorder-item__down" ${i === catState.length - 1 ? 'disabled' : ''} aria-label="아래로">↓</button>
+                <button type="button" class="yg-catorder-item__del" aria-label="삭제">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+            </div>
+        `;
+        li.querySelector('.yg-catorder-item__up').addEventListener('click', () => moveCatItem(li, -1));
+        li.querySelector('.yg-catorder-item__down').addEventListener('click', () => moveCatItem(li, 1));
+        li.querySelector('.yg-catorder-item__del').addEventListener('click', () => deleteCatItem(li));
+        catList.appendChild(li);
+    });
+}
+
+function moveCatItem(li, dir) {
+    const items = Array.from(catList.children);
+    const idx = items.indexOf(li);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= items.length) return;
+    if (dir === -1) catList.insertBefore(li, items[swapIdx]);
+    else catList.insertBefore(items[swapIdx], li);
+    refreshUpDown();
+}
+
+function refreshUpDown() {
+    Array.from(catList.children).forEach((item, i, arr) => {
+        item.querySelector('.yg-catorder-item__up').disabled = i === 0;
+        item.querySelector('.yg-catorder-item__down').disabled = i === arr.length - 1;
+    });
+}
+
+async function deleteCatItem(li) {
+    if (isGuest) return guestAlert();
+    const id = li.dataset.id;
+    const name = li.querySelector('.yg-catorder-item__input').value;
+    if (!confirm(`'${name}' 카테고리를 삭제할까요?`)) return;
+    try {
+        const r = await fetch(`/api/categories/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }
+        });
+        const j = await r.json();
+        if (!j.ok) { alert(j.error || '삭제 실패'); return; }
+        li.remove();
+        refreshUpDown();
+        catState = catState.filter(x => String(x.id) !== String(id));
+        if (String(catHidden.value) === String(id)) selectCategory('');
+        renderChips();
+    } catch (e) { alert('네트워크 오류'); }
+}
+
+catDoneBtn.addEventListener('click', async () => {
+    if (isGuest) return guestAlert();
+    const items = Array.from(catList.querySelectorAll('.yg-catorder-item'));
+
+    // 1) 이름 변경
+    for (const li of items) {
+        const input = li.querySelector('.yg-catorder-item__input');
+        const origName = li.dataset.origName;
+        const newName = input.value.trim();
+        if (newName && newName !== origName) {
+            try {
+                const r = await fetch(`/api/categories/${li.dataset.id}`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ name: newName })
+                });
+                const j = await r.json();
+                if (!j.ok) { alert(j.error || '이름 변경 실패: ' + origName); continue; }
+                const found = catState.find(x => String(x.id) === String(li.dataset.id));
+                if (found) found.name = newName;
+            } catch (e) { alert('네트워크 오류'); }
+        }
+    }
+
+    // 2) 순서 저장
+    const ids = items.map(li => +li.dataset.id);
+    try {
+        const r = await fetch('/api/categories/reorder', {
+            method: 'PATCH',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ order: ids })
+        });
+        const j = await r.json();
+        if (!j.ok) { alert('순서 저장 실패'); return; }
+    } catch (e) { alert('네트워크 오류'); return; }
+
+    // 3) 로컬 state 순서 반영
+    catState.sort((a, b) => ids.indexOf(+a.id) - ids.indexOf(+b.id));
+
+    renderChips();
+    closeCatPanel();
+});
 
 catAddBtn.addEventListener('click', async () => {
     if (isGuest) return guestAlert();
@@ -921,8 +973,8 @@ catAddBtn.addEventListener('click', async () => {
         const j = await r.json();
         if (!j.ok) { alert('추가 실패'); return; }
         catState.push({ id: j.item.id, name: j.item.name, is_default: false });
-        renderCatList();
-        selectCategory(j.item.id);
+        renderCatOrderList();
+        renderChips();
     } catch (e) { alert('네트워크 오류'); }
 });
 
