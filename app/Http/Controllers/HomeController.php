@@ -50,26 +50,20 @@ class HomeController extends Controller
         $savedCount = 0;
         $weekNewCount = 0;
         if ($request->user()) {
-            $categoryLatest = Place::where('user_id', $request->user()->id)
-                ->where('is_visible', true)
-                ->with(['category', 'images'])
-                ->latest()
-                ->get()
-                ->groupBy('category_id')
-                ->map(fn($g) => $g->first());
+            $uid = $request->user()->id;
 
-            $recentPlaces = Place::where('user_id', $request->user()->id)
+            // 사용자 전체 visible 장소를 한 번에 로드 후 파생값 계산 (쿼리 3개 → 1개)
+            $allPlaces = Place::where('user_id', $uid)
                 ->where('is_visible', true)
                 ->with(['category', 'images'])
                 ->latest()
-                ->limit(20)
                 ->get();
 
-            $savedCount = Place::where('user_id', $request->user()->id)
-                ->where('is_visible', true)->count();
-            $weekNewCount = Place::where('user_id', $request->user()->id)
-                ->where('is_visible', true)
-                ->where('created_at', '>=', now()->subDays(7))->count();
+            $savedCount = $allPlaces->count();
+            $recentPlaces = $allPlaces->take(20);
+            $categoryLatest = $allPlaces->groupBy('category_id')->map(fn($g) => $g->first());
+            $weekAgo = now()->subDays(7);
+            $weekNewCount = $allPlaces->filter(fn($p) => $p->created_at >= $weekAgo)->count();
         }
 
         $curation = $this->curation();
