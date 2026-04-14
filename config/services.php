@@ -50,6 +50,11 @@ return [
         'client_secret' => env('NAVER_MAP_CLIENT_SECRET'),
     ],
 
+    'naver_search' => [
+        'client_id' => env('NAVER_SEARCH_CLIENT_ID'),
+        'client_secret' => env('NAVER_SEARCH_CLIENT_SECRET'),
+    ],
+
     'google_places' => [
         'api_key' => env('GOOGLE_PLACES_API_KEY'),
     ],

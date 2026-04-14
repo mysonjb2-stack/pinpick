@@ -14,7 +14,7 @@ class Place extends Model
     protected $fillable = [
         'user_id', 'category_id', 'name', 'phone', 'address', 'road_address',
         'lat', 'lng', 'memo', 'status', 'visited_at',
-        'naver_place_id', 'kakao_place_id', 'is_overseas', 'sort_order', 'is_visible',
+        'naver_place_id', 'kakao_place_id', 'is_overseas', 'thumbnail', 'sort_order', 'is_visible',
     ];
 
     protected $casts = [

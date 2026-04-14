@@ -88,8 +88,9 @@
                 @php $emptyCreateUrl = route('places.create'); @endphp
                 @forelse($recentPlaces as $p)
                     <a href="{{ route('places.show', $p) }}" class="pp-rspot" data-cat="{{ $p->category_id }}">
-                        <div class="pp-rspot__thumb"@if($p->images->first()) style="background-image:url('{{ asset('storage/' . $p->images->first()->path) }}');background-size:cover;background-position:center"@endif>
-                            @unless($p->images->first())<span class="pp-rspot__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
+                        @php $thumbUrl = $p->images->first() ? asset('storage/' . $p->images->first()->path) : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
+                        <div class="pp-rspot__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
+                            @unless($thumbUrl)<span class="pp-rspot__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                             <span class="pp-rspot__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                         </div>
                         <div class="pp-rspot__body">
@@ -235,8 +236,9 @@
         <div class="pp-mine-grid" id="ppMineGrid">
             @forelse($myPlaces as $p)
                 <a href="{{ route('places.show', $p) }}" class="pp-mine-grid__item" data-cat="{{ $p->category_id }}" data-name="{{ $p->name }}" data-created="{{ $p->created_at->timestamp }}" data-status="{{ $p->status }}">
-                    <div class="pp-mine-grid__thumb"@if($p->images->first()) style="background-image:url('{{ asset('storage/' . $p->images->first()->path) }}');background-size:cover;background-position:center"@endif>
-                        @unless($p->images->first())<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
+                    @php $thumbUrl = $p->images->first() ? asset('storage/' . $p->images->first()->path) : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
+                    <div class="pp-mine-grid__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
+                        @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                         <span class="pp-mine-grid__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                     </div>
                     <div class="pp-mine-grid__body">
@@ -317,6 +319,13 @@
         let emptyEl = null;
         let mineEmptyEl = null;
         let currentCat = 'all';
+        let currentCatName = '';
+        function korParticle(word, withJong, withoutJong) {
+            if (!word) return withoutJong;
+            const code = word.charCodeAt(word.length - 1) - 0xAC00;
+            if (code < 0 || code > 11171) return withoutJong;
+            return (code % 28) !== 0 ? withJong : withoutJong;
+        }
         let currentStatus = localStorage.getItem('pp_mine_status') || 'all';
         let currentSort = localStorage.getItem('pp_mine_sort') || 'created_desc';
 
@@ -338,9 +347,17 @@
                 mineEmptyEl.href = currentCat !== 'all'
                     ? createUrlBase + '?category=' + encodeURIComponent(currentCat)
                     : createUrlBase;
+                let title, desc;
+                if (currentCat !== 'all' && currentCatName) {
+                    title = '아직 저장한 ' + currentCatName + korParticle(currentCatName, '이', '가') + ' 없어요';
+                    desc = currentCatName + korParticle(currentCatName, '을', '를') + ' 추가하면 여기서 모아볼 수 있어요.';
+                } else {
+                    title = '조건에 맞는 장소가 없어요';
+                    desc = '다른 카테고리나 방문상태를 선택해보거나<br>새 장소를 추가해보세요.';
+                }
                 mineEmptyEl.innerHTML = '<div class="pp-rspot__plus">＋</div>'
-                    + '<div class="pp-rspot__empty-title">조건에 맞는 장소가 없어요</div>'
-                    + '<p class="pp-rspot__empty-desc">다른 카테고리나 방문상태를 선택해보거나<br>새 장소를 추가해보세요.</p>'
+                    + '<div class="pp-rspot__empty-title">' + title + '</div>'
+                    + '<p class="pp-rspot__empty-desc">' + desc + '</p>'
                     + '<span class="pp-rspot__empty-btn">장소 추가하기</span>';
                 mineGrid.appendChild(mineEmptyEl);
             }
@@ -360,8 +377,9 @@
             if (mineEmptyEl) mineGrid.appendChild(mineEmptyEl);
         }
 
-        function applyCatFilter(cat) {
+        function applyCatFilter(cat, catName) {
             currentCat = cat;
+            currentCatName = catName || '';
             let visibleCount = 0;
             heroSlide.querySelectorAll('.pp-rspot:not(.pp-rspot--empty-filter)').forEach(el => {
                 const show = cat === 'all' || el.dataset.cat === cat;
@@ -374,9 +392,15 @@
                 emptyEl = document.createElement('a');
                 emptyEl.className = 'pp-rspot pp-rspot--empty pp-rspot--empty-filter';
                 emptyEl.href = createUrlBase + '?category=' + encodeURIComponent(cat);
+                const emptyTitle = currentCatName
+                    ? '아직 저장한 ' + currentCatName + korParticle(currentCatName, '이', '가') + ' 없어요'
+                    : '첫 장소를 추가해보세요';
+                const emptyDesc = currentCatName
+                    ? currentCatName + korParticle(currentCatName, '을', '를') + ' 추가하면 여기서 모아볼 수 있어요.'
+                    : '맛집, 카페, 여행지처럼 다시 찾고<br>싶은 장소를 저장하면 여기서<br>바로 꺼내볼 수 있어요.';
                 emptyEl.innerHTML = '<div class="pp-rspot__plus">＋</div>'
-                    + '<div class="pp-rspot__empty-title">첫 장소를 추가해보세요</div>'
-                    + '<p class="pp-rspot__empty-desc">맛집, 카페, 여행지처럼 다시 찾고<br>싶은 장소를 저장하면 여기서<br>바로 꺼내볼 수 있어요.</p>'
+                    + '<div class="pp-rspot__empty-title">' + emptyTitle + '</div>'
+                    + '<p class="pp-rspot__empty-desc">' + emptyDesc + '</p>'
                     + '<span class="pp-rspot__empty-btn">장소 추가하기</span>';
                 heroSlide.appendChild(emptyEl);
             }
@@ -387,7 +411,8 @@
             const btn = e.target.closest('.pp-hero2__tab');
             if (!btn) return;
             heroTabs.querySelectorAll('.pp-hero2__tab').forEach(b => b.classList.toggle('is-active', b === btn));
-            applyCatFilter(btn.dataset.cat);
+            const name = btn.dataset.cat === 'all' ? '' : (btn.textContent || '').trim();
+            applyCatFilter(btn.dataset.cat, name);
         });
 
         // 정렬/필터 메뉴
@@ -475,6 +500,11 @@
     });
 
     function openCatPanel() {
+        // 사람들 탭에서 눌러도 동작하도록 먼저 내장소 탭으로 전환
+        const mineBtn = document.querySelector('.yg-segtab__btn[data-pane="mine"]');
+        if (mineBtn && !mineBtn.classList.contains('is-active')) {
+            mineBtn.click();
+        }
         orderPanel.hidden = false;
         renderCatOrderList();
     }

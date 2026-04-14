@@ -475,6 +475,17 @@ function pickPlace(d) {
     document.getElementById('f_lng').value = d.x || '';
     document.getElementById('f_kpid').value = d.id || '';
     document.getElementById('f_overseas').value = currentRegion === 'overseas' ? '1' : '0';
+    // 카카오에 전화번호 없으면 네이버→구글 순으로 폴백 조회 (국내만)
+    if (!d.phone && currentRegion === 'domestic' && d.place_name) {
+        const phoneEl = document.getElementById('f_phone');
+        phoneEl.placeholder = '전화번호 조회 중…';
+        const params = new URLSearchParams({ name: d.place_name, address: d.road_address_name || d.address_name || '' });
+        fetch('/api/phone/fallback?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+            .then(r => r.json())
+            .then(j => { if (j && j.phone && !phoneEl.value) phoneEl.value = j.phone; })
+            .catch(() => {})
+            .finally(() => { phoneEl.placeholder = ''; });
+    }
     const sp = document.getElementById('searchTrigger').querySelector('span');
     if (sp) sp.textContent = d.place_name || '';
     document.getElementById('searchTrigger').classList.add('is-filled');

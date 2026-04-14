@@ -3,7 +3,7 @@
 
 @section('header')
 <header class="pp-header">
-    <button class="pp-header__icon" onclick="history.back()" aria-label="뒤로">
+    <button class="pp-header__icon" onclick="ppShowBack()" aria-label="뒤로">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     </button>
     <div class="pp-header__title">장소 상세</div>
@@ -16,7 +16,7 @@
 
 @section('content')
 <div style="padding:16px">
-    {{-- 이미지 갤러리 --}}
+    {{-- 이미지 갤러리 (사용자 업로드 우선, 없으면 지도 썸네일) --}}
     @if($place->images->count())
     <div class="pp-show-images">
         @foreach($place->images as $img)
@@ -24,6 +24,12 @@
             <img src="{{ asset('storage/' . $img->path) }}" alt="{{ $place->name }}">
         </div>
         @endforeach
+    </div>
+    @elseif($place->thumbnail)
+    <div class="pp-show-images">
+        <div class="pp-show-images__item">
+            <img src="{{ asset('storage/' . $place->thumbnail) }}" alt="{{ $place->name }}">
+        </div>
     </div>
     @endif
 
@@ -104,6 +110,14 @@
 
 @push('scripts')
 <script>
+function ppShowBack(){
+    var r = document.referrer || '';
+    if (/\/places\/\d+\/edit(\?|#|\/|$)/.test(r)) {
+        location.href = '{{ route('home') }}';
+    } else {
+        history.back();
+    }
+}
 // 길찾기 (내 위치 → 목적지). 모바일: 앱스킴 → 1초 내 앱 미실행 시 웹 폴백. 데스크톱: 바로 웹.
 window.ppOpenRoute = function(provider, lat, lng, name) {
     const ua = navigator.userAgent || '';

@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\Place;
 use App\Models\PlaceImage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PlaceController extends Controller
@@ -70,6 +72,8 @@ class PlaceController extends Controller
             ]);
         }
 
+        $this->generateMapThumbnail($place);
+
         return redirect('/')->with('success', '장소가 저장되었어요.');
     }
 
@@ -129,7 +133,17 @@ class PlaceController extends Controller
         $images = $request->file('images', []);
         unset($data['images']);
 
+        $oldLat = $place->lat;
+        $oldLng = $place->lng;
+
         $place->update($data);
+
+        if (
+            ($place->lat !== null && $place->lng !== null) &&
+            ($oldLat != $place->lat || $oldLng != $place->lng || empty($place->thumbnail))
+        ) {
+            $this->generateMapThumbnail($place);
+        }
 
         // 새 이미지 추가 (기존 이미지 수 + 신규 <= 5)
         $existingCount = $place->images()->count();
@@ -192,6 +206,9 @@ class PlaceController extends Controller
         abort_unless($place->user_id === $request->user()?->id, 403);
         foreach ($place->images as $img) {
             Storage::disk('public')->delete($img->path);
+        }
+        if ($place->thumbnail) {
+            Storage::disk('public')->delete($place->thumbnail);
         }
         $place->delete();
         return redirect('/')->with('success', '삭제되었어요.');
@@ -464,5 +481,130 @@ class PlaceController extends Controller
         }
 
         return response()->json(['address' => $address]);
+    }
+
+    // 전화번호 폴백: 카카오에서 못 찾은 국내 장소 phone을 구글 Places로 조회
+    // (네이버 지역검색은 telephone 필드가 deprecated되어 항상 빈 값이라 사용 불가)
+    public function phoneFallback(Request $request)
+    {
+        $name = trim((string) $request->input('name', ''));
+        $address = trim((string) $request->input('address', ''));
+        if ($name === '') return response()->json(['phone' => '', 'source' => null]);
+
+        $gg = $this->phoneFromGooglePlaces($name, $address);
+        if ($gg) return response()->json(['phone' => $gg, 'source' => 'google']);
+
+        return response()->json(['phone' => '', 'source' => null]);
+    }
+
+    private function phoneFromGooglePlaces(string $name, string $address): string
+    {
+        $key = config('services.google_places.api_key');
+        if (!$key) return '';
+        $query = trim($address !== '' ? ($address . ' ' . $name) : $name);
+        try {
+            $res = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'X-Goog-Api-Key' => $key,
+                'X-Goog-FieldMask' => 'places.displayName,places.internationalPhoneNumber,places.nationalPhoneNumber,places.formattedAddress',
+            ])->timeout(6)->post('https://places.googleapis.com/v1/places:searchText', [
+                'textQuery' => $query,
+                'languageCode' => 'ko',
+                'regionCode' => 'KR',
+                'maxResultCount' => 3,
+            ]);
+            if (!$res->successful()) return '';
+            $places = $res->json()['places'] ?? [];
+            $normName = $this->normalizeName($name);
+            foreach ($places as $p) {
+                $title = $this->normalizeName($p['displayName']['text'] ?? '');
+                $tel = trim($p['nationalPhoneNumber'] ?? ($p['internationalPhoneNumber'] ?? ''));
+                if (!$tel) continue;
+                if ($title && $normName && (str_contains($title, $normName) || str_contains($normName, $title))) {
+                    return $tel;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Google Places phone lookup error', ['msg' => $e->getMessage()]);
+        }
+        return '';
+    }
+
+    private function normalizeName(string $s): string
+    {
+        $s = preg_replace('/\s+/u', '', $s);
+        $s = preg_replace('/[\p{P}\p{S}]/u', '', $s);
+        return mb_strtolower((string) $s);
+    }
+
+    // 장소 좌표로 Static Map 썸네일을 생성/저장하고 places.thumbnail 업데이트
+    private function generateMapThumbnail(Place $place): void
+    {
+        if ($place->lat === null || $place->lng === null) return;
+
+        $lat = (float) $place->lat;
+        $lng = (float) $place->lng;
+        $w = 600;
+        $h = 400;
+        $zoom = 16;
+
+        try {
+            $binary = null;
+
+            if ($place->is_overseas) {
+                $key = config('services.google_maps.api_key');
+                if (!$key) return;
+
+                $params = [
+                    'center' => "$lat,$lng",
+                    'zoom' => $zoom,
+                    'size' => "{$w}x{$h}",
+                    'scale' => 2,
+                    'maptype' => 'roadmap',
+                    'markers' => "color:red|$lat,$lng",
+                    'language' => 'ko',
+                    'key' => $key,
+                ];
+                $res = Http::timeout(10)->get('https://maps.googleapis.com/maps/api/staticmap', $params);
+                if (!$res->successful()) {
+                    Log::warning('Google Static Map failed', ['status' => $res->status(), 'place_id' => $place->id]);
+                    return;
+                }
+                $binary = $res->body();
+            } else {
+                $clientId = config('services.naver_map.client_id');
+                $clientSecret = config('services.naver_map.client_secret');
+                if (!$clientId || !$clientSecret) return;
+
+                $params = [
+                    'w' => $w,
+                    'h' => $h,
+                    'center' => "$lng,$lat",
+                    'level' => $zoom,
+                    'scale' => 2,
+                    'format' => 'jpg',
+                    'markers' => "type:d|size:mid|pos:$lng $lat",
+                ];
+                $res = Http::withHeaders([
+                    'X-NCP-APIGW-API-KEY-ID' => $clientId,
+                    'X-NCP-APIGW-API-KEY' => $clientSecret,
+                ])->timeout(10)->get('https://maps.apigw.ntruss.com/map-static/v2/raster', $params);
+                if (!$res->successful()) {
+                    Log::warning('Naver Static Map failed', ['status' => $res->status(), 'body' => $res->body(), 'place_id' => $place->id]);
+                    return;
+                }
+                $binary = $res->body();
+            }
+
+            if (!$binary) return;
+
+            $path = 'places/thumb_' . $place->id . '.jpg';
+            Storage::disk('public')->put($path, $binary);
+
+            $place->thumbnail = $path;
+            $place->saveQuietly();
+        } catch (\Throwable $e) {
+            Log::warning('Map thumbnail generation error', ['msg' => $e->getMessage(), 'place_id' => $place->id]);
+        }
     }
 }
