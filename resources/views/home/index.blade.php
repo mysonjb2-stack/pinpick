@@ -92,6 +92,9 @@
                         </div>
                         <div class="pp-rspot__body">
                             <div class="pp-rspot__name">{{ $p->name }}</div>
+                            @if($p->themes->isNotEmpty())
+                                <div class="pp-card-theme">{{ $p->themes->take(2)->pluck('name')->implode(' · ') }}</div>
+                            @endif
                             <div class="pp-rspot__meta pp-rspot__meta--all">
                                 {{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit(preg_replace('/^(\S+\s+\S+).*/', '$1', $p->road_address ?: $p->address), 10) }}@endif
                             </div>
@@ -240,6 +243,9 @@
                     </div>
                     <div class="pp-mine-grid__body">
                         <div class="pp-mine-grid__name">{{ $p->name }}</div>
+                        @if($p->themes->isNotEmpty())
+                            <div class="pp-card-theme">{{ $p->themes->take(2)->pluck('name')->implode(' · ') }}</div>
+                        @endif
                         <div class="pp-mine-grid__meta">{{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit($p->road_address ?: $p->address, 12) }}@endif</div>
                     </div>
                 </a>

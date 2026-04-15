@@ -120,7 +120,7 @@ class CategoryController extends Controller
         $status = in_array($request->input('status'), ['all', 'planned', 'visited']) ? $request->input('status') : 'all';
         $sort = in_array($request->input('sort'), ['recent', 'name', 'visit']) ? $request->input('sort') : 'recent';
 
-        $q = Place::with('images')
+        $q = Place::with(['images', 'themes'])
             ->where('user_id', $request->user()->id)
             ->where('category_id', $category->id)
             ->where('is_visible', true);

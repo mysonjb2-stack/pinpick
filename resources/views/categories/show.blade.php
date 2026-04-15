@@ -67,6 +67,9 @@
                         </div>
                         <div class="cat-card__body">
                             <div class="cat-card__name">{{ $p->name }}</div>
+                            @if($p->themes->isNotEmpty())
+                                <div class="pp-card-theme">{{ $p->themes->first()->name }}</div>
+                            @endif
                             @if($p->road_address || $p->address)
                                 <div class="cat-card__addr">{{ $p->road_address ?: $p->address }}</div>
                             @endif

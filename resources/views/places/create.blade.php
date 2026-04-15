@@ -58,6 +58,24 @@
             </div>
         </div>
 
+        @php
+            $selectedThemeIds = $editMode ? $place->themes->pluck('id')->all() : [];
+        @endphp
+        <div class="pp-field">
+            <label class="pp-label">테마 <span class="pp-label-sub">(복수 선택 가능, 최대 2개)</span></label>
+            <div class="pp-theme-chips" id="themeChips" data-max="2">
+                @foreach($themes as $t)
+                    @php $on = in_array($t->id, $selectedThemeIds, true); @endphp
+                    <button type="button" class="pp-theme-chip{{ $on ? ' is-active' : '' }}" data-theme-id="{{ $t->id }}">{{ $t->name }}</button>
+                @endforeach
+            </div>
+            <div id="themeHidden">
+                @foreach($selectedThemeIds as $tid)
+                    <input type="hidden" name="theme_ids[]" value="{{ $tid }}">
+                @endforeach
+            </div>
+        </div>
+
         <div class="pp-field">
             <label class="pp-label">전화번호</label>
             <input class="pp-input" name="phone" id="f_phone" inputmode="tel" value="{{ $editMode ? $place->phone : '' }}">
@@ -225,6 +243,42 @@ var _gmReady = new Promise(function(resolve) { window.__gmcb = resolve; });
 
 @push('scripts')
 <script>
+// =========================================
+// 테마 칩 선택 (최대 2개)
+// =========================================
+(function() {
+    const wrap = document.getElementById('themeChips');
+    const hidden = document.getElementById('themeHidden');
+    if (!wrap || !hidden) return;
+    const MAX = parseInt(wrap.dataset.max, 10) || 2;
+
+    function syncHidden() {
+        const selected = Array.from(wrap.querySelectorAll('.pp-theme-chip.is-active'))
+            .map(el => el.dataset.themeId);
+        hidden.innerHTML = selected.map(id =>
+            `<input type="hidden" name="theme_ids[]" value="${id}">`
+        ).join('');
+    }
+
+    wrap.addEventListener('click', (e) => {
+        const chip = e.target.closest('.pp-theme-chip');
+        if (!chip) return;
+        if (chip.classList.contains('is-active')) {
+            chip.classList.remove('is-active');
+        } else {
+            const active = wrap.querySelectorAll('.pp-theme-chip.is-active');
+            if (active.length >= MAX) {
+                wrap.classList.remove('is-shake');
+                void wrap.offsetWidth;
+                wrap.classList.add('is-shake');
+                return;
+            }
+            chip.classList.add('is-active');
+        }
+        syncHidden();
+    });
+})();
+
 // =========================================
 // 공통 유틸
 // =========================================

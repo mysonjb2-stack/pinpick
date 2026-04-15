@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -14,13 +15,14 @@ class Place extends Model
     protected $fillable = [
         'user_id', 'category_id', 'name', 'phone', 'address', 'road_address',
         'lat', 'lng', 'memo', 'status', 'visited_at',
-        'naver_place_id', 'kakao_place_id', 'is_overseas', 'thumbnail', 'sort_order', 'is_visible',
+        'naver_place_id', 'kakao_place_id', 'is_overseas', 'thumbnail', 'sort_order', 'is_visible', 'is_public',
     ];
 
     protected $casts = [
         'visited_at' => 'date',
         'is_visible' => 'boolean',
         'is_overseas' => 'boolean',
+        'is_public' => 'boolean',
         'lat' => 'float',
         'lng' => 'float',
     ];
@@ -28,4 +30,8 @@ class Place extends Model
     public function user(): BelongsTo { return $this->belongsTo(User::class); }
     public function category(): BelongsTo { return $this->belongsTo(Category::class); }
     public function images(): HasMany { return $this->hasMany(PlaceImage::class)->orderBy('sort_order'); }
+    public function themes(): BelongsToMany
+    {
+        return $this->belongsToMany(Theme::class, 'place_themes')->orderBy('sort_order');
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Place;
 use App\Models\PlaceImage;
+use App\Models\Theme;
 use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -24,7 +25,8 @@ class PlaceController extends Controller
         }
         $naverClientId = config('services.naver_map.client_id');
         $googleMapsKey = config('services.google_maps.api_key');
-        return view('places.create', compact('categories', 'naverClientId', 'googleMapsKey'));
+        $themes = Theme::orderBy('sort_order')->get(['id', 'name', 'slug']);
+        return view('places.create', compact('categories', 'naverClientId', 'googleMapsKey', 'themes'));
     }
 
     public function store(Request $request)
@@ -44,7 +46,12 @@ class PlaceController extends Controller
             'is_overseas' => ['nullable', 'boolean'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
+            'theme_ids' => ['nullable', 'array', 'max:2'],
+            'theme_ids.*' => ['integer', 'exists:themes,id'],
         ]);
+
+        $themeIds = $data['theme_ids'] ?? [];
+        unset($data['theme_ids']);
 
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
         $data['user_id'] = $request->user()->id;
@@ -63,6 +70,7 @@ class PlaceController extends Controller
         unset($data['images']);
 
         $place = Place::create($data);
+        $place->themes()->sync($themeIds);
 
         $processor = app(ImageProcessor::class);
         foreach ($images as $i => $file) {
@@ -96,15 +104,16 @@ class PlaceController extends Controller
     public function edit(Place $place, Request $request)
     {
         abort_unless($place->user_id === $request->user()?->id, 403);
-        $place->load('images');
+        $place->load(['images', 'themes']);
 
         CategoryController::ensureUserCategories($request->user());
         $categories = Category::where('user_id', $request->user()->id)
             ->orderBy('sort_order')->get();
         $naverClientId = config('services.naver_map.client_id');
         $googleMapsKey = config('services.google_maps.api_key');
+        $themes = Theme::orderBy('sort_order')->get(['id', 'name', 'slug']);
 
-        return view('places.create', compact('place', 'categories', 'naverClientId', 'googleMapsKey'));
+        return view('places.create', compact('place', 'categories', 'naverClientId', 'googleMapsKey', 'themes'));
     }
 
     public function update(Place $place, Request $request)
@@ -126,7 +135,12 @@ class PlaceController extends Controller
             'is_overseas' => ['nullable', 'boolean'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
+            'theme_ids' => ['nullable', 'array', 'max:2'],
+            'theme_ids.*' => ['integer', 'exists:themes,id'],
         ]);
+
+        $themeIds = $data['theme_ids'] ?? [];
+        unset($data['theme_ids']);
 
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
 
@@ -146,6 +160,7 @@ class PlaceController extends Controller
         $oldLng = $place->lng;
 
         $place->update($data);
+        $place->themes()->sync($themeIds);
 
         if (
             ($place->lat !== null && $place->lng !== null) &&
@@ -227,6 +242,60 @@ class PlaceController extends Controller
         }
         $place->delete();
         return redirect('/')->with('success', '삭제되었어요.');
+    }
+
+    // 테마별 내 장소 (로그인 사용자)
+    public function placesByTheme(Request $request)
+    {
+        if (!$request->user()) {
+            return response()->json(['items' => []]);
+        }
+        $slug = trim((string) $request->input('theme', ''));
+        $query = Place::where('user_id', $request->user()->id)
+            ->where('is_visible', true)
+            ->with(['category', 'themes']);
+
+        if ($slug !== '') {
+            $query->whereHas('themes', fn($q) => $q->where('slug', $slug));
+        }
+
+        $items = $query->latest()->limit(100)->get()->map(fn($p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'category' => $p->category?->name,
+            'address' => $p->road_address ?: $p->address,
+            'themes' => $p->themes->pluck('name'),
+            'lat' => $p->lat,
+            'lng' => $p->lng,
+        ]);
+
+        return response()->json(['items' => $items]);
+    }
+
+    // 테마별 공개 장소 (추후 에디터스픽 등)
+    public function placesPublicByTheme(Request $request)
+    {
+        $slug = trim((string) $request->input('theme', ''));
+        $query = Place::where('is_public', 1)
+            ->where('is_visible', true)
+            ->with(['category', 'themes', 'user:id,name']);
+
+        if ($slug !== '') {
+            $query->whereHas('themes', fn($q) => $q->where('slug', $slug));
+        }
+
+        $items = $query->latest()->limit(50)->get()->map(fn($p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'category' => $p->category?->name,
+            'address' => $p->road_address ?: $p->address,
+            'themes' => $p->themes->pluck('name'),
+            'user' => $p->user?->name,
+            'lat' => $p->lat,
+            'lng' => $p->lng,
+        ]);
+
+        return response()->json(['items' => $items]);
     }
 
     // 카카오 로컬 API 프록시 (검색)

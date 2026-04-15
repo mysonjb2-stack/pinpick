@@ -44,6 +44,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/api/categories/{category}', [CategoryController::class, 'destroy'])->name('api.categories.destroy');
 });
 
+// 테마별 장소 필터
+Route::middleware('auth')->get('/api/places', [PlaceController::class, 'placesByTheme'])->name('api.places.by_theme');
+Route::get('/api/places/public', [PlaceController::class, 'placesPublicByTheme'])->name('api.places.public');
+
 // 검색 API 프록시 (비로그인도 가능)
 Route::get('/api/search/overseas/autocomplete', [PlaceController::class, 'autocompleteOverseas'])->name('api.search.overseas.autocomplete');
 Route::get('/api/search/overseas', [PlaceController::class, 'searchOverseas'])->name('api.search.overseas');

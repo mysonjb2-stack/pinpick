@@ -18,9 +18,9 @@
 <div style="padding:16px">
     {{-- 이미지 갤러리 (사용자 업로드 우선, 없으면 지도 썸네일) --}}
     @if($place->images->count())
-    <div class="pp-show-images">
-        @foreach($place->images as $img)
-        <div class="pp-show-images__item">
+    <div class="pp-show-images" id="ppShowImages">
+        @foreach($place->images as $i => $img)
+        <div class="pp-show-images__item" data-lb-idx="{{ $i }}" data-lb-src="{{ $img->url }}">
             <img src="{{ $img->url }}" alt="{{ $place->name }}" loading="lazy">
         </div>
         @endforeach
@@ -138,6 +138,24 @@
     </div>
 </div>
 
+@if($place->images->count())
+<div class="pp-lb" id="ppLb" hidden aria-hidden="true" role="dialog" aria-label="이미지 갤러리">
+    <button type="button" class="pp-lb__close" aria-label="닫기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="22" height="22"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="pp-lb__counter" id="ppLbCounter">1 / {{ $place->images->count() }}</div>
+    <button type="button" class="pp-lb__nav pp-lb__nav--prev" aria-label="이전">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <button type="button" class="pp-lb__nav pp-lb__nav--next" aria-label="다음">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <div class="pp-lb__stage" id="ppLbStage">
+        <img class="pp-lb__img" id="ppLbImg" alt="">
+    </div>
+</div>
+@endif
+
 @push('scripts')
 @if($hasCoord ?? false)
     @if($place->is_overseas)
@@ -248,6 +266,81 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
         } catch (e) { alert('복사에 실패했어요'); }
     });
 });
+
+// 이미지 라이트박스
+(function() {
+    const lb = document.getElementById('ppLb');
+    if (!lb) return;
+    const items = Array.from(document.querySelectorAll('#ppShowImages .pp-show-images__item'));
+    if (!items.length) return;
+
+    const imgEl = document.getElementById('ppLbImg');
+    const counterEl = document.getElementById('ppLbCounter');
+    const prevBtn = lb.querySelector('.pp-lb__nav--prev');
+    const nextBtn = lb.querySelector('.pp-lb__nav--next');
+    const closeBtn = lb.querySelector('.pp-lb__close');
+    const stage = document.getElementById('ppLbStage');
+    const total = items.length;
+    let idx = 0;
+
+    function render() {
+        const src = items[idx].dataset.lbSrc;
+        imgEl.src = src;
+        counterEl.textContent = `${idx + 1} / ${total}`;
+        prevBtn.style.visibility = total > 1 ? 'visible' : 'hidden';
+        nextBtn.style.visibility = total > 1 ? 'visible' : 'hidden';
+        counterEl.style.display = total > 1 ? '' : 'none';
+    }
+    function open(i) {
+        idx = i;
+        render();
+        lb.hidden = false;
+        lb.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+    function close() {
+        lb.hidden = true;
+        lb.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        imgEl.src = '';
+    }
+    function prev() { idx = (idx - 1 + total) % total; render(); }
+    function next() { idx = (idx + 1) % total; render(); }
+
+    items.forEach((el, i) => {
+        el.style.cursor = 'zoom-in';
+        el.addEventListener('click', () => open(i));
+    });
+    closeBtn.addEventListener('click', close);
+    prevBtn.addEventListener('click', prev);
+    nextBtn.addEventListener('click', next);
+    lb.addEventListener('click', (e) => { if (e.target === lb || e.target === stage) close(); });
+    document.addEventListener('keydown', (e) => {
+        if (lb.hidden) return;
+        if (e.key === 'Escape') close();
+        else if (e.key === 'ArrowLeft') prev();
+        else if (e.key === 'ArrowRight') next();
+    });
+
+    // 터치 스와이프 (좌/우 네비, 아래로 당기면 닫기)
+    let tsX = 0, tsY = 0, tsTime = 0;
+    stage.addEventListener('touchstart', (e) => {
+        const t = e.changedTouches[0];
+        tsX = t.clientX; tsY = t.clientY; tsTime = Date.now();
+    }, { passive: true });
+    stage.addEventListener('touchend', (e) => {
+        const t = e.changedTouches[0];
+        const dx = t.clientX - tsX;
+        const dy = t.clientY - tsY;
+        const dt = Date.now() - tsTime;
+        if (dt > 600) return;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            dx < 0 ? next() : prev();
+        } else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
+            close();
+        }
+    }, { passive: true });
+})();
 
 (function() {
     const csrf = '{{ csrf_token() }}';

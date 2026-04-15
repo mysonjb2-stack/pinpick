@@ -27,7 +27,7 @@ class HomeController extends Controller
         if ($request->user()) {
             $query = Place::where('user_id', $request->user()->id)
                 ->where('is_visible', true)
-                ->with(['category', 'images'])
+                ->with(['category', 'images', 'themes'])
                 ->orderBy('sort_order')
                 ->latest();
 
@@ -55,7 +55,7 @@ class HomeController extends Controller
             // 사용자 전체 visible 장소를 한 번에 로드 후 파생값 계산 (쿼리 3개 → 1개)
             $allPlaces = Place::where('user_id', $uid)
                 ->where('is_visible', true)
-                ->with(['category', 'images'])
+                ->with(['category', 'images', 'themes'])
                 ->latest()
                 ->get();
 
