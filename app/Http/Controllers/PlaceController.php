@@ -95,7 +95,7 @@ class PlaceController extends Controller
     public function show(Place $place)
     {
         abort_unless($place->user_id === request()->user()?->id, 403);
-        $place->load('images');
+        $place->load(['images', 'themes']);
         $naverClientId = config('services.naver_map.client_id');
         $googleMapsKey = config('services.google_maps.api_key');
         return view('places.show', compact('place', 'naverClientId', 'googleMapsKey'));

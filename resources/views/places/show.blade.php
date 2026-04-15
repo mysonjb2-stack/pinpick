@@ -1,5 +1,6 @@
 @extends('layouts.app')
 @section('title', $place->name)
+@section('app_class', 'pp-app--detail')
 
 @section('header')
 <header class="pp-header">
@@ -8,9 +9,18 @@
     </button>
     <div class="pp-header__title">장소 상세</div>
     <div class="pp-header__spacer"></div>
-    <a href="{{ route('places.edit', $place) }}" class="pp-header__icon" aria-label="수정">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-    </a>
+    <div class="pp-header__more" id="ppMoreWrap">
+        <button type="button" class="pp-header__icon" id="ppMoreBtn" aria-label="더보기" aria-haspopup="menu" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>
+        <div class="pp-header__menu" id="ppMoreMenu" role="menu" hidden>
+            <a href="{{ route('places.edit', $place) }}" class="pp-header__menu-item" role="menuitem">수정</a>
+            <form method="POST" action="{{ route('places.destroy', $place) }}" onsubmit="return confirm('삭제할까요?')" class="pp-header__del-form">
+                @csrf @method('DELETE')
+                <button type="submit" class="pp-header__menu-item pp-header__menu-item--del" role="menuitem">삭제</button>
+            </form>
+        </div>
+    </div>
 </header>
 @endsection
 
@@ -38,7 +48,15 @@
             <div class="pp-card__icon">{{ $place->category?->icon ?? '📌' }}</div>
             <div class="pp-card__body">
                 <div class="pp-card__name">{{ $place->name }}</div>
-                <div class="pp-card__meta">{{ $place->category?->name ?? '기타' }}</div>
+                <div class="pp-card__meta">
+                    <span>{{ $place->category?->name ?? '기타' }}</span>
+                    @if($place->themes->isNotEmpty())
+                        <span class="pp-meta-dot" aria-hidden="true"></span>
+                        @foreach($place->themes as $theme)
+                            <span class="pp-theme-badge">{{ $theme->name }}</span>
+                        @endforeach
+                    @endif
+                </div>
             </div>
             <span class="pp-badge pp-badge--{{ $place->status }}">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
         </div>
@@ -56,16 +74,9 @@
         @endif
     </div>
 
-    {{-- 전화 예약 --}}
     @php
         $hasCoord = $place->lat && $place->lng;
     @endphp
-    @if($place->phone)
-    <a href="tel:{{ preg_replace('/[^0-9+]/', '', $place->phone) }}" class="pp-callbtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
-        전화 예약
-    </a>
-    @endif
 
     {{-- 위치 (지도 + 길찾기 + 주소복사) --}}
     @if($hasCoord)
@@ -129,13 +140,21 @@
     </div>
     @endif
 
-    <div style="display:flex;gap:10px;margin-top:16px">
-        <a href="{{ route('places.edit', $place) }}" class="pp-btn pp-btn--outline" style="flex:1;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">수정</a>
-        <form method="POST" action="{{ route('places.destroy', $place) }}" onsubmit="return confirm('삭제할까요?')" style="flex:1">
-            @csrf @method('DELETE')
-            <button type="submit" class="pp-btn pp-btn--ghost" style="width:100%">삭제</button>
-        </form>
-    </div>
+</div>
+
+<div class="pp-detail-cta">
+    @php $phoneTel = $place->phone ? preg_replace('/[^0-9+]/', '', $place->phone) : ''; @endphp
+    @if($phoneTel)
+        <a href="tel:{{ $phoneTel }}" class="pp-btn pp-btn--block pp-btn--phone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+            전화 예약
+        </a>
+    @else
+        <button type="button" class="pp-btn pp-btn--block pp-btn--phone" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+            전화 예약
+        </button>
+    @endif
 </div>
 
 @if($place->images->count())
@@ -169,6 +188,23 @@
     @endif
 @endif
 <script>
+// 헤더 더보기 메뉴 (수정/삭제)
+(function(){
+    const wrap = document.getElementById('ppMoreWrap');
+    const btn = document.getElementById('ppMoreBtn');
+    const menu = document.getElementById('ppMoreMenu');
+    if (!wrap || !btn || !menu) return;
+    function close(){ menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+    function toggle(e){
+        e.stopPropagation();
+        const open = menu.hidden;
+        menu.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    btn.addEventListener('click', toggle);
+    document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+})();
 function ppShowBack(){
     var r = document.referrer || '';
     if (/\/places\/\d+\/edit(\?|#|\/|$)/.test(r)) {

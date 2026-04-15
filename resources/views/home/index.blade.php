@@ -92,11 +92,14 @@
                         </div>
                         <div class="pp-rspot__body">
                             <div class="pp-rspot__name">{{ $p->name }}</div>
-                            @if($p->themes->isNotEmpty())
-                                <div class="pp-card-theme">{{ $p->themes->take(2)->pluck('name')->implode(' · ') }}</div>
-                            @endif
-                            <div class="pp-rspot__meta pp-rspot__meta--all">
-                                {{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit(preg_replace('/^(\S+\s+\S+).*/', '$1', $p->road_address ?: $p->address), 10) }}@endif
+                            <div class="pp-rspot__meta">
+                                <span>{{ $p->category?->name ?? '기타' }}</span>
+                                @if($p->themes->isNotEmpty())
+                                    <span class="pp-meta-dot" aria-hidden="true"></span>
+                                    @foreach($p->themes->take(2) as $theme)
+                                        <span class="pp-theme-badge">{{ $theme->name }}</span>
+                                    @endforeach
+                                @endif
                             </div>
                             <div class="pp-rspot__sub">
                                 @if($p->road_address || $p->address)

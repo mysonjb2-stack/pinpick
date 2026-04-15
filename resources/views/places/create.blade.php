@@ -1,6 +1,7 @@
 @php $editMode = isset($place); @endphp
 @extends('layouts.app')
 @section('title', $editMode ? '장소 수정' : '장소 추가')
+@section('app_class', 'pp-app--form')
 
 @section('header')
 <header class="pp-header">
@@ -63,10 +64,10 @@
         @endphp
         <div class="pp-field">
             <label class="pp-label">테마 <span class="pp-label-sub">(복수 선택 가능, 최대 2개)</span></label>
-            <div class="pp-theme-chips" id="themeChips" data-max="2">
+            <div class="pp-chips pp-chips--wrap" id="themeChips" data-max="2">
                 @foreach($themes as $t)
                     @php $on = in_array($t->id, $selectedThemeIds, true); @endphp
-                    <button type="button" class="pp-theme-chip{{ $on ? ' is-active' : '' }}" data-theme-id="{{ $t->id }}">{{ $t->name }}</button>
+                    <button type="button" class="pp-chip{{ $on ? ' is-active' : '' }}" data-theme-id="{{ $t->id }}">{{ $t->name }}</button>
                 @endforeach
             </div>
             <div id="themeHidden">
@@ -135,8 +136,11 @@
             <input type="date" class="pp-input" name="visited_at" value="{{ $editMode && $place->visited_at ? $place->visited_at->format('Y-m-d') : '' }}">
         </div>
 
-        <button class="pp-btn" type="submit">{{ $editMode ? '수정하기' : '저장하기' }}</button>
     </form>
+</div>
+
+<div class="pp-form-submit">
+    <button class="pp-btn pp-btn--block" type="submit" form="placeForm" id="placeSubmitBtn" disabled>{{ $editMode ? '수정하기' : '저장하기' }}</button>
 </div>
 
 {{-- ===== 장소 검색 레이어 (풀스크린 슬라이드업) ===== --}}
@@ -253,7 +257,7 @@ var _gmReady = new Promise(function(resolve) { window.__gmcb = resolve; });
     const MAX = parseInt(wrap.dataset.max, 10) || 2;
 
     function syncHidden() {
-        const selected = Array.from(wrap.querySelectorAll('.pp-theme-chip.is-active'))
+        const selected = Array.from(wrap.querySelectorAll('.pp-chip.is-active[data-theme-id]'))
             .map(el => el.dataset.themeId);
         hidden.innerHTML = selected.map(id =>
             `<input type="hidden" name="theme_ids[]" value="${id}">`
@@ -261,12 +265,12 @@ var _gmReady = new Promise(function(resolve) { window.__gmcb = resolve; });
     }
 
     wrap.addEventListener('click', (e) => {
-        const chip = e.target.closest('.pp-theme-chip');
+        const chip = e.target.closest('.pp-chip[data-theme-id]');
         if (!chip) return;
         if (chip.classList.contains('is-active')) {
             chip.classList.remove('is-active');
         } else {
-            const active = wrap.querySelectorAll('.pp-theme-chip.is-active');
+            const active = wrap.querySelectorAll('.pp-chip.is-active[data-theme-id]');
             if (active.length >= MAX) {
                 wrap.classList.remove('is-shake');
                 void wrap.offsetWidth;
@@ -277,6 +281,50 @@ var _gmReady = new Promise(function(resolve) { window.__gmcb = resolve; });
         }
         syncHidden();
     });
+})();
+
+// =========================================
+// 저장 버튼 활성화 (장소명/카테고리/테마/주소 모두 입력 시)
+// =========================================
+(function() {
+    const btn = document.getElementById('placeSubmitBtn');
+    const nameEl = document.getElementById('f_name');
+    const catEl = document.getElementById('f_category');
+    const roadEl = document.getElementById('f_road');
+    const addrEl = document.getElementById('f_addr');
+    const themeWrap = document.getElementById('themeChips');
+    if (!btn) return;
+
+    function check() {
+        const hasName  = (nameEl?.value || '').trim() !== '';
+        const hasCat   = (catEl?.value || '').trim() !== '';
+        const hasAddr  = ((roadEl?.value || '').trim() !== '') || ((addrEl?.value || '').trim() !== '');
+        const hasTheme = themeWrap
+            ? themeWrap.querySelectorAll('.pp-chip.is-active[data-theme-id]').length > 0
+            : false;
+        btn.disabled = !(hasName && hasCat && hasTheme && hasAddr);
+    }
+
+    [nameEl, catEl, roadEl, addrEl].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', check);
+        el.addEventListener('change', check);
+    });
+    if (themeWrap) themeWrap.addEventListener('click', () => setTimeout(check, 0));
+
+    // 프로그램적으로 값 변경되는 hidden input도 감지 (MutationObserver)
+    [catEl, roadEl, addrEl].forEach(el => {
+        if (!el) return;
+        new MutationObserver(check).observe(el, { attributes: true, attributeFilter: ['value'] });
+    });
+    // hidden input의 value 프로퍼티 변경도 폴링으로 감지 (확실성)
+    let snapshot = '';
+    setInterval(() => {
+        const s = [nameEl?.value, catEl?.value, roadEl?.value, addrEl?.value].join('|');
+        if (s !== snapshot) { snapshot = s; check(); }
+    }, 300);
+
+    check();
 })();
 
 // =========================================
