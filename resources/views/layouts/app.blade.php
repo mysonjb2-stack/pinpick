@@ -38,5 +38,23 @@
     @include('partials.nav')
 </div>
 @stack('scripts')
+<script>
+(function(){
+    window.addEventListener('pageshow', function(e){
+        if (e.persisted) { window.location.reload(); }
+    });
+    var hiddenAt = null;
+    var STALE_MS = 30 * 60 * 1000;
+    document.addEventListener('visibilitychange', function(){
+        if (document.visibilityState === 'hidden') {
+            hiddenAt = Date.now();
+        } else if (document.visibilityState === 'visible' && hiddenAt) {
+            var idle = Date.now() - hiddenAt;
+            hiddenAt = null;
+            if (idle > STALE_MS) { window.location.reload(); }
+        }
+    });
+})();
+</script>
 </body>
 </html>

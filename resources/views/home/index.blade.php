@@ -50,7 +50,7 @@
                 <div class="pp-hero2__stats">
                     <span class="pp-hero2__stat">저장 {{ $savedCount }}</span>
                     <span class="pp-hero2__stat-dot">·</span>
-                    <span class="pp-hero2__stat">카테고리 {{ $categories->count() }}</span>
+                    <span class="pp-hero2__stat" id="ppHeroCatCount">카테고리 {{ $categories->count() }}</span>
                 </div>
                 @endauth
             </div>
@@ -85,7 +85,7 @@
                 @php $emptyCreateUrl = route('places.create'); @endphp
                 @forelse($recentPlaces as $p)
                     <a href="{{ route('places.show', $p) }}" class="pp-rspot" data-cat="{{ $p->category_id }}">
-                        @php $thumbUrl = $p->images->first() ? asset('storage/' . $p->images->first()->path) : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
+                        @php $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
                         <div class="pp-rspot__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
                             @unless($thumbUrl)<span class="pp-rspot__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                             <span class="pp-rspot__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
@@ -233,7 +233,7 @@
         <div class="pp-mine-grid" id="ppMineGrid">
             @forelse($myPlaces as $p)
                 <a href="{{ route('places.show', $p) }}" class="pp-mine-grid__item" data-cat="{{ $p->category_id }}" data-name="{{ $p->name }}" data-created="{{ $p->created_at->timestamp }}" data-status="{{ $p->status }}">
-                    @php $thumbUrl = $p->images->first() ? asset('storage/' . $p->images->first()->path) : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
+                    @php $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
                     <div class="pp-mine-grid__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
                         @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                         <span class="pp-mine-grid__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
@@ -475,6 +475,25 @@
 
     function escHtml(s) { return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+    function ppToast(msg, isError) {
+        const el = document.createElement('div');
+        el.className = 'pp-flash' + (isError ? ' pp-flash--error' : '');
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(() => {
+            el.style.transition = 'opacity .4s, transform .4s';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-6px)';
+            setTimeout(() => el.remove(), 450);
+        }, 2000);
+    }
+
+    function updateCatCount() {
+        const n = document.querySelectorAll('.yg-mycat-meta .yg-mycat').length;
+        const el = document.getElementById('ppHeroCatCount');
+        if (el) el.textContent = `카테고리 ${n}`;
+    }
+
     if (isGuest) return;
     const orderPanel = document.getElementById('catOrderPanel');
     const orderList = document.getElementById('catOrderList');
@@ -514,8 +533,8 @@
                         body: JSON.stringify({ name: newName })
                     });
                     const j = await r.json();
-                    if (!j.ok) { alert(j.error || '이름 변경 실패: ' + origName); }
-                } catch (e) { alert('네트워크 오류'); }
+                    if (!j.ok) { ppToast(j.error || '이름 변경 실패: ' + origName, true); }
+                } catch (e) { ppToast('네트워크 오류', true); }
             }
         }
 
@@ -528,18 +547,18 @@
                 body: JSON.stringify({ order: ids })
             });
             const j = await r.json();
-            if (!j.ok) { alert('순서 저장 실패'); return; }
-        } catch (e) { alert('네트워크 오류'); return; }
+            if (!j.ok) { ppToast('순서 저장 실패', true); return; }
+        } catch (e) { ppToast('네트워크 오류', true); return; }
 
-        // 3) DOM 반영: 카테고리명 + 순서 재배치
+        // 3) DOM 반영: 카테고리명 + 순서 재배치 + 히어로 탭 동기화
         const pane = document.querySelector('[data-pane="mine"]');
         const sections = Array.from(pane.querySelectorAll('.yg-mycat'));
+        const heroTabs = document.getElementById('ppHeroTabs');
         items.forEach(li => {
             const id = +li.dataset.id;
             const newName = li.querySelector('.yg-catorder-item__input').value.trim();
             const sec = sections.find(s => +s.dataset.catId === id);
-            if (!sec) return;
-            if (newName) {
+            if (sec && newName) {
                 const titleSpan = sec.querySelector('.yg-mycat__catname');
                 if (titleSpan) titleSpan.textContent = newName;
                 const editBtn = sec.querySelector('.yg-mycat__edit');
@@ -550,26 +569,66 @@
                     m.textContent = dotIdx >= 0 ? `${newName}${txt.slice(dotIdx)}` : newName;
                 });
             }
-            pane.appendChild(sec);
+            if (sec) pane.appendChild(sec);
+            // 히어로 탭 버튼 이름 + 순서 반영
+            if (heroTabs && newName) {
+                const tabBtn = heroTabs.querySelector(`.pp-hero2__tab[data-cat="${id}"]`);
+                if (tabBtn) {
+                    tabBtn.textContent = newName;
+                    heroTabs.appendChild(tabBtn);
+                }
+            }
         });
         orderPanel.hidden = true;
+        ppToast('카테고리가 저장되었어요');
     });
 
     // 카테고리 추가
     document.getElementById('catOrderAdd').addEventListener('click', async () => {
         const name = prompt('새 카테고리 이름을 입력하세요');
         if (!name || !name.trim()) return;
+        const trimmed = name.trim();
         try {
             const r = await fetch('/api/categories', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ name: name.trim() })
+                body: JSON.stringify({ name: trimmed })
             });
             const j = await r.json();
-            if (!j.ok) { alert('추가 실패'); return; }
-            // 페이지 새로고침으로 새 섹션 반영
-            location.reload();
-        } catch (e) { alert('네트워크 오류'); }
+            if (!j.ok) { ppToast('추가 실패', true); return; }
+
+            const newId = j.item.id;
+
+            // 1) hidden meta 섹션 추가 (카테고리 관리 리스트의 데이터 소스)
+            const metaWrap = document.querySelector('.yg-mycat-meta');
+            if (metaWrap) {
+                const sec = document.createElement('section');
+                sec.className = 'yg-mycat';
+                sec.dataset.catId = newId;
+                sec.dataset.sort = String(metaWrap.children.length);
+                sec.innerHTML = `<span class="yg-mycat__catname">${escHtml(trimmed)}</span>`;
+                metaWrap.appendChild(sec);
+            }
+
+            // 2) 히어로 탭 버튼 추가
+            const heroTabs = document.getElementById('ppHeroTabs');
+            if (heroTabs) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'pp-hero2__tab';
+                btn.dataset.cat = newId;
+                btn.textContent = trimmed;
+                heroTabs.appendChild(btn);
+            }
+
+            // 3) 카테고리 관리 리스트에도 즉시 반영
+            renderCatOrderList();
+
+            // 4) 상단 카운트 갱신
+            updateCatCount();
+
+            ppToast('새 카테고리가 추가되었어요');
+        } catch (e) { ppToast('네트워크 오류', true); }
     });
 
     function renderCatOrderList() {
@@ -627,13 +686,23 @@
                 headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' }
             });
             const j = await r.json();
-            if (!j.ok) { alert(j.error || '삭제 실패'); return; }
+            if (!j.ok) { ppToast(j.error || '삭제 실패', true); return; }
             li.remove();
             refreshUpDown();
-            // DOM에서도 해당 카테고리 섹션 제거
-            const sec = document.querySelector(`.yg-mycat[data-cat-id="${id}"]`);
-            if (sec) sec.remove();
-        } catch (e) { alert('네트워크 오류'); }
+            // DOM에서도 해당 카테고리 섹션 + 히어로 탭 + 내장소 섹션 모두 제거
+            document.querySelectorAll(`.yg-mycat[data-cat-id="${id}"]`).forEach(s => s.remove());
+            const tabBtn = document.querySelector(`#ppHeroTabs .pp-hero2__tab[data-cat="${id}"]`);
+            if (tabBtn) {
+                // 삭제된 탭이 활성 상태면 "전체"로 되돌림
+                if (tabBtn.classList.contains('is-active')) {
+                    const allBtn = document.querySelector('#ppHeroTabs .pp-hero2__tab[data-cat="all"]');
+                    if (allBtn) allBtn.click();
+                }
+                tabBtn.remove();
+            }
+            updateCatCount();
+            ppToast('카테고리가 삭제되었어요');
+        } catch (e) { ppToast('네트워크 오류', true); }
     }
 })();
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Place;
 use App\Models\PlaceImage;
+use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -63,8 +64,14 @@ class PlaceController extends Controller
 
         $place = Place::create($data);
 
+        $processor = app(ImageProcessor::class);
         foreach ($images as $i => $file) {
-            $path = $file->store('places/' . $place->id, 'public');
+            try {
+                $path = $processor->processPlaceImage($file, 'places/' . $place->id);
+            } catch (\Throwable $e) {
+                Log::warning('image process failed: ' . $e->getMessage(), ['place_id' => $place->id]);
+                continue;
+            }
             PlaceImage::create([
                 'place_id' => $place->id,
                 'path' => $path,
@@ -149,9 +156,15 @@ class PlaceController extends Controller
 
         // 새 이미지 추가 (기존 이미지 수 + 신규 <= 5)
         $existingCount = $place->images()->count();
+        $processor = app(ImageProcessor::class);
         foreach ($images as $i => $file) {
             if ($existingCount + $i + 1 > 5) break;
-            $path = $file->store('places/' . $place->id, 'public');
+            try {
+                $path = $processor->processPlaceImage($file, 'places/' . $place->id);
+            } catch (\Throwable $e) {
+                Log::warning('image process failed: ' . $e->getMessage(), ['place_id' => $place->id]);
+                continue;
+            }
             PlaceImage::create([
                 'place_id' => $place->id,
                 'path' => $path,
@@ -197,7 +210,7 @@ class PlaceController extends Controller
         $place = $placeImage->place;
         abort_unless($place->user_id === $request->user()?->id, 403);
 
-        Storage::disk('public')->delete($placeImage->path);
+        Storage::disk('public')->delete([$placeImage->path, $placeImage->thumb_path]);
         $placeImage->delete();
 
         return response()->json(['ok' => true]);
@@ -207,7 +220,7 @@ class PlaceController extends Controller
     {
         abort_unless($place->user_id === $request->user()?->id, 403);
         foreach ($place->images as $img) {
-            Storage::disk('public')->delete($img->path);
+            Storage::disk('public')->delete([$img->path, $img->thumb_path]);
         }
         if ($place->thumbnail) {
             Storage::disk('public')->delete($place->thumbnail);

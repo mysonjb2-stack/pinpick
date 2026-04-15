@@ -90,7 +90,7 @@
                 @if($editMode)
                     @foreach($place->images as $img)
                     <div class="pp-images__item" data-existing-id="{{ $img->id }}">
-                        <img src="{{ asset('storage/' . $img->path) }}" alt="">
+                        <img src="{{ $img->thumb_url }}" alt="">
                         <button type="button" class="pp-images__del pp-images__del--existing" data-img-id="{{ $img->id }}" aria-label="삭제">&times;</button>
                     </div>
                     @endforeach

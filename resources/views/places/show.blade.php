@@ -21,7 +21,7 @@
     <div class="pp-show-images">
         @foreach($place->images as $img)
         <div class="pp-show-images__item">
-            <img src="{{ asset('storage/' . $img->path) }}" alt="{{ $place->name }}">
+            <img src="{{ $img->url }}" alt="{{ $place->name }}" loading="lazy">
         </div>
         @endforeach
     </div>

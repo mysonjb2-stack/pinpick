@@ -54,7 +54,7 @@
         @else
             <div class="cat-show__grid">
                 @foreach($places as $p)
-                    @php $thumbUrl = $p->images->first() ? asset('storage/' . $p->images->first()->path) : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
+                    @php $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
                     <a href="{{ route('places.show', $p) }}" class="cat-card">
                         <div class="cat-card__thumb"
                             @if($thumbUrl) style="background-image:url('{{ $thumbUrl }}')" @endif>
