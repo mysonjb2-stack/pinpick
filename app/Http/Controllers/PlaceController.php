@@ -35,6 +35,7 @@ class PlaceController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'opening_hours' => ['nullable', 'string'],
             'address' => ['nullable', 'string', 'max:255'],
             'road_address' => ['nullable', 'string', 'max:255'],
             'lat' => ['nullable', 'numeric'],
@@ -52,6 +53,12 @@ class PlaceController extends Controller
 
         $themeIds = $data['theme_ids'] ?? [];
         unset($data['theme_ids']);
+
+        if (!empty($data['opening_hours'])) {
+            $data['opening_hours'] = json_decode($data['opening_hours'], true);
+        } else {
+            $data['opening_hours'] = null;
+        }
 
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
         $data['user_id'] = $request->user()->id;
@@ -124,6 +131,7 @@ class PlaceController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'opening_hours' => ['nullable', 'string'],
             'address' => ['nullable', 'string', 'max:255'],
             'road_address' => ['nullable', 'string', 'max:255'],
             'lat' => ['nullable', 'numeric'],
@@ -141,6 +149,12 @@ class PlaceController extends Controller
 
         $themeIds = $data['theme_ids'] ?? [];
         unset($data['theme_ids']);
+
+        if (!empty($data['opening_hours'])) {
+            $data['opening_hours'] = json_decode($data['opening_hours'], true);
+        } else {
+            $data['opening_hours'] = null;
+        }
 
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
 
@@ -329,7 +343,7 @@ class PlaceController extends Controller
         $res = \Illuminate\Support\Facades\Http::withHeaders([
             'Content-Type' => 'application/json',
             'X-Goog-Api-Key' => $key,
-            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.location,places.primaryType',
+            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.location,places.primaryType,places.regularOpeningHours',
         ])->post('https://places.googleapis.com/v1/places:searchText', [
             'textQuery' => $q,
             'languageCode' => 'ko',
@@ -347,6 +361,7 @@ class PlaceController extends Controller
                 'road_address_name' => $p['formattedAddress'] ?? '',
                 'address_name' => $p['formattedAddress'] ?? '',
                 'phone' => $p['internationalPhoneNumber'] ?? '',
+                'opening_hours' => $p['regularOpeningHours']['weekdayDescriptions'] ?? null,
                 'x' => (string) ($p['location']['longitude'] ?? ''),
                 'y' => (string) ($p['location']['latitude'] ?? ''),
                 'category_group_name' => $p['primaryType'] ?? '',
@@ -403,12 +418,17 @@ class PlaceController extends Controller
         $res = \Illuminate\Support\Facades\Http::withHeaders([
             'Content-Type' => 'application/json',
             'X-Goog-Api-Key' => $key,
-            'X-Goog-FieldMask' => 'id,displayName,formattedAddress,internationalPhoneNumber,location,primaryType',
+            'X-Goog-FieldMask' => 'id,displayName,formattedAddress,internationalPhoneNumber,location,primaryType,regularOpeningHours',
         ])->get("https://places.googleapis.com/v1/places/{$placeId}", [
             'languageCode' => 'ko',
         ]);
 
         $p = $res->json();
+
+        $openingHours = null;
+        if (!empty($p['regularOpeningHours']['weekdayDescriptions'])) {
+            $openingHours = $p['regularOpeningHours']['weekdayDescriptions'];
+        }
 
         return response()->json([
             'id' => $p['id'] ?? $placeId,
@@ -416,6 +436,7 @@ class PlaceController extends Controller
             'road_address_name' => $p['formattedAddress'] ?? '',
             'address_name' => $p['formattedAddress'] ?? '',
             'phone' => $p['internationalPhoneNumber'] ?? '',
+            'opening_hours' => $openingHours,
             'x' => (string) ($p['location']['longitude'] ?? ''),
             'y' => (string) ($p['location']['latitude'] ?? ''),
             'category_group_name' => $p['primaryType'] ?? '',
@@ -567,51 +588,59 @@ class PlaceController extends Controller
         return response()->json(['address' => $address]);
     }
 
-    // 전화번호 폴백: 카카오에서 못 찾은 국내 장소 phone을 구글 Places로 조회
+    // 전화번호/영업시간 폴백: 카카오에서 못 찾은 국내 장소를 구글 Places로 조회
     // (네이버 지역검색은 telephone 필드가 deprecated되어 항상 빈 값이라 사용 불가)
     public function phoneFallback(Request $request)
     {
         $name = trim((string) $request->input('name', ''));
         $address = trim((string) $request->input('address', ''));
-        if ($name === '') return response()->json(['phone' => '', 'source' => null]);
+        if ($name === '') return response()->json(['phone' => '', 'opening_hours' => null, 'source' => null]);
 
-        $gg = $this->phoneFromGooglePlaces($name, $address);
-        if ($gg) return response()->json(['phone' => $gg, 'source' => 'google']);
+        $info = $this->infoFromGooglePlaces($name, $address);
+        if ($info['phone'] || $info['opening_hours']) {
+            return response()->json([
+                'phone' => $info['phone'],
+                'opening_hours' => $info['opening_hours'],
+                'source' => 'google',
+            ]);
+        }
 
-        return response()->json(['phone' => '', 'source' => null]);
+        return response()->json(['phone' => '', 'opening_hours' => null, 'source' => null]);
     }
 
-    private function phoneFromGooglePlaces(string $name, string $address): string
+    private function infoFromGooglePlaces(string $name, string $address): array
     {
+        $empty = ['phone' => '', 'opening_hours' => null];
         $key = config('services.google_places.api_key');
-        if (!$key) return '';
+        if (!$key) return $empty;
         $query = trim($address !== '' ? ($address . ' ' . $name) : $name);
         try {
             $res = Http::withHeaders([
                 'Content-Type' => 'application/json',
                 'X-Goog-Api-Key' => $key,
-                'X-Goog-FieldMask' => 'places.displayName,places.internationalPhoneNumber,places.nationalPhoneNumber,places.formattedAddress',
+                'X-Goog-FieldMask' => 'places.displayName,places.internationalPhoneNumber,places.nationalPhoneNumber,places.formattedAddress,places.regularOpeningHours',
             ])->timeout(6)->post('https://places.googleapis.com/v1/places:searchText', [
                 'textQuery' => $query,
                 'languageCode' => 'ko',
                 'regionCode' => 'KR',
                 'maxResultCount' => 3,
             ]);
-            if (!$res->successful()) return '';
+            if (!$res->successful()) return $empty;
             $places = $res->json()['places'] ?? [];
             $normName = $this->normalizeName($name);
             foreach ($places as $p) {
                 $title = $this->normalizeName($p['displayName']['text'] ?? '');
                 $tel = trim($p['nationalPhoneNumber'] ?? ($p['internationalPhoneNumber'] ?? ''));
-                if (!$tel) continue;
+                $hours = $p['regularOpeningHours']['weekdayDescriptions'] ?? null;
+                if (!$tel && !$hours) continue;
                 if ($title && $normName && (str_contains($title, $normName) || str_contains($normName, $title))) {
-                    return $tel;
+                    return ['phone' => $tel, 'opening_hours' => $hours];
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning('Google Places phone lookup error', ['msg' => $e->getMessage()]);
+            Log::warning('Google Places lookup error', ['msg' => $e->getMessage()]);
         }
-        return '';
+        return $empty;
     }
 
     private function normalizeName(string $s): string

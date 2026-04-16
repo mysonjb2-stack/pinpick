@@ -19,6 +19,9 @@
     <div id="pp-map-naver" class="pp-map"{{ $defaultScope === 'domestic' ? '' : ' hidden' }}></div>
     <div id="pp-map-google" class="pp-map"{{ $defaultScope === 'overseas' ? '' : ' hidden' }}></div>
     <div class="pp-map-credit" id="ppMapCredit">지도: NAVER</div>
+    <button type="button" class="pp-map-locate" id="ppMapLocate" aria-label="현재 위치">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
 </div>
 
 <div class="pp-map-regions" id="ppRegions" hidden>
@@ -155,8 +158,9 @@
         return Array.from(buckets.values());
     }
 
-    let currentScope = @json($defaultScope);
-    let currentCat = 'all';
+    const _savedScope = sessionStorage.getItem('pp_map_scope');
+    let currentScope = (_savedScope === 'domestic' || _savedScope === 'overseas') ? _savedScope : @json($defaultScope);
+    let currentCat = sessionStorage.getItem('pp_map_cat') || 'all';
 
     // ===== Naver (국내) =====
     let nMap = null, nMarkers = [], nActive = null;
@@ -167,12 +171,19 @@
         const c = domestic.length
             ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
             : new naver.maps.LatLng(37.5665, 126.9780);
+        const savedN = JSON.parse(sessionStorage.getItem('pp_map_naver_view') || 'null');
+        const nCenter = savedN ? new naver.maps.LatLng(savedN.lat, savedN.lng) : c;
+        const nZoom = savedN ? savedN.zoom : 13;
         nMap = new naver.maps.Map('pp-map-naver', {
-            center: c, zoom: 13,
+            center: nCenter, zoom: nZoom,
             mapTypeControl: false, zoomControl: false,
             scaleControl: false, logoControl: false, mapDataControl: false,
         });
         naver.maps.Event.addListener(nMap, 'click', closeSheet);
+        naver.maps.Event.addListener(nMap, 'idle', () => {
+            const ct = nMap.getCenter();
+            sessionStorage.setItem('pp_map_naver_view', JSON.stringify({ lat: ct.lat(), lng: ct.lng(), zoom: nMap.getZoom() }));
+        });
     }
     function clearNaver() { nMarkers.forEach(m => m.setMap(null)); nMarkers = []; nActive = null; }
     function renderNaver(cat) {
@@ -208,16 +219,25 @@
 
     // ===== Google (해외) =====
     let gMap = null, gMarkers = [], gActive = null, HtmlOverlay = null;
+    let _pinClickGuard = false;
     function initGoogle() {
         if (gMap) return;
         if (typeof google === 'undefined' || !google.maps) return;
         const overseas = places.filter(p => p.is_overseas);
         const c = overseas.length ? { lat: overseas[0].lat, lng: overseas[0].lng } : { lat: 35.6762, lng: 139.6503 };
+        const savedG = JSON.parse(sessionStorage.getItem('pp_map_google_view') || 'null');
+        const gCenter = savedG ? { lat: savedG.lat, lng: savedG.lng } : c;
+        const gZoom = savedG ? savedG.zoom : 13;
         gMap = new google.maps.Map(document.getElementById('pp-map-google'), {
-            center: c, zoom: 13,
+            center: gCenter, zoom: gZoom,
             mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoomControl: false,
+            clickableIcons: false,
         });
-        gMap.addListener('click', closeSheet);
+        gMap.addListener('click', () => { if (!_pinClickGuard) closeSheet(); });
+        gMap.addListener('idle', () => {
+            const ct = gMap.getCenter();
+            sessionStorage.setItem('pp_map_google_view', JSON.stringify({ lat: ct.lat(), lng: ct.lng(), zoom: gMap.getZoom() }));
+        });
 
         HtmlOverlay = class extends google.maps.OverlayView {
             constructor(position, html, onClick) {
@@ -226,7 +246,9 @@
                 this.el = document.createElement('div');
                 this.el.style.position = 'absolute';
                 this.el.innerHTML = html;
-                this.el.addEventListener('click', (e) => { e.stopPropagation(); onClick && onClick(); });
+                this.el.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); _pinClickGuard = true; setTimeout(() => { _pinClickGuard = false; }, 1500); onClick && onClick(); });
+                this.el.addEventListener('touchstart', (e) => { e.stopPropagation(); });
+                this.el.addEventListener('touchend', (e) => { e.stopPropagation(); });
             }
             setHtml(html) { this.el.innerHTML = html; }
             onAdd() { this.getPanes().overlayMouseTarget.appendChild(this.el); }
@@ -284,6 +306,7 @@
     const creditEl = document.getElementById('ppMapCredit');
     function applyScope(scope) {
         currentScope = scope;
+        sessionStorage.setItem('pp_map_scope', scope);
         naverEl.hidden = scope !== 'domestic';
         googleEl.hidden = scope !== 'overseas';
         creditEl.textContent = scope === 'domestic' ? '지도: NAVER' : '지도: Google';
@@ -316,7 +339,7 @@
             if (!buckets.has(r)) buckets.set(r, []);
             buckets.get(r).push(p);
         });
-        if (buckets.size < 2) { regionsEl.hidden = true; return; }
+        if (buckets.size < 2) { regionsEl.hidden = true; updateLocateBtnPosSafe(); return; }
         const sorted = [...buckets.entries()].sort((a, b) => b[1].length - a[1].length);
         const titleName = currentCat === 'all' ? USER_NAME : (CATEGORY_NAMES[currentCat] || '장소');
         regionsTitleEl.textContent = `${titleName}에 등록된 장소`;
@@ -324,6 +347,19 @@
             `<button type="button" class="pp-map-regions__chip" data-region="${escapeHtml(region)}">${escapeHtml(region)}<span class="pp-map-regions__count">(${items.length})</span></button>`
         ).join('');
         regionsEl.hidden = false;
+        updateLocateBtnPosSafe();
+    }
+    function updateLocateBtnPosSafe() {
+        const btn = document.getElementById('ppMapLocate');
+        if (!btn) return;
+        const sheetEl = document.getElementById('ppMapSheet');
+        let offset = 0;
+        if (!sheetEl.hidden) {
+            offset = sheetEl.offsetHeight + 10;
+        } else if (!regionsEl.hidden) {
+            offset = regionsEl.offsetHeight + 10;
+        }
+        btn.style.setProperty('--locate-offset', offset + 'px');
     }
 
     regionsListEl.addEventListener('click', (e) => {
@@ -354,6 +390,37 @@
         applyScope(btn.dataset.scope);
     });
 
+    function fitToFilteredPlaces() {
+        const targets = currentFilteredPlaces();
+        if (!targets.length) return;
+        if (currentScope === 'domestic' && nMap) {
+            if (targets.length === 1) {
+                nMap.setCenter(new naver.maps.LatLng(targets[0].lat, targets[0].lng));
+                nMap.setZoom(15);
+            } else {
+                const bounds = new naver.maps.LatLngBounds();
+                targets.forEach(p => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
+                nMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            }
+        } else if (currentScope === 'overseas' && gMap) {
+            if (targets.length === 1) {
+                gMap.setCenter({ lat: targets[0].lat, lng: targets[0].lng });
+                gMap.setZoom(15);
+            } else {
+                const bounds = new google.maps.LatLngBounds();
+                targets.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+                gMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            }
+        }
+    }
+
+    function regionCount() {
+        const filtered = currentFilteredPlaces();
+        const set = new Set();
+        filtered.forEach(p => { const r = regionOf(p); if (r) set.add(r); });
+        return set.size;
+    }
+
     const tabs = document.getElementById('ppMapTabs');
     tabs.addEventListener('click', (e) => {
         const btn = e.target.closest('.pp-map-tab');
@@ -361,9 +428,12 @@
         tabs.querySelectorAll('.pp-map-tab').forEach(b => b.classList.remove('is-active'));
         btn.classList.add('is-active');
         currentCat = btn.dataset.cat;
+        sessionStorage.setItem('pp_map_cat', currentCat);
         if (currentScope === 'domestic') renderNaver(currentCat);
         else renderGoogle(currentCat);
         updateRegions();
+        // 지역이 1개 이하일 땐 지역 칩이 안 나오므로 자동으로 장소 영역으로 이동
+        if (regionCount() < 2) fitToFilteredPlaces();
     });
 
     // ===== Bottom sheet =====
@@ -376,6 +446,17 @@
     const msDetail = document.getElementById('ppMsDetail');
     const msClose = document.getElementById('ppMapSheetClose');
     const msThumb = document.getElementById('ppMsThumb');
+
+    const locateBtn = document.getElementById('ppMapLocate');
+    function updateLocateBtnPos() {
+        let offset = 0;
+        if (!sheet.hidden) {
+            offset = sheet.offsetHeight + 10;
+        } else if (!regionsEl.hidden) {
+            offset = regionsEl.offsetHeight + 10;
+        }
+        locateBtn.style.setProperty('--locate-offset', offset + 'px');
+    }
 
     function openSheet(p) {
         if (p.thumb_url) { msThumb.src = p.thumb_url; msThumb.hidden = false; }
@@ -399,10 +480,11 @@
         sheet.hidden = false;
         sheet.setAttribute('aria-hidden', 'false');
         requestAnimationFrame(() => sheet.classList.add('is-open'));
+        updateLocateBtnPos();
     }
     function closeSheet() {
         sheet.classList.remove('is-open');
-        setTimeout(() => { sheet.hidden = true; sheet.setAttribute('aria-hidden', 'true'); }, 220);
+        setTimeout(() => { sheet.hidden = true; sheet.setAttribute('aria-hidden', 'true'); updateLocateBtnPos(); }, 220);
         setNaverActive(null);
         setGoogleActive(null);
     }
@@ -429,7 +511,53 @@
         }
     }
 
-    // Initial
+    // ===== 현위치 =====
+    let userLocMarker = null;
+    locateBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) { alert('위치 기능을 지원하지 않는 브라우저입니다'); return; }
+        locateBtn.classList.add('is-active');
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
+                const ll = new naver.maps.LatLng(lat, lng);
+                nMap.setCenter(ll);
+                nMap.setZoom(15);
+                if (userLocMarker && userLocMarker.setMap) userLocMarker.setMap(null);
+                userLocMarker = new naver.maps.Marker({
+                    position: ll, map: nMap,
+                    icon: { content: '<div class="pp-loc-dot"></div>', anchor: new naver.maps.Point(8, 8) },
+                    zIndex: 1000,
+                });
+            } else if (currentScope === 'overseas' && gMap && typeof google !== 'undefined') {
+                gMap.setCenter({ lat, lng });
+                gMap.setZoom(15);
+                if (userLocMarker && userLocMarker.setMap) userLocMarker.setMap(null);
+                userLocMarker = new google.maps.Marker({
+                    position: { lat, lng }, map: gMap,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8, fillColor: '#2E7FFF', fillOpacity: 1,
+                        strokeColor: '#fff', strokeWeight: 3,
+                    },
+                    zIndex: 1000,
+                });
+            }
+        }, (err) => {
+            locateBtn.classList.remove('is-active');
+            alert('위치를 가져올 수 없어요');
+        }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+    });
+
+    // Initial — restore saved UI state
+    scopeEl.querySelectorAll('.yg-segtab__btn').forEach(b => {
+        b.classList.toggle('is-active', b.dataset.scope === currentScope);
+    });
+    if (currentCat !== 'all') {
+        tabs.querySelectorAll('.pp-map-tab').forEach(b => {
+            b.classList.toggle('is-active', b.dataset.cat === currentCat);
+        });
+    }
     applyScope(currentScope);
 })();
 </script>

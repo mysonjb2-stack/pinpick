@@ -95,6 +95,7 @@
             <input type="hidden" name="lng" id="f_lng" value="{{ $editMode ? $place->lng : '' }}">
             <input type="hidden" name="kakao_place_id" id="f_kpid" value="{{ $editMode ? $place->kakao_place_id : '' }}">
             <input type="hidden" name="is_overseas" id="f_overseas" value="{{ $editMode && $place->is_overseas ? '1' : '0' }}">
+            <input type="hidden" name="opening_hours" id="f_hours" value="{{ $editMode && $place->opening_hours ? json_encode($place->opening_hours) : '' }}">
         </div>
 
         <div class="pp-field">
@@ -571,20 +572,25 @@ function renderAcOverseas(suggestions) {
 function pickPlace(d) {
     document.getElementById('f_name').value = d.place_name || '';
     document.getElementById('f_phone').value = d.phone || '';
+    document.getElementById('f_hours').value = d.opening_hours ? JSON.stringify(d.opening_hours) : '';
     document.getElementById('f_road').value = d.road_address_name || d.address_name || '';
     document.getElementById('f_addr').value = d.address_name || '';
     document.getElementById('f_lat').value = d.y || '';
     document.getElementById('f_lng').value = d.x || '';
     document.getElementById('f_kpid').value = d.id || '';
     document.getElementById('f_overseas').value = currentRegion === 'overseas' ? '1' : '0';
-    // 카카오에 전화번호 없으면 네이버→구글 순으로 폴백 조회 (국내만)
-    if (!d.phone && currentRegion === 'domestic' && d.place_name) {
+    // 카카오에 전화번호/영업시간 없으면 구글로 폴백 조회 (국내만)
+    if (currentRegion === 'domestic' && d.place_name) {
         const phoneEl = document.getElementById('f_phone');
-        phoneEl.placeholder = '전화번호 조회 중…';
+        const hoursEl = document.getElementById('f_hours');
+        if (!phoneEl.value) phoneEl.placeholder = '전화번호 조회 중…';
         const params = new URLSearchParams({ name: d.place_name, address: d.road_address_name || d.address_name || '' });
         fetch('/api/phone/fallback?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(r => r.json())
-            .then(j => { if (j && j.phone && !phoneEl.value) phoneEl.value = j.phone; })
+            .then(j => {
+                if (j && j.phone && !phoneEl.value) phoneEl.value = j.phone;
+                if (j && j.opening_hours && !hoursEl.value) hoursEl.value = JSON.stringify(j.opening_hours);
+            })
             .catch(() => {})
             .finally(() => { phoneEl.placeholder = ''; });
     }

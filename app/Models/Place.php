@@ -13,13 +13,14 @@ class Place extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'category_id', 'name', 'phone', 'address', 'road_address',
+        'user_id', 'category_id', 'name', 'phone', 'opening_hours', 'address', 'road_address',
         'lat', 'lng', 'memo', 'status', 'visited_at',
         'naver_place_id', 'kakao_place_id', 'is_overseas', 'thumbnail', 'sort_order', 'is_visible', 'is_public',
     ];
 
     protected $casts = [
         'visited_at' => 'date',
+        'opening_hours' => 'array',
         'is_visible' => 'boolean',
         'is_overseas' => 'boolean',
         'is_public' => 'boolean',

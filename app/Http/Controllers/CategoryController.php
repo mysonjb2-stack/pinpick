@@ -17,7 +17,7 @@ class CategoryController extends Controller
 
         $items = Category::where('user_id', $request->user()->id)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'sort_order']);
+            ->get(['id', 'name', 'icon', 'sort_order']);
 
         return response()->json(['items' => $items]);
     }

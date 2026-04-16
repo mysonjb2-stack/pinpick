@@ -61,10 +61,30 @@
             <span class="pp-badge pp-badge--{{ $place->status }}">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
         </div>
         @if($place->road_address || $place->address)
-            <div style="margin-top:12px;font-size:13px">{{ $place->road_address ?: $place->address }}</div>
+            <div class="pp-info-row">
+                <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span>{{ $place->road_address ?: $place->address }}</span>
+            </div>
         @endif
         @if($place->phone)
-            <div style="margin-top:6px;font-size:13px;color:var(--pp-text-sub)">{{ $place->phone }}</div>
+            <div class="pp-info-row pp-info-row--sub">
+                <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+                <span>{{ $place->phone }}</span>
+            </div>
+        @endif
+        @if($place->opening_hours)
+            <div class="pp-hours">
+                <button type="button" class="pp-hours__toggle pp-info-row pp-info-row--sub" id="ppHoursToggle">
+                    <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>영업시간</span>
+                    <svg class="pp-hours__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="pp-hours__list" id="ppHoursList" hidden>
+                    @foreach($place->opening_hours as $line)
+                        <div class="pp-hours__line">{{ $line }}</div>
+                    @endforeach
+                </div>
+            </div>
         @endif
         @if($place->memo)
             <div style="margin-top:12px;padding:12px;background:var(--pp-bg-soft);border-radius:10px;font-size:13.5px">{{ $place->memo }}</div>
@@ -88,13 +108,21 @@
         @if($addrText)
         <div class="pp-loc__addr">{{ $addrText }}</div>
         @endif
-        <div class="pp-loc__map" id="ppLocMap"
-             data-lat="{{ $place->lat }}"
-             data-lng="{{ $place->lng }}"
-             data-name="{{ $place->name }}"
-             data-overseas="{{ $place->is_overseas ? '1' : '0' }}">
-            @if($place->thumbnail)
-                <img src="{{ asset('storage/' . $place->thumbnail) }}" alt="{{ $place->name }} 위치" class="pp-loc__map-fallback">
+        <div class="pp-loc__map-wrap">
+            <div class="pp-loc__map" id="ppLocMap"
+                 data-lat="{{ $place->lat }}"
+                 data-lng="{{ $place->lng }}"
+                 data-name="{{ $place->name }}"
+                 data-overseas="{{ $place->is_overseas ? '1' : '0' }}">
+                @if($place->thumbnail)
+                    <img src="{{ asset('storage/' . $place->thumbnail) }}" alt="{{ $place->name }} 위치" class="pp-loc__map-fallback">
+                @endif
+            </div>
+            @if($place->is_overseas)
+            <a href="https://www.google.com/maps/search/?api=1&query={{ $place->lat }},{{ $place->lng }}" target="_blank" rel="noopener" class="pp-loc__glink">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" fill="#4285F4"/></svg>
+                Google 지도에서 보기
+            </a>
             @endif
         </div>
         <div class="pp-dirs {{ $place->is_overseas ? 'pp-dirs--solo' : '' }}">
@@ -279,6 +307,18 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
         if (typeof naver !== 'undefined' && naver.maps) initNaver();
         else window.addEventListener('load', initNaver, { once: true });
     }
+})();
+
+// 영업시간 토글
+(function(){
+    const btn = document.getElementById('ppHoursToggle');
+    const list = document.getElementById('ppHoursList');
+    if (!btn || !list) return;
+    btn.addEventListener('click', () => {
+        const open = list.hidden;
+        list.hidden = !open;
+        btn.classList.toggle('is-open', open);
+    });
 })();
 
 // 주소 복사

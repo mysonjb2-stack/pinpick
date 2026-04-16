@@ -89,6 +89,9 @@
                         <div class="pp-rspot__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
                             @unless($thumbUrl)<span class="pp-rspot__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                             <span class="pp-rspot__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                            @if($p->status === 'visited' && $p->visited_at)
+                                <span class="pp-rspot__date">{{ $p->visited_at->format('Y.m.d') }}</span>
+                            @endif
                         </div>
                         <div class="pp-rspot__body">
                             <div class="pp-rspot__name">{{ $p->name }}</div>
@@ -243,6 +246,9 @@
                     <div class="pp-mine-grid__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
                         @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                         <span class="pp-mine-grid__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                        @if($p->status === 'visited' && $p->visited_at)
+                            <span class="pp-mine-grid__date">{{ $p->visited_at->format('Y.m.d') }}</span>
+                        @endif
                     </div>
                     <div class="pp-mine-grid__body">
                         <div class="pp-mine-grid__name">{{ $p->name }}</div>
@@ -734,6 +740,8 @@
     list.forEach(p => {
         const badge = p.status === 'visited' ? '방문완료' : '방문예정';
         const addr = (p.road_address || p.address || '').slice(0, 12);
+        const dateHtml = (p.status === 'visited' && p.visited_at)
+            ? `<span class="pp-mine-grid__date">${escapeHtml(String(p.visited_at).slice(0,10).replaceAll('-','.'))}</span>` : '';
         const card = document.createElement('div');
         card.className = 'pp-mine-grid__item';
         card.dataset.cat = p.category_id;
@@ -741,6 +749,7 @@
             <div class="pp-mine-grid__thumb">
                 <span class="pp-mine-grid__ph">📌</span>
                 <span class="pp-mine-grid__badge">${badge}</span>
+                ${dateHtml}
             </div>
             <div class="pp-mine-grid__body">
                 <div class="pp-mine-grid__name">${escapeHtml(p.name)}</div>

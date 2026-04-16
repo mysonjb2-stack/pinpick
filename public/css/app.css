@@ -146,6 +146,55 @@ input, select, textarea { font: inherit; color: inherit; }
   margin-top: 6px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.pp-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.pp-info-row--sub {
+  color: var(--pp-text-sub);
+}
+.pp-info-row__ico {
+  flex: 0 0 14px;
+  margin-top: 3px;
+  color: var(--pp-text-sub);
+  opacity: 0.75;
+}
+.pp-hours {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.pp-hours__toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  margin-top: 0;
+}
+.pp-hours__arrow {
+  transition: transform .2s;
+  opacity: 0.6;
+  margin-left: 2px;
+  margin-top: 4px;
+}
+.pp-hours__toggle.is-open .pp-hours__arrow {
+  transform: rotate(180deg);
+}
+.pp-hours__list {
+  margin-top: 6px;
+  padding-left: 21px;
+  font-size: 12.5px;
+  color: var(--pp-text-sub);
+  line-height: 1.7;
+}
+.pp-hours__line {
+  white-space: nowrap;
+}
 .pp-badge {
   display: inline-block;
   padding: 3px 8px; border-radius: 6px;
@@ -253,7 +302,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .pp-map-tab {
   flex-shrink: 0;
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 8px 14px; border-radius: 999px;
+  padding: 5px 14px; border-radius: 999px;
   font-size: 13.5px; font-weight: 600;
   background: #fff; color: var(--pp-text-sub);
   border: 1px solid transparent;
@@ -340,6 +389,33 @@ input, select, textarea { font: inherit; color: inherit; }
   padding: 2px 6px; border-radius: 4px;
   pointer-events: none;
   user-select: none;
+}
+
+/* 현위치 버튼 */
+.pp-map-locate {
+  --locate-offset: 0px;
+  position: fixed; right: 12px;
+  bottom: calc(var(--pp-nav-h) + 12px + var(--locate-offset) + env(safe-area-inset-bottom, 0px));
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--pp-line);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--pp-text);
+  cursor: pointer;
+  z-index: 85;
+  transition: bottom .2s ease, transform .15s;
+}
+.pp-map-locate svg { width: 16px; height: 16px; }
+.pp-map-locate:active { transform: scale(0.95); }
+.pp-map-locate.is-active { color: var(--pp-primary); }
+/* 네이버맵 현위치 점 */
+.pp-loc-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #2E7FFF;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(46, 127, 255, 0.25);
 }
 
 /* 지도 지역 칩 바 */
@@ -2778,6 +2854,34 @@ body { background: #f8f5f2; }
   background: var(--pp-bg-soft, #f8f5f2);
   margin-bottom: 10px;
 }
+.pp-loc__map-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+.pp-loc__map-wrap .pp-loc__map {
+  margin-bottom: 0;
+}
+.pp-loc__glink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4285F4;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+}
+.pp-loc__glink:active {
+  background: #f0f4ff;
+}
+.pp-loc__map-wrap .pp-loc__map {
+  border-radius: 12px 12px 0 0;
+}
 .pp-loc__map-fallback {
   width: 100%;
   height: 100%;
@@ -2993,6 +3097,17 @@ body { background: #f8f5f2; }
   font-weight: 700;
   color: #2b211e;
 }
+.pp-rspot__date {
+  position: absolute;
+  right: 10px; bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
 .pp-rspot__body { padding: 12px 12px 14px; }
 .pp-rspot__name {
   font-size: 15px;
@@ -3128,6 +3243,13 @@ body { background: #f8f5f2; }
     background: rgba(0,0,0,.55); color: #fff;
     font-size: 11px; padding: 3px 8px; border-radius: 999px;
     letter-spacing: -0.2px;
+}
+.pp-mine-grid__date {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: 11px; padding: 3px 8px; border-radius: 999px;
+    letter-spacing: -0.2px;
+    font-weight: 500;
 }
 .pp-mine-grid__body { padding: 10px 12px 12px; }
 .pp-mine-grid__name {
@@ -3289,4 +3411,437 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
     background: #2b211e;
     color: #fff;
     font-weight: 600;
+}
+
+/* =========================================================
+   공개 장소 상세 (/place/{id}) — 둥글고 부드러운 카드 스타일
+========================================================= */
+.pp-app--pub {
+  /* 사용자 지정 팔레트 */
+  --pub-bg: #f5f2ef;           /* 페이지 배경 */
+  --pub-card: #fffdfb;          /* 카드 */
+  --pub-soft: #fffaf5;          /* 인사이트/통계 박스 */
+  --pub-border: #eadfd4;        /* 카드 테두리 */
+  --pub-text: #1F1A17;          /* 진한 헤딩 */
+  --pub-text-sub: #8E8174;      /* 보조 텍스트 */
+  --pub-accent: #c96a5d;        /* 카테고리 강조 */
+  --pub-yellow: #ffd84e;        /* 노란 뱃지 */
+  --pub-dark: #2b211e;          /* 다크 버튼 */
+
+  background: var(--pub-bg);
+  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+}
+.pp-app--pub .pp-nav { display: none; }
+
+.pp-pub { padding-bottom: 0; }
+
+/* Top Nav — 좌측 큰 타이틀 + 우측 아이콘 */
+.pp-pub__top {
+  position: sticky; top: 0; z-index: 40;
+  height: 56px;
+  display: flex; align-items: center;
+  padding: 0 14px;
+  background: var(--pub-bg);
+}
+.pp-pub__back {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 6px 6px 0;
+  color: var(--pub-text);
+  font-size: 19px; font-weight: 800;
+  letter-spacing: -0.4px;
+}
+.pp-pub__back svg { flex-shrink: 0; }
+.pp-pub__spacer { flex: 1; }
+.pp-pub__title { display: none; }
+.pp-pub__top-action {
+  width: 36px; height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  color: var(--pub-text);
+}
+.pp-pub__top-action:active { background: rgba(0,0,0,0.05); }
+
+/* Hero — 카드 상단에 합쳐진 이미지 */
+.pp-pub__card.pp-pub__card--hero {
+  padding: 0;
+  overflow: hidden;
+}
+.pp-pub__card.pp-pub__card--hero .pp-pub__card-body {
+  padding: 18px 18px 20px;
+}
+.pp-pub__hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--pub-soft);
+}
+.pp-pub__hero-img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.pp-pub__hero-ph {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 72px;
+  background: linear-gradient(135deg, var(--pub-soft) 0%, var(--pub-border) 100%);
+}
+.pp-pub__badge {
+  position: absolute;
+  display: inline-flex; align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12.5px; font-weight: 800;
+  letter-spacing: -0.2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.pp-pub__badge--week {
+  bottom: 12px; left: 12px;
+  background: var(--pub-yellow);
+  color: var(--pub-text);
+}
+.pp-pub__badge--hot {
+  top: 12px; right: 12px;
+  background: #fff;
+  color: var(--pub-text);
+}
+
+/* Card — 둥글고 포근한 흰색 카드 */
+.pp-pub__card {
+  margin: 14px;
+  padding: 20px 18px;
+  background: var(--pub-card);
+  border: 1px solid var(--pub-border);
+  border-radius: 22px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+.pp-pub__section-title {
+  margin: 0 0 14px;
+  font-size: 16px; font-weight: 800;
+  color: var(--pub-text);
+  letter-spacing: -0.3px;
+}
+
+/* 기본 정보 */
+.pp-pub__name {
+  margin: 2px 0 8px;
+  font-size: 24px; font-weight: 900;
+  color: var(--pub-text);
+  letter-spacing: -0.6px;
+  line-height: 1.25;
+}
+.pp-pub__subline {
+  display: flex; align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: 13.5px;
+  color: var(--pub-text-sub);
+  margin-bottom: 18px;
+}
+.pp-pub__cat {
+  color: var(--pub-accent);
+  font-weight: 800;
+  font-size: 13.5px;
+}
+.pp-pub__sep { color: var(--pub-border); }
+.pp-pub__addr { color: var(--pub-text-sub); }
+.pp-pub__actions {
+  display: flex;
+  gap: 10px;
+}
+.pp-pub__btn {
+  flex: 1;
+  height: 50px;
+  border-radius: 16px;
+  font-size: 15px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform .08s ease;
+  white-space: nowrap;
+  letter-spacing: -0.3px;
+}
+.pp-pub__btn:active { transform: scale(0.98); }
+.pp-pub__btn--dark {
+  background: var(--pub-dark); color: #fff;
+  border: none;
+}
+.pp-pub__btn--outline {
+  background: var(--pub-soft); color: var(--pub-text);
+  border: 1px solid var(--pub-border);
+  font-weight: 700;
+}
+.pp-pub__btn--save {
+  flex: 1.4;
+}
+
+/* Insights — 둥근 크림 박스 */
+.pp-pub__insights {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.pp-pub__insight {
+  padding: 14px 16px;
+  background: var(--pub-soft);
+  border: 1px solid var(--pub-border);
+  border-radius: 16px;
+}
+.pp-pub__insight-title {
+  font-size: 14.5px; font-weight: 800;
+  color: var(--pub-text);
+  margin-bottom: 4px;
+  letter-spacing: -0.3px;
+}
+.pp-pub__insight-desc {
+  font-size: 13px;
+  color: var(--pub-text-sub);
+  line-height: 1.5;
+}
+
+/* Stats 2x2 — 크림 박스, 왼쪽 정렬 */
+.pp-pub__stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.pp-pub__stat {
+  padding: 16px 16px;
+  background: var(--pub-soft);
+  border: 1px solid var(--pub-border);
+  border-radius: 16px;
+  min-height: 86px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.pp-pub__stat-v {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--pub-text);
+  line-height: 1.15;
+  letter-spacing: -0.6px;
+  margin-bottom: 4px;
+  word-break: keep-all;
+}
+.pp-pub__stat-v--sm { font-size: 20px; }
+.pp-pub__stat-l {
+  font-size: 12px;
+  color: var(--pub-text-sub);
+  letter-spacing: -0.2px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+/* Themes */
+.pp-pub__themes {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.pp-pub__theme-row { display: flex; flex-direction: column; gap: 6px; }
+.pp-pub__theme-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13.5px;
+}
+.pp-pub__theme-name {
+  font-weight: 700;
+  color: var(--pub-text);
+}
+.pp-pub__theme-pct {
+  font-weight: 800;
+  color: var(--pub-text);
+  font-variant-numeric: tabular-nums;
+}
+.pp-pub__theme-bar {
+  height: 8px;
+  background: var(--pub-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pp-pub__theme-bar-fill {
+  height: 100%;
+  background: var(--pub-dark);
+  border-radius: 999px;
+  transition: width .4s ease;
+}
+
+/* Memos */
+.pp-pub__memos {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.pp-pub__memo {
+  padding: 14px 16px;
+  background: var(--pub-soft);
+  border: 1px solid var(--pub-border);
+  border-radius: 16px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--pub-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Map */
+.pp-pub__map {
+  position: relative;
+  width: 100%;
+  height: 210px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--pub-soft);
+  margin-bottom: 12px;
+}
+.pp-pub__map-fallback {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pp-pub__map-addr {
+  font-size: 13.5px;
+  color: var(--pub-text);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.pp-pub__map-actions {
+  display: flex; gap: 10px;
+}
+
+/* Similar places */
+.pp-pub__similar {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin: 0 -4px;
+  padding-left: 4px;
+  padding-right: 4px;
+  scrollbar-width: none;
+}
+.pp-pub__similar::-webkit-scrollbar { display: none; }
+.pp-pub__sim-card {
+  flex: 0 0 auto;
+  width: 144px;
+  display: block;
+  color: inherit;
+}
+.pp-pub__sim-thumb {
+  width: 100%;
+  aspect-ratio: 1/1;
+  border-radius: 18px;
+  background: var(--pub-soft) center/cover no-repeat;
+  margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px;
+  overflow: hidden;
+}
+.pp-pub__sim-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--pub-text);
+  letter-spacing: -0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+.pp-pub__sim-meta {
+  font-size: 12px;
+  color: var(--pub-text-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Bottom CTA */
+.pp-pub__cta {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: rgba(248, 245, 238, 0.96);
+  backdrop-filter: saturate(1.3) blur(8px);
+  -webkit-backdrop-filter: saturate(1.3) blur(8px);
+  border-top: 1px solid var(--pub-border);
+  z-index: 45;
+}
+.pp-pub__cta-text {
+  font-size: 12px;
+  color: var(--pub-text-sub);
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: -0.2px;
+}
+.pp-pub__cta-actions {
+  display: flex; gap: 10px;
+}
+
+/* Bottom Sheet */
+.pp-pub-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.pp-pub-sheet[hidden] { display: none; }
+.pp-pub-sheet__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background .22s ease;
+}
+.pp-pub-sheet.is-open .pp-pub-sheet__backdrop { background: rgba(0, 0, 0, 0.45); }
+.pp-pub-sheet__body {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: var(--pub-card);
+  border-radius: 24px 24px 0 0;
+  padding: 10px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateY(100%);
+  transition: transform .22s ease;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+.pp-pub-sheet.is-open .pp-pub-sheet__body { transform: translateY(0); }
+.pp-pub-sheet__handle {
+  width: 40px; height: 4px;
+  border-radius: 2px;
+  background: #d6cabb;
+  margin: 0 auto 10px;
+}
+.pp-pub-sheet__title {
+  font-size: 16px; font-weight: 800;
+  color: var(--pub-text);
+  text-align: center;
+  padding: 6px 0 14px;
+  letter-spacing: -0.3px;
+}
+.pp-pub-sheet__list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pp-pub-sheet__loading {
+  padding: 20px;
+  text-align: center;
+  color: var(--pub-text-sub);
+  font-size: 13px;
+}
+.pp-pub-sheet__item {
+  display: flex; align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--pub-soft);
+  border: 1px solid var(--pub-border);
+  border-radius: 16px;
+  font-size: 14.5px; font-weight: 700;
+  color: var(--pub-text);
+  text-align: left;
+  transition: transform .08s ease;
+}
+.pp-pub-sheet__item:active { transform: scale(0.99); background: var(--pub-border); }
+.pp-pub-sheet__ico {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  background: var(--pub-card);
+  border-radius: 10px;
+  flex-shrink: 0;
 }

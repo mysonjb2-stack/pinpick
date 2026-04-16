@@ -6,6 +6,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MapController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\PlaceController;
+use App\Http\Controllers\PublicPlaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -56,3 +57,8 @@ Route::get('/api/place/detail', [PlaceController::class, 'placeDetail'])->name('
 Route::get('/api/geocode/reverse', [PlaceController::class, 'reverseGeocode'])->name('api.geocode.reverse');
 Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi'])->name('api.geocode.forward');
 Route::get('/api/phone/fallback', [PlaceController::class, 'phoneFallback'])->name('api.phone.fallback');
+
+// 공개 장소 상세 (비로그인 접근 가능)
+Route::get('/place/{place}', [PublicPlaceController::class, 'show'])->name('public.place.show');
+Route::post('/place/{place}/copy', [PublicPlaceController::class, 'copyToMine'])
+    ->middleware('auth')->name('public.place.copy');
