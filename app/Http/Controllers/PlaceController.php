@@ -484,6 +484,101 @@ class PlaceController extends Controller
         return [(float) $doc['y'], (float) $doc['x']];
     }
 
+    /**
+     * 정적 지도 프록시 — 국내=Naver, 해외=Google
+     * GET /api/static-map?lat=&lng=&overseas=0|1&w=&h=
+     * 결과는 storage/app/public/static-maps/{hash}.jpg 에 캐시
+     */
+    public function staticMap(Request $request)
+    {
+        $request->validate([
+            'lat' => ['required', 'numeric'],
+            'lng' => ['required', 'numeric'],
+            'overseas' => ['nullable'],
+            'w' => ['nullable', 'integer', 'min:80', 'max:800'],
+            'h' => ['nullable', 'integer', 'min:80', 'max:800'],
+        ]);
+
+        $lat = round((float) $request->input('lat'), 5);
+        $lng = round((float) $request->input('lng'), 5);
+        $overseas = (bool) $request->input('overseas');
+        $w = (int) ($request->input('w') ?? 400);
+        $h = (int) ($request->input('h') ?? 300);
+
+        $hash = sha1("{$lat}|{$lng}|" . ($overseas ? 'g' : 'n') . "|{$w}x{$h}");
+        $relPath = "static-maps/{$hash}.jpg";
+        $absPath = storage_path('app/public/' . $relPath);
+
+        if (!is_file($absPath)) {
+            if (!is_dir(dirname($absPath))) {
+                @mkdir(dirname($absPath), 0775, true);
+            }
+            try {
+                $body = $overseas
+                    ? $this->fetchGoogleStaticMap($lat, $lng, $w, $h)
+                    : $this->fetchNaverStaticMap($lat, $lng, $w, $h);
+                if ($body) {
+                    file_put_contents($absPath, $body);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[static-map] fetch fail: ' . $e->getMessage());
+            }
+        }
+
+        if (is_file($absPath)) {
+            return response()->file($absPath, [
+                'Content-Type' => 'image/jpeg',
+                'Cache-Control' => 'public, max-age=2592000', // 30일
+            ]);
+        }
+        return response('', 404);
+    }
+
+    private function fetchNaverStaticMap(float $lat, float $lng, int $w, int $h): ?string
+    {
+        $cid = config('services.naver_map.client_id');
+        $sec = config('services.naver_map.client_secret');
+        if (!$cid || !$sec) return null;
+
+        $resp = Http::withHeaders([
+            'X-NCP-APIGW-API-KEY-ID' => $cid,
+            'X-NCP-APIGW-API-KEY' => $sec,
+        ])->timeout(6)->get('https://maps.apigw.ntruss.com/map-static/v2/raster', [
+            'w' => $w,
+            'h' => $h,
+            'level' => 16,
+            'center' => "{$lng},{$lat}",
+            'markers' => "type:n|size:mid|pos:{$lng} {$lat}",
+            'lang' => 'ko',
+            'format' => 'jpeg',
+        ]);
+        if (!$resp->successful()) {
+            Log::warning('[static-map] naver ' . $resp->status() . ' ' . substr($resp->body(), 0, 200));
+            return null;
+        }
+        return $resp->body();
+    }
+
+    private function fetchGoogleStaticMap(float $lat, float $lng, int $w, int $h): ?string
+    {
+        $key = config('services.google_maps.api_key');
+        if (!$key) return null;
+
+        $resp = Http::timeout(6)->get('https://maps.googleapis.com/maps/api/staticmap', [
+            'center' => "{$lat},{$lng}",
+            'zoom' => 14,
+            'size' => "{$w}x{$h}",
+            'markers' => "color:red|{$lat},{$lng}",
+            'language' => 'ko',
+            'key' => $key,
+        ]);
+        if (!$resp->successful()) {
+            Log::warning('[static-map] google ' . $resp->status() . ' ' . substr($resp->body(), 0, 200));
+            return null;
+        }
+        return $resp->body();
+    }
+
     // 역지오코딩 통합 프록시 (?provider=google|naver)
     public function reverseGeocode(Request $request)
     {

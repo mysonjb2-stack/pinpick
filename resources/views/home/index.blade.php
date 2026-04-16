@@ -141,7 +141,7 @@
                     <h3 class="pp-trend__title">이번주 핫한 저장</h3>
                     <p class="pp-trend__sub">전국에서 이번주 저장이 빠르게 늘어난 장소</p>
                 </div>
-                <a href="#" class="pp-trend__more">전체보기 ›</a>
+                <a href="/explore/trending?type=weekly" class="pp-trend__more">전체보기 ›</a>
             </div>
             <div class="pp-trend__hscroll" data-list="weekly">
                 <div class="pp-trend-card pp-trend-card--skel">
@@ -243,16 +243,44 @@
             </div>
         </section>
 
-        {{-- 4섹션: 여행자들의 핀픽 --}}
-        <section class="pp-trend" data-section="travel">
+        {{-- 4섹션: 국내 여행자들의 핀픽 --}}
+        <section class="pp-trend" data-section="travel-domestic">
             <div class="pp-trend__head">
                 <div class="pp-trend__titles">
-                    <h3 class="pp-trend__title">여행자들의 핀픽</h3>
-                    <p class="pp-trend__sub">요즘 많이 저장되는 여행지</p>
+                    <h3 class="pp-trend__title">국내 여행자들의 핀픽</h3>
+                    <p class="pp-trend__sub">요즘 많이 저장되는 국내 여행지</p>
                 </div>
-                <a href="#" class="pp-trend__more" data-more="travel">더보기 ›</a>
+                <a href="/explore/trending?type=travel&scope=domestic" class="pp-trend__more" data-more="travel-domestic">더보기 ›</a>
             </div>
-            <div class="pp-trend__hscroll pp-trend__hscroll--big" data-list="travel">
+            <div class="pp-trend__hscroll pp-trend__hscroll--big" data-list="travel-domestic">
+                <div class="pp-trend-card pp-trend-card--big pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--big pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--big pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+            </div>
+        </section>
+
+        {{-- 5섹션: 해외 여행자들의 핀픽 --}}
+        <section class="pp-trend" data-section="travel-overseas">
+            <div class="pp-trend__head">
+                <div class="pp-trend__titles">
+                    <h3 class="pp-trend__title">해외 여행자들의 핀픽</h3>
+                    <p class="pp-trend__sub">요즘 많이 저장되는 해외 여행지</p>
+                </div>
+                <a href="/explore/trending?type=travel&scope=overseas" class="pp-trend__more" data-more="travel-overseas">더보기 ›</a>
+            </div>
+            <div class="pp-trend__hscroll pp-trend__hscroll--big" data-list="travel-overseas">
                 <div class="pp-trend-card pp-trend-card--big pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
                     <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
@@ -972,7 +1000,9 @@
             : '전국에서 많이 저장한 장소';
         titleEl.textContent = title;
         if (moreEl) {
-            moreEl.href = regionName ? `/explore?region=${encodeURIComponent(regionName)}` : '/explore';
+            moreEl.href = regionName
+                ? `/explore/trending?type=local&region=${encodeURIComponent(regionName)}`
+                : '/explore/trending?type=local';
         }
 
         const params = { period: '30days', limit: 10 };
@@ -1013,7 +1043,7 @@
         const section = peoplePane.querySelector('[data-section="theme"]');
         const listEl = section.querySelector('[data-list="theme"]');
         const moreEl = section.querySelector('[data-more="theme"]');
-        if (moreEl) moreEl.href = `/explore?theme=${encodeURIComponent(themeSlug)}`;
+        if (moreEl) moreEl.href = `/explore/trending?type=theme&theme=${encodeURIComponent(themeSlug)}`;
 
         // skeleton 복원
         const skelCard = '<div class="pp-trend-card pp-trend-card--skel">'
@@ -1039,14 +1069,20 @@
         }
     }
 
-    async function loadTravel() {
-        const section = peoplePane.querySelector('[data-section="travel"]');
-        const listEl = section.querySelector('[data-list="travel"]');
-        const moreEl = section.querySelector('[data-more="travel"]');
-        if (moreEl) moreEl.href = '/explore?theme=travel';
+    async function loadTravelScope(scope) {
+        const sectionKey = scope === 'overseas' ? 'travel-overseas' : 'travel-domestic';
+        const section = peoplePane.querySelector(`[data-section="${sectionKey}"]`);
+        if (!section) return;
+        const listEl = section.querySelector(`[data-list="${sectionKey}"]`);
 
         try {
-            const items = await fetchTrending({ theme: 'travel', period: '7days', group_by: 'region', limit: 3 });
+            const items = await fetchTrending({
+                theme: 'travel',
+                period: '7days',
+                group_by: 'region',
+                scope: scope,
+                limit: 3,
+            });
             if (!items.length) { hideSection(section); return; }
             listEl.innerHTML = items.map(it => buildCard(it, { big: true, groupRegion: true })).join('');
         } catch (e) {
@@ -1130,10 +1166,11 @@
         if (initialized) return;
         initialized = true;
 
-        // 1섹션, 3섹션, 4섹션은 지역 무관 즉시 로드
+        // 1섹션, 3섹션, 4·5섹션은 지역 무관 즉시 로드
         loadWeekly();
         loadTheme(currentTheme);
-        loadTravel();
+        loadTravelScope('domestic');
+        loadTravelScope('overseas');
 
         // 2섹션: 지역 판단 후 로드
         const { name } = await resolveRegion();

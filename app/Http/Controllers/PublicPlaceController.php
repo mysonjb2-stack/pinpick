@@ -136,7 +136,10 @@ class PublicPlaceController extends Controller
         if ($p->is_overseas) {
             if (str_contains($addr, ',')) {
                 $parts = array_map('trim', explode(',', $addr));
-                return end($parts) ?: '';
+                $last = end($parts) ?: '';
+                // 우편번호 prefix 제거: "540-0002 일본" → "일본"
+                $cleaned = trim((string) preg_replace('/^[\d\-]+\s+/u', '', $last));
+                return $cleaned !== '' ? $cleaned : $last;
             }
             return $addr;
         }

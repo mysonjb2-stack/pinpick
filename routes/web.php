@@ -58,9 +58,14 @@ Route::get('/api/place/detail', [PlaceController::class, 'placeDetail'])->name('
 Route::get('/api/geocode/reverse', [PlaceController::class, 'reverseGeocode'])->name('api.geocode.reverse');
 Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi'])->name('api.geocode.forward');
 Route::get('/api/phone/fallback', [PlaceController::class, 'phoneFallback'])->name('api.phone.fallback');
+Route::get('/api/static-map', [PlaceController::class, 'staticMap'])->name('api.static-map');
 
 // 트렌딩 장소 (비로그인 접근 가능)
 Route::get('/api/places/trending', [TrendingController::class, 'trending'])->name('api.places.trending');
+Route::get('/api/places/trending/list', [TrendingController::class, 'list'])->name('api.places.trending.list');
+
+// 트렌딩 전체보기 페이지
+Route::view('/explore/trending', 'explore.trending')->name('explore.trending');
 
 // 공개 장소 상세 (비로그인 접근 가능)
 Route::get('/place/{place}', [PublicPlaceController::class, 'show'])->name('public.place.show');
