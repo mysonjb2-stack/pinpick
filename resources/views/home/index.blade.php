@@ -139,25 +139,31 @@
             <div class="pp-trend__head">
                 <div class="pp-trend__titles">
                     <h3 class="pp-trend__title">이번주 핫한 저장</h3>
-                    <p class="pp-trend__sub">지금 핀픽에서 많이 저장되는 장소</p>
+                    <p class="pp-trend__sub">전국에서 이번주 저장이 빠르게 늘어난 장소</p>
                 </div>
-                <a href="#" class="pp-trend__more">더보기 ›</a>
+                <a href="#" class="pp-trend__more">전체보기 ›</a>
             </div>
             <div class="pp-trend__hscroll" data-list="weekly">
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -167,24 +173,31 @@
             <div class="pp-trend__head">
                 <div class="pp-trend__titles">
                     <h3 class="pp-trend__title" data-title="region">전국에서 많이 저장한 장소</h3>
+                    <p class="pp-trend__sub">현재 위치 또는 최근 본 지역 기준으로 개인화된 섹션</p>
                 </div>
                 <a href="#" class="pp-trend__more" data-more="region">더보기 ›</a>
             </div>
             <div class="pp-trend__hscroll" data-list="region">
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -208,18 +221,24 @@
             <div class="pp-trend__hscroll" data-list="theme">
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
                 <div class="pp-trend-card pp-trend-card--skel">
                     <div class="pp-trend-card__thumb pp-skel"></div>
-                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
-                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    <div class="pp-trend-card__body">
+                        <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                        <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -851,33 +870,51 @@
         opts = opts || {};
         const big = !!opts.big;
         const groupRegion = !!opts.groupRegion;
-        const thumb = it.thumbnail
-            ? `<div class="pp-trend-card__thumb" style="background-image:url('${escapeHtml(it.thumbnail)}')"></div>`
-            : `<div class="pp-trend-card__thumb pp-trend-card__thumb--ph"><span class="pp-trend-card__ph">핀픽</span></div>`;
-        const badge = groupRegion
-            ? `<span class="pp-trend-card__badge">${fmtNum(it.region_count)} 저장</span>`
-            : `<span class="pp-trend-card__badge">${fmtNum(it.week_count)} 저장</span>`;
+        const regionPrefix = opts.regionPrefix || '';
+        const tag = opts.tag || '';
+
+        const thumbInner = it.thumbnail
+            ? `<div class="pp-trend-card__thumb" style="background-image:url('${escapeHtml(it.thumbnail)}')">`
+            : `<div class="pp-trend-card__thumb pp-trend-card__thumb--ph"><span class="pp-trend-card__ph">핀픽</span>`;
+
+        const badgeText = groupRegion
+            ? `${fmtNum(it.region_count)} 저장`
+            : (regionPrefix
+                ? `${regionPrefix} ${fmtNum(it.week_count)} 저장`
+                : `${fmtNum(it.week_count)} 저장`);
+        const badge = `<span class="pp-trend-card__badge">${escapeHtml(badgeText)}</span>`;
+
         const theme = it.theme_name || it.category_name || '';
         const region = it.region || '';
-        const metaParts = [];
-        if (theme) metaParts.push(escapeHtml(theme));
-        if (region) metaParts.push(escapeHtml(region));
-        const meta = metaParts.join(' · ');
 
         if (big) {
             return `<a class="pp-trend-card pp-trend-card--big" href="${PLACE_SHOW_URL(it.id)}">
-                ${thumb.replace('pp-trend-card__thumb', 'pp-trend-card__thumb')}
-                <div class="pp-trend-card__region">${escapeHtml(it.region || '')}</div>
-                <div class="pp-trend-card__name">${escapeHtml(it.name)}</div>
-                <div class="pp-trend-card__meta">${fmtNum(it.region_count || it.week_count)} 저장</div>
+                ${thumbInner}${badge}</div>
+                <div class="pp-trend-card__body">
+                    <span class="pp-trend-card__region">${escapeHtml(region)}</span>
+                    <div class="pp-trend-card__name">${escapeHtml(it.name)}</div>
+                    <div class="pp-trend-card__meta">${fmtNum(it.region_count || it.week_count)} 저장</div>
+                </div>
             </a>`;
         }
 
-        const thumbWithBadge = thumb.replace('</div>', `${badge}</div>`);
+        let metaHtml = '';
+        if (theme || region) {
+            const parts = [];
+            if (theme) parts.push(`<span class="pp-trend-card__theme">${escapeHtml(theme)}</span>`);
+            if (theme && region) parts.push(`<span class="pp-trend-card__meta-dot">·</span>`);
+            if (region) parts.push(`<span class="pp-trend-card__region">${escapeHtml(region)}</span>`);
+            metaHtml = `<div class="pp-trend-card__meta">${parts.join('')}</div>`;
+        }
+        const tagHtml = tag ? `<div class="pp-trend-card__tag">${escapeHtml(tag)}</div>` : '';
+
         return `<a class="pp-trend-card" href="${PLACE_SHOW_URL(it.id)}">
-            ${thumbWithBadge}
-            <div class="pp-trend-card__name">${escapeHtml(it.name)}</div>
-            <div class="pp-trend-card__meta">${meta}</div>
+            ${thumbInner}${badge}</div>
+            <div class="pp-trend-card__body">
+                <div class="pp-trend-card__name">${escapeHtml(it.name)}</div>
+                ${metaHtml}
+                ${tagHtml}
+            </div>
         </a>`;
     }
 
@@ -899,16 +936,29 @@
         return j.items || [];
     }
 
+    function weeklyTagOf(it, idx) {
+        if (idx < 3) return '이번주 급상승';
+        if (it.theme_name) return `${it.theme_name} 테마 인기`;
+        return '이번주 저장 많음';
+    }
+
     async function loadWeekly() {
         const section = peoplePane.querySelector('[data-section="weekly"]');
         const listEl = section.querySelector('[data-list="weekly"]');
         try {
             const items = await fetchTrending({ period: '7days', limit: 10 });
             if (!items.length) { hideSection(section); return; }
-            listEl.innerHTML = items.map(it => buildCard(it)).join('');
+            listEl.innerHTML = items.map((it, i) => buildCard(it, { tag: weeklyTagOf(it, i) })).join('');
         } catch (e) {
             hideSection(section);
         }
+    }
+
+    function regionTagOf(it, idx, regionName) {
+        if (idx === 0 && regionName) return `${regionName} 저장 상위`;
+        if (it.theme_name) return `${it.theme_name} 저장 많음`;
+        if (regionName) return `${regionName} 인기`;
+        return '저장 많음';
     }
 
     async function loadRegion(regionName) {
@@ -936,19 +986,28 @@
                     const fallback = await fetchTrending({ period: '30days', limit: 10 });
                     if (!fallback.length) { hideSection(section); return; }
                     titleEl.textContent = '전국에서 많이 저장한 장소';
-                    listEl.innerHTML = fallback.map(it => buildCard(it)).join('');
+                    listEl.innerHTML = fallback.map((it, i) => buildCard(it, { tag: regionTagOf(it, i, '') })).join('');
                     section.hidden = false;
                     return;
                 }
                 hideSection(section);
                 return;
             }
-            listEl.innerHTML = items.map(it => buildCard(it)).join('');
+            listEl.innerHTML = items.map((it, i) => buildCard(it, {
+                tag: regionTagOf(it, i, regionName),
+                regionPrefix: regionName || ''
+            })).join('');
             section.hidden = false;
         } catch (e) {
             hideSection(section);
         }
     }
+
+    const THEME_LABELS = {
+        food: '맛집', cafe: '카페', travel: '여행',
+        beauty: '뷰티/케어', stay: '숙소', culture: '문화/여가',
+        medical: '병원/약국', shopping: '쇼핑', etc: '기타',
+    };
 
     async function loadTheme(themeSlug) {
         const section = peoplePane.querySelector('[data-section="theme"]');
@@ -957,18 +1016,24 @@
         if (moreEl) moreEl.href = `/explore?theme=${encodeURIComponent(themeSlug)}`;
 
         // skeleton 복원
-        listEl.innerHTML = `
-            <div class="pp-trend-card pp-trend-card--skel"><div class="pp-trend-card__thumb pp-skel"></div><div class="pp-trend-card__name pp-skel pp-skel--line"></div><div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div></div>
-            <div class="pp-trend-card pp-trend-card--skel"><div class="pp-trend-card__thumb pp-skel"></div><div class="pp-trend-card__name pp-skel pp-skel--line"></div><div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div></div>
-            <div class="pp-trend-card pp-trend-card--skel"><div class="pp-trend-card__thumb pp-skel"></div><div class="pp-trend-card__name pp-skel pp-skel--line"></div><div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div></div>
-        `;
+        const skelCard = '<div class="pp-trend-card pp-trend-card--skel">'
+            + '<div class="pp-trend-card__thumb pp-skel"></div>'
+            + '<div class="pp-trend-card__body">'
+            + '<div class="pp-trend-card__name pp-skel pp-skel--line"></div>'
+            + '<div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>'
+            + '</div></div>';
+        listEl.innerHTML = skelCard + skelCard + skelCard;
+
+        const label = THEME_LABELS[themeSlug] || '';
         try {
             const items = await fetchTrending({ theme: themeSlug, period: '30days', limit: 10 });
             if (!items.length) {
                 renderEmpty(listEl, '아직 해당 테마의 장소 데이터가 부족해요.');
                 return;
             }
-            listEl.innerHTML = items.map(it => buildCard(it)).join('');
+            listEl.innerHTML = items.map((it, i) => buildCard(it, {
+                tag: i === 0 && label ? `${label} 테마 1위` : (label ? `${label} 저장 많음` : '저장 많음')
+            })).join('');
         } catch (e) {
             renderEmpty(listEl, '데이터를 불러오지 못했어요.');
         }

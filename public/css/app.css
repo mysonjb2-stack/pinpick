@@ -3927,23 +3927,32 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 }
 .pp-trend__hscroll::-webkit-scrollbar { display: none; }
 
-/* 카드 */
+/* 카드 — 크림 박스 스타일 (세로: 이미지 → 본문 영역) */
 .pp-trend-card {
-  width: 164px;
-  flex: 0 0 auto;
+  flex: 0 0 calc(50% - 6px);
+  min-width: 180px;
+  max-width: 260px;
   text-decoration: none;
   color: inherit;
   scroll-snap-align: start;
   display: block;
+  background: #fffdfb;
+  border: 1px solid #eadfd4;
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform .15s, box-shadow .15s;
+}
+.pp-trend-card:active {
+  transform: scale(0.99);
 }
 .pp-trend-card__thumb {
-  width: 164px;
-  height: 164px;
-  border-radius: 16px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 0;
   background: #f0e6d9 center/cover no-repeat;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: none;
 }
 .pp-trend-card__thumb--ph {
   background: linear-gradient(135deg, #f5ede3 0%, #e8dcca 100%);
@@ -3959,31 +3968,64 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 }
 .pp-trend-card__badge {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
+  left: 10px;
+  bottom: 10px;
   background: #ffd84e;
   color: #2b211e;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 800;
-  padding: 4px 9px;
+  padding: 5px 11px;
   border-radius: 999px;
   letter-spacing: -0.01em;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.pp-trend-card__body {
+  padding: 13px 14px 15px;
 }
 .pp-trend-card__name {
-  margin-top: 10px;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   color: #1f1a17;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .pp-trend-card__meta {
-  margin-top: 3px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.pp-trend-card__theme {
+  color: #c96a5d;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.pp-trend-card__meta-dot {
+  color: #d6c9b8;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.pp-trend-card__region {
+  color: #8e8174;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-trend-card__tag {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f2e9dd;
   font-size: 12px;
   color: #8e8174;
   font-weight: 500;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3992,16 +4034,17 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 /* 4섹션 — 큰 카드 (여행자 핀픽) */
 .pp-trend__hscroll--big { gap: 14px; }
 .pp-trend-card--big {
-  width: 240px;
+  flex: 0 0 calc(72%);
+  max-width: 280px;
+  min-width: 220px;
 }
 .pp-trend-card--big .pp-trend-card__thumb {
-  width: 240px;
-  height: 240px;
-  border-radius: 20px;
+  aspect-ratio: 1 / 1;
 }
 .pp-trend-card--big .pp-trend-card__region {
-  margin-top: 12px;
-  font-size: 18px;
+  display: block;
+  margin: 0;
+  font-size: 19px;
   font-weight: 900;
   letter-spacing: -0.03em;
   color: #1f1a17;
@@ -4013,7 +4056,7 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
   color: #5a4f44;
 }
 .pp-trend-card--big .pp-trend-card__meta {
-  margin-top: 3px;
+  margin-top: 6px;
   font-size: 12px;
   color: #8e8174;
 }
@@ -4050,8 +4093,16 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+.pp-trend-card--skel {
+  background: #fffdfb;
+  border: 1px solid #eadfd4;
+}
 .pp-trend-card--skel .pp-trend-card__thumb {
   border: none;
+  border-radius: 0;
+}
+.pp-trend-card--skel .pp-trend-card__body {
+  padding: 13px 14px 15px;
 }
 .pp-trend-card--skel .pp-trend-card__name,
 .pp-trend-card--skel .pp-trend-card__meta {
