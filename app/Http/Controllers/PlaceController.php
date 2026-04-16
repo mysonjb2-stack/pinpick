@@ -62,6 +62,8 @@ class PlaceController extends Controller
 
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
         $data['user_id'] = $request->user()->id;
+        // personal-only-v1: 공개 장소 노출 차단 — 항상 비공개로 강제
+        $data['is_public'] = false;
 
         // 좌표가 비어있으면 주소로 forward geocoding
         if (empty($data['lat']) || empty($data['lng'])) {
@@ -157,6 +159,8 @@ class PlaceController extends Controller
         }
 
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
+        // personal-only-v1: 공개 장소 노출 차단 — 항상 비공개로 강제 (기존 true 였던 장소도 update 시 false로 정정)
+        $data['is_public'] = false;
 
         if (empty($data['lat']) || empty($data['lng'])) {
             $addr = $data['road_address'] ?? $data['address'] ?? '';

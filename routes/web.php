@@ -60,14 +60,15 @@ Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi']
 Route::get('/api/phone/fallback', [PlaceController::class, 'phoneFallback'])->name('api.phone.fallback');
 Route::get('/api/static-map', [PlaceController::class, 'staticMap'])->name('api.static-map');
 
-// 트렌딩 장소 (비로그인 접근 가능)
-Route::get('/api/places/trending', [TrendingController::class, 'trending'])->name('api.places.trending');
-Route::get('/api/places/trending/list', [TrendingController::class, 'list'])->name('api.places.trending.list');
-
-// 트렌딩 전체보기 페이지
-Route::view('/explore/trending', 'explore.trending')->name('explore.trending');
-
-// 공개 장소 상세 (비로그인 접근 가능)
-Route::get('/place/{place}', [PublicPlaceController::class, 'show'])->name('public.place.show');
-Route::post('/place/{place}/copy', [PublicPlaceController::class, 'copyToMine'])
-    ->middleware('auth')->name('public.place.copy');
+// ── personal-only-v1: 사람들/공개 장소 라우트 비활성화 (v1-with-people 태그에서 복원 가능) ──
+// // 트렌딩 장소 (비로그인 접근 가능)
+// Route::get('/api/places/trending', [TrendingController::class, 'trending'])->name('api.places.trending');
+// Route::get('/api/places/trending/list', [TrendingController::class, 'list'])->name('api.places.trending.list');
+//
+// // 트렌딩 전체보기 페이지
+// Route::view('/explore/trending', 'explore.trending')->name('explore.trending');
+//
+// // 공개 장소 상세 (비로그인 접근 가능)
+// Route::get('/place/{place}', [PublicPlaceController::class, 'show'])->name('public.place.show');
+// Route::post('/place/{place}/copy', [PublicPlaceController::class, 'copyToMine'])
+//     ->middleware('auth')->name('public.place.copy');

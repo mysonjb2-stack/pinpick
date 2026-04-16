@@ -31,11 +31,13 @@
 @section('content')
 <div class="yg-content">
 
-    {{-- 세그먼트 탭: 사람들 / 내 장소 --}}
+    {{-- personal-only-v1: 세그먼트 탭 제거 (v1-with-people 태그에서 복원 가능) --}}
+    {{--
     <div class="yg-segtab">
         <button type="button" class="yg-segtab__btn is-active" data-pane="people">사람들</button>
         <button type="button" class="yg-segtab__btn" data-pane="mine">내 장소</button>
     </div>
+    --}}
 
     {{-- 상단 히어로 카드 (요약 + 카테고리 탭 + 최근 장소) --}}
     <div class="pp-hero2">
@@ -132,7 +134,8 @@
         </div>
     </div>
 
-    {{-- 사람들 탭 (큐레이션) --}}
+    {{-- personal-only-v1: 사람들 탭 통째로 비활성화 (v1-with-people 태그에서 복원 가능) --}}
+    @if(false)
     <div class="yg-pane is-active" data-pane="people" data-default-region="{{ $defaultRegion ?? '' }}">
         {{-- 1섹션: 이번주 핫한 저장 --}}
         <section class="pp-trend" data-section="weekly">
@@ -300,8 +303,10 @@
         </section>
     </div>
 
-    {{-- 내 장소 탭 — 통합 그리드 (카테고리 탭으로 필터) --}}
-    <div class="yg-pane" data-pane="mine">
+    @endif
+
+    {{-- personal-only-v1: 내 장소 영역만 노출. is-active 기본 활성화 --}}
+    <div class="yg-pane is-active" data-pane="mine">
         {{-- 카테고리 관리 버튼은 히어로 헤드로 이동됨. 패널은 그대로 사용 --}}
         @auth
         <div class="pp-mine-sechead">
@@ -404,26 +409,20 @@
 @push('scripts')
 <script>
 (function() {
-    const STORAGE_KEY = 'pp_home_pane';
-    function setPane(target) {
-        document.querySelectorAll('.yg-segtab__btn').forEach(b => b.classList.toggle('is-active', b.dataset.pane === target));
-        document.querySelectorAll('.yg-pane').forEach(p => p.classList.toggle('is-active', p.dataset.pane === target));
+    // personal-only-v1: 항상 mine 모드. setPane / 세그먼트 탭 비활성화.
+    (function applyMineMode() {
         const tip = document.getElementById('ppFabTip');
-        if (tip) tip.classList.toggle('is-visible', target === 'mine');
+        if (tip) tip.classList.add('is-visible');
         const hero = document.querySelector('.pp-hero2');
         if (hero) {
-            hero.classList.toggle('pp-hero2--compact', target === 'mine');
-            hero.classList.toggle('pp-hero2--mine', target === 'mine');
+            hero.classList.add('pp-hero2--compact');
+            hero.classList.add('pp-hero2--mine');
         }
         const content = document.querySelector('.yg-content');
-        if (content) content.classList.toggle('is-mine', target === 'mine');
+        if (content) content.classList.add('is-mine');
         const title = document.getElementById('ppHeroTitle');
-        if (title && title.dataset.people && title.dataset.mine) {
-            title.textContent = target === 'mine' ? title.dataset.mine : title.dataset.people;
-        }
-    }
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'people' || saved === 'mine') setPane(saved);
+        if (title && title.dataset.mine) title.textContent = title.dataset.mine;
+    })();
 
     // 히어로 카테고리 탭 필터 + 내장소 정렬/필터
     const heroTabs = document.getElementById('ppHeroTabs');
@@ -585,13 +584,7 @@
         }
     }
 
-    document.querySelectorAll('.yg-segtab__btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const target = btn.dataset.pane;
-            setPane(target);
-            try { localStorage.setItem(STORAGE_KEY, target); } catch(e) {}
-        });
-    });
+    // personal-only-v1: 세그먼트 탭 listener 비활성화 (탭 자체가 DOM에 없음)
 })();
 
 // ── 카테고리 관리 (순서 + 이름편집 + 추가 + 삭제) ──
@@ -872,7 +865,8 @@
 })();
 @endguest
 
-// ── 사람들 탭 (트렌딩) ──
+// ── personal-only-v1: 사람들 탭 (트렌딩) IIFE 통째로 비활성화 (v1-with-people 태그에서 복원 가능) ──
+@if(false)
 (function() {
     const peoplePane = document.querySelector('.yg-pane[data-pane="people"]');
     if (!peoplePane) return;
@@ -1187,5 +1181,6 @@
         btn.addEventListener('click', () => setTimeout(maybeInit, 0));
     });
 })();
+@endif
 </script>
 @endpush
