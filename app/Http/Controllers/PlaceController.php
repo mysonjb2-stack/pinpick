@@ -516,7 +516,11 @@ class PlaceController extends Controller
 
         $road = $doc['road_address']['address_name'] ?? '';
         $jibun = $doc['address']['address_name'] ?? '';
-        return response()->json(['address' => $road ?: $jibun]);
+        $address = $road ?: $jibun;
+        return response()->json([
+            'address' => $address,
+            'region' => \App\Http\Controllers\TrendingController::regionOfStatic($address, false),
+        ]);
     }
 
     private function reverseGeocodeGoogle($lat, $lng)
@@ -534,7 +538,10 @@ class PlaceController extends Controller
         $results = $data['results'] ?? [];
         $address = !empty($results[0]['formatted_address']) ? $results[0]['formatted_address'] : '';
 
-        return response()->json(['address' => $address]);
+        return response()->json([
+            'address' => $address,
+            'region' => \App\Http\Controllers\TrendingController::regionOfStatic($address, true),
+        ]);
     }
 
     private function reverseGeocodeNaver($lat, $lng)

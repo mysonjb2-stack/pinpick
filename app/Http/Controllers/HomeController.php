@@ -68,9 +68,21 @@ class HomeController extends Controller
 
         $curation = $this->curation();
 
+        // 로그인 사용자의 최근 저장 장소 주소 기반 기본 지역 (Geolocation fallback용)
+        $defaultRegion = null;
+        if ($request->user() && $recentPlaces->isNotEmpty()) {
+            foreach ($recentPlaces as $p) {
+                if ($p->is_overseas) continue;
+                $addr = $p->road_address ?: $p->address;
+                if (!$addr) continue;
+                $r = TrendingController::regionOfStatic($addr, false);
+                if ($r) { $defaultRegion = $r; break; }
+            }
+        }
+
         return view('home.index', compact(
             'categories', 'myPlaces', 'selectedCategory', 'q', 'curation', 'categoryLatest',
-            'recentPlaces', 'savedCount', 'weekNewCount'
+            'recentPlaces', 'savedCount', 'weekNewCount', 'defaultRegion'
         ));
     }
 

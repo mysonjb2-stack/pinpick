@@ -3845,3 +3845,215 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
   border-radius: 10px;
   flex-shrink: 0;
 }
+
+/* ─────────────────────────────────────────────
+   사람들 탭 · 트렌딩 섹션
+   ───────────────────────────────────────────── */
+.pp-trend {
+  margin-top: 28px;
+}
+.pp-trend__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+.pp-trend__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pp-trend__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #1f1a17;
+}
+.pp-trend__sub {
+  margin: 0;
+  font-size: 12.5px;
+  color: #8e8174;
+  font-weight: 500;
+}
+.pp-trend__more {
+  font-size: 13px;
+  color: #7a6e61;
+  font-weight: 600;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+/* 테마 탭 */
+.pp-trend__themes {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 10px;
+  margin-bottom: 4px;
+}
+.pp-trend__themes::-webkit-scrollbar { display: none; }
+.pp-trend__theme {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 1px solid #eadfd4;
+  border-radius: 999px;
+  background: #fffdfb;
+  color: #5a4f44;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.pp-trend__theme.is-active {
+  background: #2b211e;
+  border-color: #2b211e;
+  color: #fff;
+}
+
+/* 가로 스크롤 리스트 */
+.pp-trend__hscroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 6px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.pp-trend__hscroll::-webkit-scrollbar { display: none; }
+
+/* 카드 */
+.pp-trend-card {
+  width: 164px;
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: inherit;
+  scroll-snap-align: start;
+  display: block;
+}
+.pp-trend-card__thumb {
+  width: 164px;
+  height: 164px;
+  border-radius: 16px;
+  background: #f0e6d9 center/cover no-repeat;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+.pp-trend-card__thumb--ph {
+  background: linear-gradient(135deg, #f5ede3 0%, #e8dcca 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pp-trend-card__ph {
+  color: #b5a288;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.pp-trend-card__badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: #ffd84e;
+  color: #2b211e;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 9px;
+  border-radius: 999px;
+  letter-spacing: -0.01em;
+}
+.pp-trend-card__name {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1f1a17;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-trend-card__meta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #8e8174;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 4섹션 — 큰 카드 (여행자 핀픽) */
+.pp-trend__hscroll--big { gap: 14px; }
+.pp-trend-card--big {
+  width: 240px;
+}
+.pp-trend-card--big .pp-trend-card__thumb {
+  width: 240px;
+  height: 240px;
+  border-radius: 20px;
+}
+.pp-trend-card--big .pp-trend-card__region {
+  margin-top: 12px;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #1f1a17;
+}
+.pp-trend-card--big .pp-trend-card__name {
+  margin-top: 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #5a4f44;
+}
+.pp-trend-card--big .pp-trend-card__meta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #8e8174;
+}
+
+/* 빈 섹션 */
+.pp-trend-empty {
+  width: 100%;
+  padding: 26px 14px;
+  text-align: center;
+  color: #8e8174;
+  font-size: 13px;
+  background: #fffaf5;
+  border: 1px dashed #eadfd4;
+  border-radius: 14px;
+}
+
+/* Skeleton */
+.pp-skel {
+  background: #efe8de;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.pp-skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
+  animation: pp-skel-pulse 1.3s ease-in-out infinite;
+}
+.pp-skel--line { height: 13px; margin-top: 10px; border-radius: 6px; }
+.pp-skel--line-sm { height: 11px; width: 70%; }
+@keyframes pp-skel-pulse {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.pp-trend-card--skel .pp-trend-card__thumb {
+  border: none;
+}
+.pp-trend-card--skel .pp-trend-card__name,
+.pp-trend-card--skel .pp-trend-card__meta {
+  background: transparent;
+}

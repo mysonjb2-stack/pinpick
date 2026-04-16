@@ -133,60 +133,124 @@
     </div>
 
     {{-- 사람들 탭 (큐레이션) --}}
-    <div class="yg-pane is-active" data-pane="people">
-        <div class="yg-section">
-            <div class="yg-section__head">
-                <div class="yg-section__title">이번주 <em>핫한 저장</em></div>
-                <a href="#" class="yg-section__more">더보기 ›</a>
+    <div class="yg-pane is-active" data-pane="people" data-default-region="{{ $defaultRegion ?? '' }}">
+        {{-- 1섹션: 이번주 핫한 저장 --}}
+        <section class="pp-trend" data-section="weekly">
+            <div class="pp-trend__head">
+                <div class="pp-trend__titles">
+                    <h3 class="pp-trend__title">이번주 핫한 저장</h3>
+                    <p class="pp-trend__sub">지금 핀픽에서 많이 저장되는 장소</p>
+                </div>
+                <a href="#" class="pp-trend__more">더보기 ›</a>
             </div>
-            <div class="yg-hscroll">
-                @foreach($curation['weekly'] as $p)
-                    <div class="yg-prod">
-                        <div class="yg-prod__thumb" style="background-image:url('{{ $p['thumb'] }}')">
-                            <span class="yg-prod__rate">{{ number_format($p['saves']) }}</span>
-                        </div>
-                        <div class="yg-prod__name">{{ $p['name'] }}</div>
-                        <div class="yg-prod__meta">{{ $p['category'] }} · {{ $p['area'] }}</div>
-                        <div class="yg-prod__price">{{ number_format($p['saves']) }} 저장</div>
-                    </div>
-                @endforeach
+            <div class="pp-trend__hscroll" data-list="weekly">
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <div class="yg-section">
-            <div class="yg-section__head">
-                <div class="yg-section__title">요즘 많이 찾는 <em>맛집</em></div>
-                <a href="#" class="yg-section__more">더보기 ›</a>
+        {{-- 2섹션: 내 지역에서 많이 저장한 장소 --}}
+        <section class="pp-trend" data-section="region" hidden>
+            <div class="pp-trend__head">
+                <div class="pp-trend__titles">
+                    <h3 class="pp-trend__title" data-title="region">전국에서 많이 저장한 장소</h3>
+                </div>
+                <a href="#" class="pp-trend__more" data-more="region">더보기 ›</a>
             </div>
-            <div class="yg-rank">
-                @foreach(array_slice($curation['trending_food'], 0, 5) as $i => $p)
-                    <div class="yg-rank__item">
-                        <div class="yg-rank__num">{{ $i + 1 }}</div>
-                        <div class="yg-rank__main">
-                            <strong>{{ $p['name'] }}</strong>
-                            <p>{{ $p['category'] }} · {{ $p['area'] }}</p>
-                        </div>
-                        <div class="yg-rank__chip">저장 많음</div>
-                    </div>
-                @endforeach
+            <div class="pp-trend__hscroll" data-list="region">
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <div class="yg-section">
-            <div class="yg-section__head">
-                <div class="yg-section__title">여행자들의 <em>서울 핀픽</em></div>
-                <a href="#" class="yg-section__more">더보기 ›</a>
+        {{-- 3섹션: 요즘 많이 찾는 장소 (테마 탭) --}}
+        <section class="pp-trend" data-section="theme">
+            <div class="pp-trend__head">
+                <div class="pp-trend__titles">
+                    <h3 class="pp-trend__title">요즘 많이 찾는 장소</h3>
+                </div>
+                <a href="#" class="pp-trend__more" data-more="theme">더보기 ›</a>
             </div>
-            <div class="yg-hscroll">
-                @foreach($curation['seoul_trip'] as $p)
-                    <div class="yg-prod">
-                        <div class="yg-prod__thumb" style="background-image:url('{{ $p['thumb'] }}')"></div>
-                        <div class="yg-prod__name">{{ $p['name'] }}</div>
-                        <div class="yg-prod__meta">{{ $p['category'] }} · {{ $p['area'] }}</div>
-                    </div>
-                @endforeach
+            <div class="pp-trend__themes" id="ppThemeTabs" role="tablist">
+                <button type="button" class="pp-trend__theme is-active" data-theme="food">맛집</button>
+                <button type="button" class="pp-trend__theme" data-theme="cafe">카페</button>
+                <button type="button" class="pp-trend__theme" data-theme="travel">여행</button>
+                <button type="button" class="pp-trend__theme" data-theme="beauty">뷰티/케어</button>
+                <button type="button" class="pp-trend__theme" data-theme="stay">숙소</button>
+                <button type="button" class="pp-trend__theme" data-theme="culture">문화/여가</button>
             </div>
-        </div>
+            <div class="pp-trend__hscroll" data-list="theme">
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+            </div>
+        </section>
+
+        {{-- 4섹션: 여행자들의 핀픽 --}}
+        <section class="pp-trend" data-section="travel">
+            <div class="pp-trend__head">
+                <div class="pp-trend__titles">
+                    <h3 class="pp-trend__title">여행자들의 핀픽</h3>
+                    <p class="pp-trend__sub">요즘 많이 저장되는 여행지</p>
+                </div>
+                <a href="#" class="pp-trend__more" data-more="travel">더보기 ›</a>
+            </div>
+            <div class="pp-trend__hscroll pp-trend__hscroll--big" data-list="travel">
+                <div class="pp-trend-card pp-trend-card--big pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--big pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+                <div class="pp-trend-card pp-trend-card--big pp-trend-card--skel">
+                    <div class="pp-trend-card__thumb pp-skel"></div>
+                    <div class="pp-trend-card__name pp-skel pp-skel--line"></div>
+                    <div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div>
+                </div>
+            </div>
+        </section>
     </div>
 
     {{-- 내 장소 탭 — 통합 그리드 (카테고리 탭으로 필터) --}}
@@ -760,5 +824,266 @@
     });
 })();
 @endguest
+
+// ── 사람들 탭 (트렌딩) ──
+(function() {
+    const peoplePane = document.querySelector('.yg-pane[data-pane="people"]');
+    if (!peoplePane) return;
+
+    const DEFAULT_REGION = peoplePane.dataset.defaultRegion || '';
+    const TRENDING_URL = @json(route('api.places.trending'));
+    const PLACE_SHOW_URL = (id) => `/place/${id}`;
+    const STORAGE_REGION = 'pp_trend_region';   // cached {name, ts}
+    const REGION_TTL_MS = 1000 * 60 * 60 * 6;   // 6시간 캐시
+
+    let initialized = false;
+    let currentTheme = 'food';
+    let resolvedRegion = null; // {name, source: 'geo'|'user'|'fallback'}
+
+    function fmtNum(n) {
+        return Number(n || 0).toLocaleString('ko-KR');
+    }
+    function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function buildCard(it, opts) {
+        opts = opts || {};
+        const big = !!opts.big;
+        const groupRegion = !!opts.groupRegion;
+        const thumb = it.thumbnail
+            ? `<div class="pp-trend-card__thumb" style="background-image:url('${escapeHtml(it.thumbnail)}')"></div>`
+            : `<div class="pp-trend-card__thumb pp-trend-card__thumb--ph"><span class="pp-trend-card__ph">핀픽</span></div>`;
+        const badge = groupRegion
+            ? `<span class="pp-trend-card__badge">${fmtNum(it.region_count)} 저장</span>`
+            : `<span class="pp-trend-card__badge">${fmtNum(it.week_count)} 저장</span>`;
+        const theme = it.theme_name || it.category_name || '';
+        const region = it.region || '';
+        const metaParts = [];
+        if (theme) metaParts.push(escapeHtml(theme));
+        if (region) metaParts.push(escapeHtml(region));
+        const meta = metaParts.join(' · ');
+
+        if (big) {
+            return `<a class="pp-trend-card pp-trend-card--big" href="${PLACE_SHOW_URL(it.id)}">
+                ${thumb.replace('pp-trend-card__thumb', 'pp-trend-card__thumb')}
+                <div class="pp-trend-card__region">${escapeHtml(it.region || '')}</div>
+                <div class="pp-trend-card__name">${escapeHtml(it.name)}</div>
+                <div class="pp-trend-card__meta">${fmtNum(it.region_count || it.week_count)} 저장</div>
+            </a>`;
+        }
+
+        const thumbWithBadge = thumb.replace('</div>', `${badge}</div>`);
+        return `<a class="pp-trend-card" href="${PLACE_SHOW_URL(it.id)}">
+            ${thumbWithBadge}
+            <div class="pp-trend-card__name">${escapeHtml(it.name)}</div>
+            <div class="pp-trend-card__meta">${meta}</div>
+        </a>`;
+    }
+
+    function renderEmpty(listEl, message) {
+        listEl.innerHTML = `<div class="pp-trend-empty">${escapeHtml(message)}</div>`;
+    }
+
+    function hideSection(section) {
+        section.hidden = true;
+    }
+
+    async function fetchTrending(params) {
+        const qs = new URLSearchParams(params);
+        const res = await fetch(`${TRENDING_URL}?${qs.toString()}`, {
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error('network');
+        const j = await res.json();
+        return j.items || [];
+    }
+
+    async function loadWeekly() {
+        const section = peoplePane.querySelector('[data-section="weekly"]');
+        const listEl = section.querySelector('[data-list="weekly"]');
+        try {
+            const items = await fetchTrending({ period: '7days', limit: 10 });
+            if (!items.length) { hideSection(section); return; }
+            listEl.innerHTML = items.map(it => buildCard(it)).join('');
+        } catch (e) {
+            hideSection(section);
+        }
+    }
+
+    async function loadRegion(regionName) {
+        const section = peoplePane.querySelector('[data-section="region"]');
+        const listEl = section.querySelector('[data-list="region"]');
+        const titleEl = section.querySelector('[data-title="region"]');
+        const moreEl = section.querySelector('[data-more="region"]');
+
+        const title = regionName
+            ? `${regionName}에서 많이 저장한 장소`
+            : '전국에서 많이 저장한 장소';
+        titleEl.textContent = title;
+        if (moreEl) {
+            moreEl.href = regionName ? `/explore?region=${encodeURIComponent(regionName)}` : '/explore';
+        }
+
+        const params = { period: '30days', limit: 10 };
+        if (regionName) params.region = regionName;
+
+        try {
+            const items = await fetchTrending(params);
+            if (!items.length) {
+                // 지역 데이터가 없으면 전국 fallback
+                if (regionName) {
+                    const fallback = await fetchTrending({ period: '30days', limit: 10 });
+                    if (!fallback.length) { hideSection(section); return; }
+                    titleEl.textContent = '전국에서 많이 저장한 장소';
+                    listEl.innerHTML = fallback.map(it => buildCard(it)).join('');
+                    section.hidden = false;
+                    return;
+                }
+                hideSection(section);
+                return;
+            }
+            listEl.innerHTML = items.map(it => buildCard(it)).join('');
+            section.hidden = false;
+        } catch (e) {
+            hideSection(section);
+        }
+    }
+
+    async function loadTheme(themeSlug) {
+        const section = peoplePane.querySelector('[data-section="theme"]');
+        const listEl = section.querySelector('[data-list="theme"]');
+        const moreEl = section.querySelector('[data-more="theme"]');
+        if (moreEl) moreEl.href = `/explore?theme=${encodeURIComponent(themeSlug)}`;
+
+        // skeleton 복원
+        listEl.innerHTML = `
+            <div class="pp-trend-card pp-trend-card--skel"><div class="pp-trend-card__thumb pp-skel"></div><div class="pp-trend-card__name pp-skel pp-skel--line"></div><div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div></div>
+            <div class="pp-trend-card pp-trend-card--skel"><div class="pp-trend-card__thumb pp-skel"></div><div class="pp-trend-card__name pp-skel pp-skel--line"></div><div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div></div>
+            <div class="pp-trend-card pp-trend-card--skel"><div class="pp-trend-card__thumb pp-skel"></div><div class="pp-trend-card__name pp-skel pp-skel--line"></div><div class="pp-trend-card__meta pp-skel pp-skel--line pp-skel--line-sm"></div></div>
+        `;
+        try {
+            const items = await fetchTrending({ theme: themeSlug, period: '30days', limit: 10 });
+            if (!items.length) {
+                renderEmpty(listEl, '아직 해당 테마의 장소 데이터가 부족해요.');
+                return;
+            }
+            listEl.innerHTML = items.map(it => buildCard(it)).join('');
+        } catch (e) {
+            renderEmpty(listEl, '데이터를 불러오지 못했어요.');
+        }
+    }
+
+    async function loadTravel() {
+        const section = peoplePane.querySelector('[data-section="travel"]');
+        const listEl = section.querySelector('[data-list="travel"]');
+        const moreEl = section.querySelector('[data-more="travel"]');
+        if (moreEl) moreEl.href = '/explore?theme=travel';
+
+        try {
+            const items = await fetchTrending({ theme: 'travel', period: '7days', group_by: 'region', limit: 3 });
+            if (!items.length) { hideSection(section); return; }
+            listEl.innerHTML = items.map(it => buildCard(it, { big: true, groupRegion: true })).join('');
+        } catch (e) {
+            hideSection(section);
+        }
+    }
+
+    // ── 지역 판단 (3단계 우선순위) ──
+    function cachedRegion() {
+        try {
+            const raw = sessionStorage.getItem(STORAGE_REGION);
+            if (!raw) return null;
+            const obj = JSON.parse(raw);
+            if (!obj || !obj.name) return null;
+            if (Date.now() - (obj.ts || 0) > REGION_TTL_MS) return null;
+            return obj.name;
+        } catch (e) { return null; }
+    }
+    function saveRegionCache(name) {
+        try {
+            sessionStorage.setItem(STORAGE_REGION, JSON.stringify({ name, ts: Date.now() }));
+        } catch (e) {}
+    }
+
+    async function reverseGeocodeRegion(lat, lng) {
+        const params = new URLSearchParams({ lat, lng, provider: 'naver' });
+        const res = await fetch(`/api/geocode/reverse?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('geocode');
+        const j = await res.json();
+        return j.region || '';
+    }
+
+    function requestGeolocation() {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) return reject(new Error('no-geo'));
+            navigator.geolocation.getCurrentPosition(
+                pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                err => reject(err),
+                { enableHighAccuracy: false, timeout: 5000, maximumAge: 1000 * 60 * 30 }
+            );
+        });
+    }
+
+    async function resolveRegion() {
+        // 1순위: Geolocation
+        const cached = cachedRegion();
+        if (cached) return { name: cached, source: 'geo-cached' };
+
+        try {
+            const coords = await requestGeolocation();
+            const region = await reverseGeocodeRegion(coords.lat, coords.lng);
+            if (region) {
+                saveRegionCache(region);
+                return { name: region, source: 'geo' };
+            }
+        } catch (e) {
+            // 위치 권한 거부 or 실패 → 2순위로
+        }
+
+        // 2순위: 로그인 사용자의 최근 저장 장소 지역
+        if (DEFAULT_REGION) return { name: DEFAULT_REGION, source: 'user' };
+
+        // 3순위: 전국
+        return { name: '', source: 'fallback' };
+    }
+
+    // 테마 탭 클릭
+    const themeTabs = document.getElementById('ppThemeTabs');
+    if (themeTabs) {
+        themeTabs.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-theme]');
+            if (!btn) return;
+            if (btn.dataset.theme === currentTheme) return;
+            themeTabs.querySelectorAll('[data-theme]').forEach(b => b.classList.toggle('is-active', b === btn));
+            currentTheme = btn.dataset.theme;
+            loadTheme(currentTheme);
+        });
+    }
+
+    async function initPeopleTab() {
+        if (initialized) return;
+        initialized = true;
+
+        // 1섹션, 3섹션, 4섹션은 지역 무관 즉시 로드
+        loadWeekly();
+        loadTheme(currentTheme);
+        loadTravel();
+
+        // 2섹션: 지역 판단 후 로드
+        const { name } = await resolveRegion();
+        resolvedRegion = name;
+        loadRegion(name);
+    }
+
+    // 페이지 로드 시 현재 사람들 탭이 활성화돼 있으면 즉시 초기화, 아니면 탭 클릭 시 초기화
+    function maybeInit() {
+        if (peoplePane.classList.contains('is-active')) initPeopleTab();
+    }
+    maybeInit();
+    document.querySelectorAll('.yg-segtab__btn[data-pane="people"]').forEach(btn => {
+        btn.addEventListener('click', () => setTimeout(maybeInit, 0));
+    });
+})();
 </script>
 @endpush
