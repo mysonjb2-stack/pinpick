@@ -3929,9 +3929,8 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 
 /* 카드 — 크림 박스 스타일 (세로: 이미지 → 본문 영역) */
 .pp-trend-card {
-  flex: 0 0 calc(50% - 6px);
-  min-width: 180px;
-  max-width: 260px;
+  flex: 0 0 auto;
+  width: 220px;
   text-decoration: none;
   color: inherit;
   scroll-snap-align: start;
@@ -3947,7 +3946,7 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 }
 .pp-trend-card__thumb {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 16 / 10;
   border-radius: 0;
   background: #f0e6d9 center/cover no-repeat;
   position: relative;
