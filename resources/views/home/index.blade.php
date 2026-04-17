@@ -526,6 +526,15 @@
             }
             heroSlide.scrollLeft = 0;
             applyMineFilters();
+            // FAB 장소추가 링크에 현재 카테고리 전달
+            const fabLink = document.querySelector('.pp-nav__fab-inner');
+            if (fabLink) {
+                if (!fabLink.dataset.createBase) {
+                    fabLink.dataset.createBase = fabLink.getAttribute('href').split('?')[0];
+                }
+                const base = fabLink.dataset.createBase;
+                fabLink.href = (cat && cat !== 'all') ? base + '?category=' + encodeURIComponent(cat) : base;
+            }
         }
         heroTabs.addEventListener('click', (e) => {
             const btn = e.target.closest('.pp-hero2__tab');

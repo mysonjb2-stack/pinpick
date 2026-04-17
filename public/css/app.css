@@ -418,6 +418,36 @@ input, select, textarea { font: inherit; color: inherit; }
   box-shadow: 0 0 0 2px rgba(46, 127, 255, 0.25);
 }
 
+/* 지도 빈 카테고리 안내 모달 */
+.pp-map-empty { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.pp-map-empty[hidden] { display: none; }
+.pp-map-empty__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+.pp-map-empty__card {
+  position: relative;
+  width: 100%; max-width: 320px;
+  background: var(--pp-bg);
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+  padding: 22px 20px 18px;
+  text-align: center;
+}
+.pp-map-empty__title {
+  font-size: 15.5px; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--pp-text); margin-bottom: 6px;
+}
+.pp-map-empty__sub {
+  font-size: 13px; color: var(--pp-text-sub); margin-bottom: 16px;
+}
+.pp-map-empty__actions { display: flex; flex-direction: column; gap: 8px; }
+.pp-map-empty__btn {
+  appearance: none; border: 1px solid var(--pp-line); background: var(--pp-bg-soft);
+  color: var(--pp-text); font-size: 14px; font-weight: 600;
+  border-radius: 10px; padding: 11px 14px; cursor: pointer;
+}
+.pp-map-empty__btn--primary {
+  background: var(--pp-primary); border-color: var(--pp-primary); color: #fff;
+}
+
 /* 지도 지역 칩 바 */
 .pp-map-regions {
   position: fixed; left: 8px; right: 8px;

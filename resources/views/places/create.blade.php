@@ -504,7 +504,6 @@ function getGoogleTypeIcon(types) {
 }
 
 async function doSearch(q) {
-    saveRecent(q);
     const isOverseas = currentRegion === 'overseas';
 
     try {
@@ -584,6 +583,8 @@ function renderAcOverseas(suggestions) {
 }
 
 function pickPlace(d) {
+    const _q = (slInput.value || '').trim();
+    if (_q) saveRecent(_q);
     document.getElementById('f_name').value = d.place_name || '';
     document.getElementById('f_phone').value = d.phone || '';
     document.getElementById('f_hours').value = d.opening_hours ? JSON.stringify(d.opening_hours) : '';
@@ -1006,6 +1007,13 @@ catTrigger.addEventListener('click', openCatPanel);
 document.getElementById('catSelectedEdit').addEventListener('click', openCatPanel);
 catCancelBtn.addEventListener('click', closeCatPanel);
 
+// ?category=ID 쿼리 → 신규 작성 시 카테고리 기본 선택
+if (!editMode && !catHidden.value) {
+    const qCat = new URLSearchParams(location.search).get('category');
+    if (qCat && catState.some(c => String(c.id) === String(qCat))) {
+        catHidden.value = qCat;
+    }
+}
 renderChips();
 if (catHidden.value) selectCategory(catHidden.value);
 

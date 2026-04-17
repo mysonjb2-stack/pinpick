@@ -207,7 +207,7 @@
             $showBookBtn = true;
             $bookDirect = true;
             $bookProvider = 'google';
-            $bookUrl = 'https://www.google.com/maps/place/?q=place_id:' . $place->google_place_id;
+            $bookUrl = 'https://www.google.com/maps/search/?api=1&query=' . urlencode($place->name ?: ($place->lat . ',' . $place->lng)) . '&query_place_id=' . $place->google_place_id;
             $bookLabel = '구글 맵에서 예약';
         } elseif ($isNaverFallbackTheme) {
             $showBookBtn = true;

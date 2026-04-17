@@ -24,6 +24,18 @@
     </button>
 </div>
 
+<div class="pp-map-empty" id="ppMapEmpty" hidden aria-hidden="true">
+    <div class="pp-map-empty__backdrop" data-role="close"></div>
+    <div class="pp-map-empty__card" role="dialog" aria-modal="true" aria-labelledby="ppMapEmptyTitle">
+        <div class="pp-map-empty__title" id="ppMapEmptyTitle"></div>
+        <div class="pp-map-empty__sub" id="ppMapEmptySub"></div>
+        <div class="pp-map-empty__actions">
+            <button type="button" class="pp-map-empty__btn pp-map-empty__btn--primary" id="ppMapEmptyGo"></button>
+            <button type="button" class="pp-map-empty__btn" data-role="close">닫기</button>
+        </div>
+    </div>
+</div>
+
 <div class="pp-map-regions" id="ppRegions" hidden>
     <div class="pp-map-regions__title" id="ppRegionsTitle"></div>
     <div class="pp-map-regions__list" id="ppRegionsList"></div>
@@ -165,6 +177,7 @@
         sessionStorage.removeItem('pp_map_naver_view');
         sessionStorage.removeItem('pp_map_google_view');
         sessionStorage.removeItem('pp_map_cat');
+        sessionStorage.removeItem('pp_map_scope');
     }
     // 저장된 뷰포트가 있으면 복원(뒤로가기 등), 없으면 첫 방문 → geolocation으로 현재 위치
     const _hasSavedView = !!(sessionStorage.getItem('pp_map_naver_view') || sessionStorage.getItem('pp_map_google_view'));
@@ -243,6 +256,7 @@
             center: gCenter, zoom: gZoom,
             mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoomControl: false,
             clickableIcons: false,
+            gestureHandling: 'greedy',
         });
         gMap.addListener('click', () => { if (!_pinClickGuard) closeSheet(); });
         gMap.addListener('idle', () => {
@@ -335,7 +349,7 @@
         }, () => {}, { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 });
     }
 
-    function applyScope(scope) {
+    function applyScope(scope, opts = {}) {
         currentScope = scope;
         sessionStorage.setItem('pp_map_scope', scope);
         naverEl.hidden = scope !== 'domestic';
@@ -346,10 +360,16 @@
             initNaver();
             renderNaver(currentCat);
             updateRegions();
+            if (opts.fit) fitToFilteredPlaces();
         } else {
-            waitForGoogle(() => { initGoogle(); renderGoogle(currentCat); updateRegions(); });
+            waitForGoogle(() => {
+                initGoogle();
+                renderGoogle(currentCat);
+                updateRegions();
+                if (opts.fit) fitToFilteredPlaces();
+            });
         }
-        tryInitialGeolocate();
+        if (!opts.fit) tryInitialGeolocate();
     }
 
     // ===== 지역 칩 =====
@@ -453,6 +473,16 @@
         return set.size;
     }
 
+    function updateFabCategory() {
+        const fabLink = document.querySelector('.pp-nav__fab-inner');
+        if (!fabLink) return;
+        if (!fabLink.dataset.createBase) {
+            fabLink.dataset.createBase = fabLink.getAttribute('href').split('?')[0];
+        }
+        const base = fabLink.dataset.createBase;
+        fabLink.href = (currentCat && currentCat !== 'all') ? base + '?category=' + encodeURIComponent(currentCat) : base;
+    }
+
     const tabs = document.getElementById('ppMapTabs');
     tabs.addEventListener('click', (e) => {
         const btn = e.target.closest('.pp-map-tab');
@@ -466,7 +496,46 @@
         updateRegions();
         // 지역이 1개 이하일 땐 지역 칩이 안 나오므로 자동으로 장소 영역으로 이동
         if (regionCount() < 2) fitToFilteredPlaces();
+        maybeShowCrossScopePrompt();
+        updateFabCategory();
     });
+
+    // ===== 현재 스코프에 장소 없음 + 반대 스코프에 있음 안내 =====
+    const emptyEl = document.getElementById('ppMapEmpty');
+    const emptyTitleEl = document.getElementById('ppMapEmptyTitle');
+    const emptySubEl = document.getElementById('ppMapEmptySub');
+    const emptyGoBtn = document.getElementById('ppMapEmptyGo');
+
+    function closeEmptyPrompt() {
+        emptyEl.hidden = true;
+        emptyEl.setAttribute('aria-hidden', 'true');
+    }
+    emptyEl.addEventListener('click', (e) => {
+        if (e.target.dataset.role === 'close') closeEmptyPrompt();
+    });
+
+    function maybeShowCrossScopePrompt() {
+        if (currentCat === 'all') { closeEmptyPrompt(); return; }
+        const catId = String(currentCat);
+        const inScope = places.filter(p => String(p.category_id) === catId && (!!p.is_overseas) === (currentScope === 'overseas'));
+        if (inScope.length > 0) { closeEmptyPrompt(); return; }
+        const otherScope = currentScope === 'domestic' ? 'overseas' : 'domestic';
+        const inOther = places.filter(p => String(p.category_id) === catId && (!!p.is_overseas) === (otherScope === 'overseas'));
+        if (inOther.length === 0) { closeEmptyPrompt(); return; }
+        const scopeLabel = currentScope === 'domestic' ? '국내' : '해외';
+        const otherLabel = otherScope === 'domestic' ? '국내' : '해외';
+        const catName = CATEGORY_NAMES[currentCat] || '장소';
+        emptyTitleEl.textContent = `저장된 ${scopeLabel} ${catName}이 없어요`;
+        emptySubEl.textContent = `${otherLabel} ${inOther.length}곳`;
+        emptyGoBtn.textContent = `${otherLabel}에서 보기`;
+        emptyGoBtn.onclick = () => {
+            closeEmptyPrompt();
+            scopeEl.querySelectorAll('.yg-segtab__btn').forEach(b => b.classList.toggle('is-active', b.dataset.scope === otherScope));
+            applyScope(otherScope, { fit: true });
+        };
+        emptyEl.hidden = false;
+        emptyEl.setAttribute('aria-hidden', 'false');
+    }
 
     // ===== Bottom sheet =====
     const sheet = document.getElementById('ppMapSheet');
@@ -591,6 +660,7 @@
         });
     }
     applyScope(currentScope);
+    updateFabCategory();
 })();
 </script>
 @endpush
