@@ -82,6 +82,17 @@
             <input class="pp-input" name="phone" id="f_phone" inputmode="tel" value="{{ $editMode ? $place->phone : '' }}">
         </div>
 
+        @if($editMode)
+        <div class="pp-field" id="naverUrlField" style="{{ $place->is_overseas ? 'display:none' : '' }}">
+            <label class="pp-label">
+                네이버 예약 URL
+                <span class="pp-label-sub">(자동 매칭 수정)</span>
+            </label>
+            <input class="pp-input" name="naver_url" id="f_naver_url" placeholder="네이버에서 공유 → 링크 복사 후 붙여넣기" value="{{ $place->naver_place_id ? 'https://m.place.naver.com/place/' . $place->naver_place_id : '' }}">
+            <p class="pp-help-text">자동으로 연결된 네이버 페이지가 잘못되었거나 비어있을 때만 수동으로 붙여넣으세요. 네이버 앱에서 업체 페이지 → 공유 → 링크 복사.</p>
+        </div>
+        @endif
+
         <div class="pp-field">
             <label class="pp-label">주소</label>
             <div class="pp-addr-wrap">
@@ -94,6 +105,7 @@
             <input type="hidden" name="lat" id="f_lat" value="{{ $editMode ? $place->lat : '' }}">
             <input type="hidden" name="lng" id="f_lng" value="{{ $editMode ? $place->lng : '' }}">
             <input type="hidden" name="kakao_place_id" id="f_kpid" value="{{ $editMode ? $place->kakao_place_id : '' }}">
+            <input type="hidden" name="google_place_id" id="f_gpid" value="{{ $editMode ? $place->google_place_id : '' }}">
             <input type="hidden" name="is_overseas" id="f_overseas" value="{{ $editMode && $place->is_overseas ? '1' : '0' }}">
             <input type="hidden" name="opening_hours" id="f_hours" value="{{ $editMode && $place->opening_hours ? json_encode($place->opening_hours) : '' }}">
         </div>
@@ -123,6 +135,11 @@
             </div>
         </div>
 
+        <div class="pp-field" id="visitedDateField" style="{{ ($editMode && $place->status === 'visited') ? '' : 'display:none' }}">
+            <label class="pp-label">방문 날짜</label>
+            <input type="date" class="pp-input" name="visited_at" value="{{ $editMode && $place->visited_at ? $place->visited_at->format('Y-m-d') : '' }}">
+        </div>
+
         <div class="pp-field">
             <label class="pp-label">방문 상태</label>
             <div class="pp-seg">
@@ -130,11 +147,6 @@
                 <button type="button" class="{{ ($editMode ? $place->status : '') === 'visited' ? 'is-active' : '' }}" data-status="visited">방문완료</button>
             </div>
             <input type="hidden" name="status" id="f_status" value="{{ $editMode ? $place->status : 'planned' }}">
-        </div>
-
-        <div class="pp-field" id="visitedDateField" style="{{ ($editMode && $place->status === 'visited') ? '' : 'display:none' }}">
-            <label class="pp-label">방문 날짜</label>
-            <input type="date" class="pp-input" name="visited_at" value="{{ $editMode && $place->visited_at ? $place->visited_at->format('Y-m-d') : '' }}">
         </div>
 
     </form>
@@ -397,6 +409,8 @@ document.querySelectorAll('.sl__region-btn').forEach(btn => {
         currentRegion = btn.dataset.region;
         document.querySelectorAll('.sl__region-btn').forEach(b => b.classList.toggle('is-active', b === btn));
         document.getElementById('f_overseas').value = currentRegion === 'overseas' ? '1' : '0';
+        const nuf = document.getElementById('naverUrlField');
+        if (nuf) nuf.style.display = currentRegion === 'overseas' ? 'none' : '';
         // 전환 시 검색 초기화
         showKeywordInit();
         slInput.value = '';
@@ -577,7 +591,14 @@ function pickPlace(d) {
     document.getElementById('f_addr').value = d.address_name || '';
     document.getElementById('f_lat').value = d.y || '';
     document.getElementById('f_lng').value = d.x || '';
-    document.getElementById('f_kpid').value = d.id || '';
+    // 국내=카카오 id, 해외=구글 place_id로 분기 저장
+    if (currentRegion === 'overseas') {
+        document.getElementById('f_kpid').value = '';
+        document.getElementById('f_gpid').value = d.id || '';
+    } else {
+        document.getElementById('f_kpid').value = d.id || '';
+        document.getElementById('f_gpid').value = '';
+    }
     document.getElementById('f_overseas').value = currentRegion === 'overseas' ? '1' : '0';
     // 카카오에 전화번호/영업시간 없으면 구글로 폴백 조회 (국내만)
     if (currentRegion === 'domestic' && d.place_name) {
@@ -888,6 +909,7 @@ document.getElementById('slMappinSave').addEventListener('click', () => {
         document.getElementById('f_addr').value = '';
         document.getElementById('f_name').value = '';
         document.getElementById('f_kpid').value = '';
+        document.getElementById('f_gpid').value = '';
         document.getElementById('f_overseas').value = currentRegion === 'overseas' ? '1' : '0';
     }
     closeSL();

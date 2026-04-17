@@ -7,6 +7,8 @@ use App\Models\Place;
 use App\Models\PlaceImage;
 use App\Models\Theme;
 use App\Services\ImageProcessor;
+use App\Services\NaverPlaceMatcher;
+use App\Services\NaverUrlParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -44,6 +46,8 @@ class PlaceController extends Controller
             'status' => ['required', 'in:planned,visited'],
             'visited_at' => ['nullable', 'date'],
             'kakao_place_id' => ['nullable', 'string'],
+            'google_place_id' => ['nullable', 'string', 'max:255'],
+            'naver_url' => ['nullable', 'string', 'max:500'],
             'is_overseas' => ['nullable', 'boolean'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
@@ -53,6 +57,17 @@ class PlaceController extends Controller
 
         $themeIds = $data['theme_ids'] ?? [];
         unset($data['theme_ids']);
+
+        // naver_url → naver_place_id 파싱
+        $naverUrlInput = $data['naver_url'] ?? null;
+        unset($data['naver_url']);
+        if ($naverUrlInput) {
+            $parsed = app(NaverUrlParser::class)->extractPlaceId($naverUrlInput);
+            if ($parsed) {
+                $data['naver_place_id'] = $parsed;
+                $data['naver_matched_at'] = now();
+            }
+        }
 
         if (!empty($data['opening_hours'])) {
             $data['opening_hours'] = json_decode($data['opening_hours'], true);
@@ -97,6 +112,7 @@ class PlaceController extends Controller
         }
 
         $this->generateMapThumbnail($place);
+        $this->tryMatchNaverPlaceId($place);
 
         return redirect('/')->with('success', '장소가 저장되었어요.');
     }
@@ -142,6 +158,8 @@ class PlaceController extends Controller
             'status' => ['required', 'in:planned,visited'],
             'visited_at' => ['nullable', 'date'],
             'kakao_place_id' => ['nullable', 'string'],
+            'google_place_id' => ['nullable', 'string', 'max:255'],
+            'naver_url' => ['nullable', 'string', 'max:500'],
             'is_overseas' => ['nullable', 'boolean'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
@@ -151,6 +169,17 @@ class PlaceController extends Controller
 
         $themeIds = $data['theme_ids'] ?? [];
         unset($data['theme_ids']);
+
+        // naver_url → naver_place_id 파싱 (빈 문자열이면 기존 값 유지, 유효값이면 덮어쓰기)
+        $naverUrlInput = $data['naver_url'] ?? null;
+        unset($data['naver_url']);
+        if ($naverUrlInput !== null && $naverUrlInput !== '') {
+            $parsed = app(NaverUrlParser::class)->extractPlaceId($naverUrlInput);
+            if ($parsed) {
+                $data['naver_place_id'] = $parsed;
+                $data['naver_matched_at'] = now();
+            }
+        }
 
         if (!empty($data['opening_hours'])) {
             $data['opening_hours'] = json_decode($data['opening_hours'], true);
@@ -205,7 +234,44 @@ class PlaceController extends Controller
             ]);
         }
 
+        $this->tryMatchNaverPlaceId($place);
+
         return redirect()->route('places.show', $place)->with('success', '수정되었어요.');
+    }
+
+    /**
+     * 저장/수정 직후 네이버 플레이스 ID 동기 매칭.
+     * - 수동 입력값(naver_place_id)이 이미 있으면 스킵 (수동이 우선)
+     * - 해외 장소 스킵
+     * - 국내 좌표(lat 33~39, lng 124~132)만 시도 (Matcher 내부에서도 재검증)
+     * - 매칭 결과 (성공/실패 무관) naver_matched_at 에 기록 → 중복 호출 방지
+     */
+    private function tryMatchNaverPlaceId(Place $place): void
+    {
+        // 수동 입력된 place_id가 있으면 자동 매칭 스킵
+        if (!empty($place->naver_place_id)) return;
+        if ($place->is_overseas) return;
+
+        $lat = (float) $place->lat;
+        $lng = (float) $place->lng;
+        $inKorea = ($lat >= 33.0 && $lat <= 39.0 && $lng >= 124.0 && $lng <= 132.0);
+        if (!$inKorea) return;
+
+        try {
+            $matcher = app(NaverPlaceMatcher::class);
+            $placeId = $matcher->match(
+                $place->name,
+                $lat,
+                $lng,
+                $place->road_address ?: $place->address
+            );
+            $place->forceFill([
+                'naver_place_id' => $placeId ?: $place->naver_place_id,
+                'naver_matched_at' => now(),
+            ])->saveQuietly();
+        } catch (\Throwable $e) {
+            Log::warning('naver match hook failed: ' . $e->getMessage(), ['place_id' => $place->id]);
+        }
     }
 
     public function reorder(Place $place, Request $request)

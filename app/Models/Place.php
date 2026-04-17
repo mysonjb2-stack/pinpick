@@ -15,7 +15,8 @@ class Place extends Model
     protected $fillable = [
         'user_id', 'category_id', 'name', 'phone', 'opening_hours', 'address', 'road_address',
         'lat', 'lng', 'memo', 'status', 'visited_at',
-        'naver_place_id', 'kakao_place_id', 'is_overseas', 'thumbnail', 'sort_order', 'is_visible', 'is_public',
+        'naver_place_id', 'kakao_place_id', 'google_place_id', 'naver_matched_at',
+        'is_overseas', 'thumbnail', 'sort_order', 'is_visible', 'is_public',
     ];
 
     protected $casts = [
@@ -26,6 +27,7 @@ class Place extends Model
         'is_public' => 'boolean',
         'lat' => 'float',
         'lng' => 'float',
+        'naver_matched_at' => 'datetime',
     ];
 
     public function user(): BelongsTo { return $this->belongsTo(User::class); }

@@ -543,6 +543,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .pp-input:focus, .pp-textarea:focus, .pp-select:focus { border-color: var(--pp-primary); background: #fff; }
 .pp-textarea { min-height: 80px; resize: vertical; }
 .pp-label-sub { font-weight: 400; color: var(--pp-text-sub); font-size: 12px; }
+.pp-help-text { margin: 6px 0 0; font-size: 12px; color: var(--pp-text-sub); line-height: 1.5; }
 
 /* 이미지 첨부 */
 .pp-images {
@@ -636,6 +637,72 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 .pp-btn--phone:disabled { background: #ccc; color: #fff; }
 
+/* 하단 CTA 분기: 예약 주 버튼 + 전화 보조 (핀픽 웜톤 팔레트) */
+/* 말풍선 안내 (폴백 "네이버 예약" 버튼 위) */
+.pp-cta-tip {
+  position: relative;
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 11.5px; line-height: 1.3;
+  color: var(--pp-text); background: var(--pp-primary-soft);
+  border: 1px solid var(--pp-line); border-radius: 8px;
+  max-width: calc(50% - 4px);
+  box-sizing: border-box;
+}
+.pp-cta-tip::after {
+  content: ""; position: absolute; left: 16px; bottom: -5px;
+  width: 8px; height: 8px;
+  background: var(--pp-primary-soft);
+  border-right: 1px solid var(--pp-line);
+  border-bottom: 1px solid var(--pp-line);
+  transform: rotate(45deg);
+}
+.pp-cta-row {
+  display: flex; align-items: stretch; gap: 8px;
+}
+.pp-cta-row > .pp-btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.pp-btn--book {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  text-decoration: none;
+  font-weight: 700;
+  border: 0;
+}
+/* 직행(예약 확정): 다크 브라운 primary + 흰 텍스트 */
+.pp-btn--book-direct { background: var(--pp-primary); color: #fff; }
+.pp-btn--book-direct:hover,
+.pp-btn--book-direct:active,
+.pp-btn--book-direct:visited { color: #fff; }
+/* 찾기(검색 딥링크): 크림톤 보조 */
+.pp-btn--book-find {
+  background: var(--pp-primary-soft); color: var(--pp-primary);
+  border: 1px solid var(--pp-line);
+}
+.pp-btn--book-find:hover,
+.pp-btn--book-find:active,
+.pp-btn--book-find:visited { color: var(--pp-primary); }
+.pp-btn__ico {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  font-weight: 800; font-size: 13px; line-height: 1;
+}
+.pp-btn__ico--naver { background: #03C75A; color: #fff; }
+.pp-btn__ico--google { background: #fff; color: #1A73E8; }
+.pp-btn--call {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  text-decoration: none;
+  background: var(--pp-primary-soft); color: var(--pp-primary);
+  border: 1px solid var(--pp-line);
+  font-weight: 700;
+}
+.pp-btn--call:hover,
+.pp-btn--call:active,
+.pp-btn--call:visited { color: var(--pp-primary); }
+
+
 /* 상세 헤더 더보기 메뉴 */
 .pp-header__more { position: relative; }
 .pp-header__del-form { margin: 0; padding: 0; }
@@ -669,9 +736,21 @@ input, select, textarea { font: inherit; color: inherit; }
 
 /* 장소 카드 테마 라인 */
 .pp-card-theme {
-  font-size: 11px; color: #FF4B6E;
+  font-size: 11px; color: var(--pp-primary);
   margin-top: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 테마 뱃지 (홈 카드 meta 줄에 인라인 삽입) */
+.pp-card-theme-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  margin-left: 6px;
+  font-size: 11px; line-height: 1.4;
+  color: var(--pp-primary);
+  background: var(--pp-chip-bg);
+  border: 1px solid var(--pp-line);
+  border-radius: 10px;
+  vertical-align: 1px;
 }
 
 /* 라이트박스 */
@@ -1328,6 +1407,17 @@ body { background: #f8f5f2; }
 .yg-catorder-item__up:not(:disabled):hover,
 .yg-catorder-item__down:not(:disabled):hover {
   background: #2b211e; color: #fff; border-color: #2b211e;
+}
+/* 모바일 터치 :active 잔상 방지 */
+.yg-catorder-item__up,
+.yg-catorder-item__down {
+  -webkit-tap-highlight-color: transparent;
+}
+/* 이동 완료 하이라이트 */
+.yg-catorder-item--moved {
+  background: var(--pp-primary-soft);
+  border-radius: 10px;
+  transition: background 0.5s ease;
 }
 .yg-catorder-panel__add {
   display: flex; align-items: center; justify-content: center;
@@ -2888,6 +2978,12 @@ body { background: #f8f5f2; }
   object-fit: cover;
   display: block;
 }
+/* 네이버 지도 로고 워터마크 축소 (SDK는 size 옵션을 제공하지 않음) */
+.pp-loc__map img[alt="NAVER"],
+.pp-loc__map a[href^="https://www.naver.com"] {
+  transform: scale(0.7);
+  transform-origin: bottom left;
+}
 .pp-loc .pp-dirs { margin-top: 0; }
 .pp-loc__copy {
   display: flex;
@@ -3258,6 +3354,13 @@ body { background: #f8f5f2; }
 }
 .pp-mine-grid__meta {
     font-size: 12px; color: #8a7a6c; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pp-mine-grid__cat { color: var(--pp-text-sub); }
+.pp-mine-grid__dot { color: var(--pp-text-sub); margin: 0 4px; }
+.pp-mine-grid__dot + .pp-card-theme-badge { margin-left: 0; }
+.pp-mine-grid__addr {
+    font-size: 12px; color: var(--pp-text-sub); margin-top: 3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pp-mine-grid__empty {

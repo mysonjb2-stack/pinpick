@@ -368,10 +368,16 @@
                     </div>
                     <div class="pp-mine-grid__body">
                         <div class="pp-mine-grid__name">{{ $p->name }}</div>
-                        @if($p->themes->isNotEmpty())
-                            <div class="pp-card-theme">{{ $p->themes->take(2)->pluck('name')->implode(' · ') }}</div>
+                        <div class="pp-mine-grid__meta">
+                            <span class="pp-mine-grid__cat">{{ $p->category?->name ?? '기타' }}</span>
+                            @if($p->themes->isNotEmpty())
+                                <span class="pp-mine-grid__dot" aria-hidden="true">·</span>
+                                <span class="pp-card-theme-badge">{{ $p->themes->first()->name }}</span>
+                            @endif
+                        </div>
+                        @if($p->road_address || $p->address)
+                            <div class="pp-mine-grid__addr">{{ Str::limit($p->road_address ?: $p->address, 20) }}</div>
                         @endif
-                        <div class="pp-mine-grid__meta">{{ $p->category?->name ?? '기타' }}@if($p->road_address || $p->address) · {{ Str::limit($p->road_address ?: $p->address, 12) }}@endif</div>
                     </div>
                 </a>
             @empty
@@ -783,9 +789,15 @@
         const idx = items.indexOf(li);
         const swapIdx = idx + dir;
         if (swapIdx < 0 || swapIdx >= items.length) return;
+        // 모바일 터치 :active 잔상 제거 — 모든 버튼 blur 처리
+        if (document.activeElement) document.activeElement.blur();
+        orderList.querySelectorAll('button').forEach(b => b.blur());
         if (dir === -1) orderList.insertBefore(li, items[swapIdx]);
         else orderList.insertBefore(items[swapIdx], li);
         refreshUpDown();
+        // 이동된 항목에 잠시 하이라이트
+        li.classList.add('yg-catorder-item--moved');
+        setTimeout(() => li.classList.remove('yg-catorder-item--moved'), 600);
     }
 
     function refreshUpDown() {

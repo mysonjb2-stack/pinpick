@@ -170,20 +170,83 @@
 
 </div>
 
+@php
+    $phoneTel = $place->phone ? preg_replace('/[^0-9+]/', '', $place->phone) : '';
+
+    // 예약 폴백 허용 테마 슬러그 (naver_place_id 없을 때 "네이버 예약" 검색 딥링크 노출)
+    $naverFallbackThemes = ['food', 'beauty', 'stay', 'medical'];
+    $placeThemeSlugs = $place->themes->pluck('slug')->all();
+    $isNaverFallbackTheme = count(array_intersect($naverFallbackThemes, $placeThemeSlugs)) > 0;
+
+    // 버튼 노출 결정
+    $showBookBtn = false;
+    $bookDirect = false;   // true = place_id 있어 직접 예약 페이지로, false = 검색 딥링크 폴백
+    $bookProvider = null;
+    $bookUrl = null;
+    $bookLabel = null;
+
+    if (!$place->is_overseas) {
+        if ($place->naver_place_id) {
+            $showBookBtn = true;
+            $bookDirect = true;
+            $bookProvider = 'naver';
+            $bookUrl = 'https://m.place.naver.com/place/' . $place->naver_place_id . '/booking?entry=plt';
+            $bookLabel = '네이버 예약';
+        } elseif ($isNaverFallbackTheme) {
+            // 예약 가능성 있는 테마에만 폴백 노출
+            $showBookBtn = true;
+            $bookDirect = false;
+            $bookProvider = 'naver';
+            $q = $place->name . ($place->road_address ? ' ' . $place->road_address : '');
+            // placePath=/booking → 검색 결과에서 업체 진입 시 예약 탭으로 바로 연결
+            $bookUrl = 'https://map.naver.com/p/search/' . urlencode($q) . '?placePath=' . urlencode('/booking');
+            $bookLabel = '네이버 예약';
+        }
+    } else {
+        if ($place->google_place_id) {
+            $showBookBtn = true;
+            $bookDirect = true;
+            $bookProvider = 'google';
+            $bookUrl = 'https://www.google.com/maps/place/?q=place_id:' . $place->google_place_id;
+            $bookLabel = '구글 맵에서 예약';
+        } elseif ($isNaverFallbackTheme) {
+            $showBookBtn = true;
+            $bookDirect = false;
+            $bookProvider = 'google';
+            $q = $place->name . ($place->road_address ? ', ' . $place->road_address : '');
+            $bookUrl = 'https://www.google.com/maps/search/' . urlencode($q);
+            $bookLabel = '구글 맵에서 찾기';
+        }
+    }
+@endphp
+
+@if($showBookBtn || $phoneTel)
 <div class="pp-detail-cta">
-    @php $phoneTel = $place->phone ? preg_replace('/[^0-9+]/', '', $place->phone) : ''; @endphp
-    @if($phoneTel)
-        <a href="tel:{{ $phoneTel }}" class="pp-btn pp-btn--block pp-btn--phone">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
-            전화 예약
-        </a>
-    @else
-        <button type="button" class="pp-btn pp-btn--block pp-btn--phone" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
-            전화 예약
-        </button>
+    @if($showBookBtn && !$bookDirect)
+        <div class="pp-cta-tip">네이버 예약을 사용중인 상점만 가능</div>
     @endif
+    <div class="pp-cta-row">
+        @if($showBookBtn)
+            <a href="{{ $bookUrl }}"
+               target="_blank" rel="noopener noreferrer"
+               class="pp-btn pp-btn--block pp-btn--book {{ $bookDirect ? 'pp-btn--book-direct' : 'pp-btn--book-find' }}">
+                @if($bookProvider === 'naver')
+                    <span class="pp-btn__ico pp-btn__ico--naver" aria-hidden="true">N</span>
+                @else
+                    <span class="pp-btn__ico pp-btn__ico--google" aria-hidden="true">G</span>
+                @endif
+                {{ $bookLabel }}
+            </a>
+        @endif
+        @if($phoneTel)
+            <a href="tel:{{ $phoneTel }}" class="pp-btn pp-btn--call">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
+                전화 문의
+            </a>
+        @endif
+    </div>
 </div>
+@endif
 
 @if($place->images->count())
 <div class="pp-lb" id="ppLb" hidden aria-hidden="true" role="dialog" aria-label="이미지 갤러리">
@@ -286,7 +349,7 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
         const map = new naver.maps.Map(el, {
             center: pos, zoom: 16, minZoom: 10,
             draggable: true, pinchZoom: true, scrollWheel: false, disableDoubleTapZoom: false,
-            mapTypeControl: false, zoomControl: false, logoControlOptions: { position: naver.maps.Position.BOTTOM_RIGHT }
+            mapTypeControl: false, zoomControl: false, logoControlOptions: { position: naver.maps.Position.BOTTOM_LEFT }
         });
         new naver.maps.Marker({ position: pos, map: map, title: name });
     }
