@@ -54,8 +54,8 @@
                         <button type="button" class="yg-catorder-panel__done" id="catOrderDone">저장</button>
                     </div>
                 </div>
-                <ul class="yg-catorder-panel__list" id="catOrderList"></ul>
                 <button type="button" class="yg-catorder-panel__add" id="catOrderAdd">＋ 새 카테고리 추가</button>
+                <ul class="yg-catorder-panel__list" id="catOrderList"></ul>
             </div>
         </div>
 
@@ -944,6 +944,19 @@ function reverseGeocodeGoogle() {
 // =========================================
 // 4) 카테고리 관리 (홈과 동일한 yg-catorder-panel 패턴)
 // =========================================
+function ppToast(msg, isError) {
+    const el = document.createElement('div');
+    el.className = 'pp-flash' + (isError ? ' pp-flash--error' : '');
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => {
+        el.style.transition = 'opacity .4s, transform .4s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-6px)';
+        setTimeout(() => el.remove(), 450);
+    }, 2000);
+}
+
 const catHidden = document.getElementById('f_category');
 const catTrigger = document.getElementById('catTrigger');
 const catChipsBox = document.getElementById('catChips');
@@ -1030,9 +1043,14 @@ function moveCatItem(li, dir) {
     const idx = items.indexOf(li);
     const swapIdx = idx + dir;
     if (swapIdx < 0 || swapIdx >= items.length) return;
+    // 모바일 터치 잔상 방지 — 눌린 버튼의 포커스 해제
+    if (document.activeElement) document.activeElement.blur();
     if (dir === -1) catList.insertBefore(li, items[swapIdx]);
     else catList.insertBefore(items[swapIdx], li);
     refreshUpDown();
+    // 이동된 항목에 잠시 하이라이트
+    li.classList.add('yg-catorder-item--moved');
+    setTimeout(() => li.classList.remove('yg-catorder-item--moved'), 600);
 }
 
 function refreshUpDown() {
@@ -1053,13 +1071,14 @@ async function deleteCatItem(li) {
             headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }
         });
         const j = await r.json();
-        if (!j.ok) { alert(j.error || '삭제 실패'); return; }
+        if (!j.ok) { ppToast(j.error || '삭제 실패', true); return; }
         li.remove();
         refreshUpDown();
         catState = catState.filter(x => String(x.id) !== String(id));
         if (String(catHidden.value) === String(id)) selectCategory('');
         renderChips();
-    } catch (e) { alert('네트워크 오류'); }
+        ppToast('카테고리가 삭제되었어요');
+    } catch (e) { ppToast('네트워크 오류', true); }
 }
 
 catDoneBtn.addEventListener('click', async () => {
@@ -1079,10 +1098,10 @@ catDoneBtn.addEventListener('click', async () => {
                     body: JSON.stringify({ name: newName })
                 });
                 const j = await r.json();
-                if (!j.ok) { alert(j.error || '이름 변경 실패: ' + origName); continue; }
+                if (!j.ok) { ppToast(j.error || '이름 변경 실패: ' + origName, true); continue; }
                 const found = catState.find(x => String(x.id) === String(li.dataset.id));
                 if (found) found.name = newName;
-            } catch (e) { alert('네트워크 오류'); }
+            } catch (e) { ppToast('네트워크 오류', true); }
         }
     }
 
@@ -1095,14 +1114,15 @@ catDoneBtn.addEventListener('click', async () => {
             body: JSON.stringify({ order: ids })
         });
         const j = await r.json();
-        if (!j.ok) { alert('순서 저장 실패'); return; }
-    } catch (e) { alert('네트워크 오류'); return; }
+        if (!j.ok) { ppToast('순서 저장 실패', true); return; }
+    } catch (e) { ppToast('네트워크 오류', true); return; }
 
     // 3) 로컬 state 순서 반영
     catState.sort((a, b) => ids.indexOf(+a.id) - ids.indexOf(+b.id));
 
     renderChips();
     closeCatPanel();
+    ppToast('카테고리가 저장되었어요');
 });
 
 catAddBtn.addEventListener('click', async () => {
@@ -1112,11 +1132,12 @@ catAddBtn.addEventListener('click', async () => {
     try {
         const r = await fetch('{{ route('api.categories.store') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
         const j = await r.json();
-        if (!j.ok) { alert('추가 실패'); return; }
+        if (!j.ok) { ppToast('추가 실패', true); return; }
         catState.push({ id: j.item.id, name: j.item.name, is_default: false });
         renderCatOrderList();
         renderChips();
-    } catch (e) { alert('네트워크 오류'); }
+        ppToast('새 카테고리가 추가되었어요');
+    } catch (e) { ppToast('네트워크 오류', true); }
 });
 
 // =========================================

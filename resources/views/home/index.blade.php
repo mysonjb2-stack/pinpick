@@ -340,8 +340,8 @@
                     <button type="button" class="yg-catorder-panel__done" id="catOrderDone">저장</button>
                 </div>
             </div>
-            <ul class="yg-catorder-panel__list" id="catOrderList"></ul>
             <button type="button" class="yg-catorder-panel__add" id="catOrderAdd">＋ 새 카테고리 추가</button>
+            <ul class="yg-catorder-panel__list" id="catOrderList"></ul>
         </div>
         @endauth
 
@@ -789,9 +789,8 @@
         const idx = items.indexOf(li);
         const swapIdx = idx + dir;
         if (swapIdx < 0 || swapIdx >= items.length) return;
-        // 모바일 터치 :active 잔상 제거 — 모든 버튼 blur 처리
+        // 모바일 터치 잔상 방지 — 눌린 버튼의 포커스 해제
         if (document.activeElement) document.activeElement.blur();
-        orderList.querySelectorAll('button').forEach(b => b.blur());
         if (dir === -1) orderList.insertBefore(li, items[swapIdx]);
         else orderList.insertBefore(items[swapIdx], li);
         refreshUpDown();
