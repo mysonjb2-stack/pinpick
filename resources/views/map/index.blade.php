@@ -158,17 +158,16 @@
         return Array.from(buckets.values());
     }
 
-    // 내비게이션 타입 감지: 새 페이지 이동/리로드는 fresh, 브라우저 back/forward는 이전 상태 유지
-    const _navEntry = (performance.getEntriesByType('navigation') || [])[0];
-    const _navType = _navEntry ? _navEntry.type : 'navigate';
-    const isFreshNav = (_navType === 'navigate' || _navType === 'reload');
-
-    // fresh 내비: 이전 뷰포트/카테고리 필터 초기화 → 현재 위치 기준으로 다시 보여주기 위함
-    if (isFreshNav) {
+    // 하단 네비 "내 지도" 탭으로 진입 시 ?me=1 쿼리 → 뷰포트 초기화 후 GPS로 이동
+    const _forceMe = new URLSearchParams(location.search).get('me') === '1';
+    if (_forceMe) {
+        history.replaceState(null, '', location.pathname);
         sessionStorage.removeItem('pp_map_naver_view');
         sessionStorage.removeItem('pp_map_google_view');
         sessionStorage.removeItem('pp_map_cat');
     }
+    // 저장된 뷰포트가 있으면 복원(뒤로가기 등), 없으면 첫 방문 → geolocation으로 현재 위치
+    const _hasSavedView = !!(sessionStorage.getItem('pp_map_naver_view') || sessionStorage.getItem('pp_map_google_view'));
 
     const _savedScope = sessionStorage.getItem('pp_map_scope');
     let currentScope = (_savedScope === 'domestic' || _savedScope === 'overseas') ? _savedScope : @json($defaultScope);
@@ -317,10 +316,10 @@
 
     const creditEl = document.getElementById('ppMapCredit');
 
-    // fresh 내비일 때 최초 1회 현재 위치로 재중앙화 (국내 scope에서만 자동 시도 — 해외 scope는 geolocation이 엉뚱한 곳을 찍을 수 있어 보류)
+    // 저장된 뷰포트 없을 때만 현재 위치로 초기 중앙화 (첫 방문 또는 세션 만료)
     let _initialGeolocated = false;
     function tryInitialGeolocate() {
-        if (_initialGeolocated || !isFreshNav) return;
+        if (_initialGeolocated || _hasSavedView) return;
         if (!navigator.geolocation) { _initialGeolocated = true; return; }
         _initialGeolocated = true;
         navigator.geolocation.getCurrentPosition((pos) => {
