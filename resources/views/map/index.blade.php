@@ -158,6 +158,18 @@
         return Array.from(buckets.values());
     }
 
+    // 내비게이션 타입 감지: 새 페이지 이동/리로드는 fresh, 브라우저 back/forward는 이전 상태 유지
+    const _navEntry = (performance.getEntriesByType('navigation') || [])[0];
+    const _navType = _navEntry ? _navEntry.type : 'navigate';
+    const isFreshNav = (_navType === 'navigate' || _navType === 'reload');
+
+    // fresh 내비: 이전 뷰포트/카테고리 필터 초기화 → 현재 위치 기준으로 다시 보여주기 위함
+    if (isFreshNav) {
+        sessionStorage.removeItem('pp_map_naver_view');
+        sessionStorage.removeItem('pp_map_google_view');
+        sessionStorage.removeItem('pp_map_cat');
+    }
+
     const _savedScope = sessionStorage.getItem('pp_map_scope');
     let currentScope = (_savedScope === 'domestic' || _savedScope === 'overseas') ? _savedScope : @json($defaultScope);
     let currentCat = sessionStorage.getItem('pp_map_cat') || 'all';
@@ -304,6 +316,26 @@
     }
 
     const creditEl = document.getElementById('ppMapCredit');
+
+    // fresh 내비일 때 최초 1회 현재 위치로 재중앙화 (국내 scope에서만 자동 시도 — 해외 scope는 geolocation이 엉뚱한 곳을 찍을 수 있어 보류)
+    let _initialGeolocated = false;
+    function tryInitialGeolocate() {
+        if (_initialGeolocated || !isFreshNav) return;
+        if (!navigator.geolocation) { _initialGeolocated = true; return; }
+        _initialGeolocated = true;
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
+                nMap.setCenter(new naver.maps.LatLng(lat, lng));
+                nMap.setZoom(13);
+            } else if (currentScope === 'overseas' && gMap && typeof google !== 'undefined') {
+                gMap.setCenter({ lat, lng });
+                gMap.setZoom(13);
+            }
+        }, () => {}, { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 });
+    }
+
     function applyScope(scope) {
         currentScope = scope;
         sessionStorage.setItem('pp_map_scope', scope);
@@ -318,6 +350,7 @@
         } else {
             waitForGoogle(() => { initGoogle(); renderGoogle(currentCat); updateRegions(); });
         }
+        tryInitialGeolocate();
     }
 
     // ===== 지역 칩 =====
