@@ -87,7 +87,10 @@
     function catColor(id) {
         const n = Number(id);
         const idx = CATEGORY_ORDER.indexOf(n);
-        if (idx < 0) return '#888';
+        if (idx < 0) {
+            if (Number.isFinite(n)) return FALLBACK_PALETTE[Math.abs(n) % FALLBACK_PALETTE.length];
+            return '#888';
+        }
         if (idx < FIXED_PALETTE.length) return FIXED_PALETTE[idx];
         return FALLBACK_PALETTE[(idx - FIXED_PALETTE.length) % FALLBACK_PALETTE.length];
     }
@@ -110,6 +113,31 @@
             'thumb_url' => optional($p->images->first())->thumb_url ?: '',
         ];
     })->values()) !!};
+
+@guest
+    // 비로그인: localStorage 장소를 places 배열에 병합
+    try {
+        const _guestList = JSON.parse(localStorage.getItem('pinpick_guest_places') || '[]');
+        _guestList.forEach(g => {
+            const lat = +g.lat, lng = +g.lng;
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            const isOv = !!g.is_overseas;
+            places.push({
+                id: String(g.id || ('g' + Date.now())),
+                name: g.name || '',
+                lat, lng,
+                category_id: g.category_id,
+                category_name: g.category_name || '기타',
+                address: g.road_address || g.address || '',
+                phone: g.phone || '',
+                status: g.status || 'planned',
+                is_overseas: isOv,
+                thumb_url: `/api/static-map?lat=${lat}&lng=${lng}&overseas=${isOv ? 1 : 0}&w=320&h=320`,
+                _guest: true,
+            });
+        });
+    } catch (e) { console.warn('guest places parse failed', e); }
+@endguest
 
     function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -423,13 +451,23 @@
         const targets = currentFilteredPlaces().filter(p => regionOf(p) === region);
         if (!targets.length) return;
         if (currentScope === 'domestic' && nMap) {
-            const bounds = new naver.maps.LatLngBounds();
-            targets.forEach(p => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
-            nMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            if (targets.length === 1) {
+                nMap.setCenter(new naver.maps.LatLng(targets[0].lat, targets[0].lng));
+                nMap.setZoom(13);
+            } else {
+                const bounds = new naver.maps.LatLngBounds();
+                targets.forEach(p => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
+                nMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            }
         } else if (currentScope === 'overseas' && gMap) {
-            const bounds = new google.maps.LatLngBounds();
-            targets.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
-            gMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            if (targets.length === 1) {
+                gMap.setCenter({ lat: targets[0].lat, lng: targets[0].lng });
+                gMap.setZoom(13);
+            } else {
+                const bounds = new google.maps.LatLngBounds();
+                targets.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+                gMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            }
         }
     });
 
@@ -448,7 +486,7 @@
         if (currentScope === 'domestic' && nMap) {
             if (targets.length === 1) {
                 nMap.setCenter(new naver.maps.LatLng(targets[0].lat, targets[0].lng));
-                nMap.setZoom(15);
+                nMap.setZoom(13);
             } else {
                 const bounds = new naver.maps.LatLngBounds();
                 targets.forEach(p => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
@@ -457,7 +495,7 @@
         } else if (currentScope === 'overseas' && gMap) {
             if (targets.length === 1) {
                 gMap.setCenter({ lat: targets[0].lat, lng: targets[0].lng });
-                gMap.setZoom(15);
+                gMap.setZoom(13);
             } else {
                 const bounds = new google.maps.LatLngBounds();
                 targets.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
@@ -577,7 +615,8 @@
             const provider = p.is_overseas ? 'google' : 'naver';
             openRoute(provider, p.lat, p.lng, p.name);
         };
-        msDetail.href = '/places/' + p.id;
+        msDetail.hidden = false;
+        msDetail.href = p._guest ? ('/guest/places/' + encodeURIComponent(p.id)) : ('/places/' + p.id);
         sheet.hidden = false;
         sheet.setAttribute('aria-hidden', 'false');
         requestAnimationFrame(() => sheet.classList.add('is-open'));

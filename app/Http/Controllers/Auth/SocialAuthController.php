@@ -32,14 +32,26 @@ class SocialAuthController extends Controller
             return redirect('/login')->with('error', '소셜 로그인에 실패했습니다.');
         }
 
-        $user = User::firstOrCreate(
-            ['provider' => $provider, 'provider_id' => (string) $social->getId()],
-            [
+        $providerId = (string) $social->getId();
+        $email = $social->getEmail();
+
+        $user = User::where('provider', $provider)
+            ->where('provider_id', $providerId)
+            ->first();
+
+        if (!$user && $email) {
+            $user = User::where('email', $email)->first();
+        }
+
+        if (!$user) {
+            $user = User::create([
+                'provider' => $provider,
+                'provider_id' => $providerId,
                 'name' => $social->getName() ?: $social->getNickname() ?: '핀픽러',
-                'email' => $social->getEmail(),
+                'email' => $email,
                 'profile_image' => $social->getAvatar(),
-            ]
-        );
+            ]);
+        }
 
         Auth::login($user, true);
 
@@ -56,6 +68,6 @@ class SocialAuthController extends Controller
 
     private function validateProvider(string $provider): void
     {
-        abort_unless(in_array($provider, ['kakao', 'google'], true), 404);
+        abort_unless(in_array($provider, ['kakao', 'google', 'naver'], true), 404);
     }
 }

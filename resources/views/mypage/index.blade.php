@@ -18,9 +18,14 @@
             @endif
         </div>
         <div>
-            <div class="pp-profile__name">{{ $user->name }}</div>
+            <div class="pp-profile__name">
+                {{ $user->name }}
+                @if($user->email)
+                    <span class="pp-profile__email">({{ $user->email }})</span>
+                @endif
+            </div>
             <div class="pp-profile__sub">
-                {{ $user->provider === 'kakao' ? '카카오 로그인' : ($user->provider === 'google' ? '구글 로그인' : '회원') }}
+                {{ ['kakao' => '카카오 로그인', 'google' => '구글 로그인', 'naver' => '네이버 로그인'][$user->provider] ?? '회원' }}
                 · 저장 장소 {{ $placeCount }}개
             </div>
         </div>

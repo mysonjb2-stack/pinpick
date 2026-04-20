@@ -5,8 +5,11 @@
 @section('header')
 <header class="yg-header">
     <div class="yg-header__brand">
-        <span class="yg-header__logo">핀픽</span>
-        <span class="yg-header__sub">나만의 지도</span>
+        <img src="{{ asset('icon-192.png') }}" alt="" class="yg-header__logo-ico" width="28" height="28">
+        <div class="yg-header__brand-text">
+            <span class="yg-header__logo">핀픽,</span>
+            <span class="yg-header__sub">나만의 지도</span>
+        </div>
     </div>
     <div class="yg-header__actions">
         <a href="#" class="yg-header__icon" aria-label="알림">
@@ -47,6 +50,15 @@
                     <h2 class="pp-hero2__title" id="ppHeroTitle" data-people="{{ auth()->user()->name }}님의 지도" data-mine="내 장소">{{ auth()->user()->name }}님의 지도</h2>
                 @else
                     <h2 class="pp-hero2__title" id="ppHeroTitle">나만의 지도를 시작해보세요</h2>
+                    <div class="pp-guest-cta" id="ppGuestLoginCta" hidden>
+                        <div class="pp-guest-cta__title">간편 로그인하고 더 많이 저장해보세요</div>
+                        <ul class="pp-guest-cta__features">
+                            <li>무제한 장소 저장</li>
+                            <li>장소 사진도 함께 저장</li>
+                            <li>국내·해외 장소를 한눈에</li>
+                        </ul>
+                        <a href="{{ route('login') }}" class="pp-guest-cta__btn">로그인하고 내 지도 이어보기</a>
+                    </div>
                 @endauth
                 @auth
                 <div class="pp-hero2__stats">
@@ -358,8 +370,16 @@
         <div class="pp-mine-grid" id="ppMineGrid">
             @forelse($myPlaces as $p)
                 <a href="{{ route('places.show', $p) }}" class="pp-mine-grid__item" data-cat="{{ $p->category_id }}" data-name="{{ $p->name }}" data-created="{{ $p->created_at->timestamp }}" data-status="{{ $p->status }}">
-                    @php $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
+                    @php
+                        $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null);
+                        $mapThumb = (!$thumbUrl && $p->lat && $p->lng)
+                            ? '/api/static-map?lat=' . $p->lat . '&lng=' . $p->lng . '&overseas=' . ($p->is_overseas ? 1 : 0) . '&w=320&h=320'
+                            : null;
+                    @endphp
                     <div class="pp-mine-grid__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
+                        @if($mapThumb)
+                            <img class="pp-mine-grid__thumb-img" src="{{ $mapThumb }}" alt="{{ $p->name }} 위치 지도" loading="lazy" onerror="this.remove()">
+                        @endif
                         @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                         <span class="pp-mine-grid__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                         @if($p->status === 'visited' && $p->visited_at)
@@ -413,6 +433,38 @@
 @endsection
 
 @push('scripts')
+@auth
+<script>
+// 비로그인 저장 장소 → 로그인 계정으로 이관
+(function() {
+    const KEY = 'pinpick_guest_places';
+    let list;
+    try { list = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return; }
+    if (!Array.isArray(list) || !list.length) return;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    fetch('/api/places/import-guest', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ places: list })
+    })
+    .then(r => r.ok ? r.json() : Promise.reject(r))
+    .then(j => {
+        if (j && j.ok) {
+            localStorage.removeItem(KEY);
+            const n = j.imported || list.length;
+            const toast = document.createElement('div');
+            toast.textContent = `저장했던 장소 ${n}개를 내 지도로 옮겼어요`;
+            toast.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#2b211e;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22);letter-spacing:-.01em';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2400);
+            setTimeout(() => location.reload(), 600);
+        }
+    })
+    .catch(() => {});
+})();
+</script>
+@endauth
 <script>
 (function() {
     // personal-only-v1: 항상 mine 모드. setPane / 세그먼트 탭 비활성화.
@@ -852,6 +904,13 @@
     if (!grid) return;
     const list = JSON.parse(localStorage.getItem('pinpick_guest_places') || '[]');
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    // 1~5개 등록 시 로그인 유도 CTA 노출, 기본 타이틀 숨김
+    const heroTitle = document.getElementById('ppHeroTitle');
+    const loginCta = document.getElementById('ppGuestLoginCta');
+    if (list.length >= 1 && list.length <= 5) {
+        if (heroTitle) heroTitle.hidden = true;
+        if (loginCta) loginCta.hidden = false;
+    }
     if (!list.length) {
         grid.innerHTML = '<a href="{{ route('places.create') }}" class="pp-mine-grid__empty">'
             + '<div class="pp-rspot__plus">＋</div>'
@@ -866,11 +925,17 @@
         const addr = (p.road_address || p.address || '').slice(0, 12);
         const dateHtml = (p.status === 'visited' && p.visited_at)
             ? `<span class="pp-mine-grid__date">${escapeHtml(String(p.visited_at).slice(0,10).replaceAll('-','.'))}</span>` : '';
-        const card = document.createElement('div');
+        const hasLatLng = Number.isFinite(+p.lat) && Number.isFinite(+p.lng);
+        const thumbImg = hasLatLng
+            ? `<img class="pp-mine-grid__thumb-img" alt="${escapeHtml(p.name)} 위치 지도" loading="lazy" src="/api/static-map?lat=${encodeURIComponent(p.lat)}&lng=${encodeURIComponent(p.lng)}&overseas=${p.is_overseas ? 1 : 0}&w=320&h=320" onerror="this.remove()">`
+            : '';
+        const card = document.createElement('a');
         card.className = 'pp-mine-grid__item';
+        card.href = '/guest/places/' + encodeURIComponent(p.id);
         card.dataset.cat = p.category_id;
         card.innerHTML = `
             <div class="pp-mine-grid__thumb">
+                ${thumbImg}
                 <span class="pp-mine-grid__ph">📌</span>
                 <span class="pp-mine-grid__badge">${badge}</span>
                 ${dateHtml}

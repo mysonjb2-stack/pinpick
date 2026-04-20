@@ -126,6 +126,72 @@ class PlaceController extends Controller
         return view('places.show', compact('place', 'naverClientId', 'googleMapsKey'));
     }
 
+    public function showGuest(string $localId)
+    {
+        return view('places.guest-show', [
+            'localId' => $localId,
+            'naverClientId' => config('services.naver_map.client_id'),
+            'googleMapsKey' => config('services.google_maps.api_key'),
+        ]);
+    }
+
+    public function importGuest(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 401);
+
+        $data = $request->validate([
+            'places' => ['required', 'array', 'min:1', 'max:20'],
+            'places.*.name' => ['required', 'string', 'max:255'],
+            'places.*.category_name' => ['nullable', 'string', 'max:255'],
+            'places.*.phone' => ['nullable', 'string', 'max:50'],
+            'places.*.address' => ['nullable', 'string', 'max:255'],
+            'places.*.road_address' => ['nullable', 'string', 'max:255'],
+            'places.*.lat' => ['nullable', 'numeric'],
+            'places.*.lng' => ['nullable', 'numeric'],
+            'places.*.memo' => ['nullable', 'string', 'max:500'],
+            'places.*.status' => ['nullable', 'in:planned,visited'],
+            'places.*.visited_at' => ['nullable'],
+            'places.*.is_overseas' => ['nullable', 'boolean'],
+        ]);
+
+        CategoryController::ensureUserCategories($user);
+        $userCats = Category::where('user_id', $user->id)->get()->keyBy(fn ($c) => mb_strtolower($c->name));
+
+        $maxSort = (int) Place::where('user_id', $user->id)->max('sort_order');
+        $imported = 0;
+
+        foreach ($data['places'] as $p) {
+            $catName = isset($p['category_name']) ? mb_strtolower($p['category_name']) : '';
+            $catId = $userCats[$catName]->id ?? null;
+
+            $lat = isset($p['lat']) && $p['lat'] !== '' ? (float) $p['lat'] : null;
+            $lng = isset($p['lng']) && $p['lng'] !== '' ? (float) $p['lng'] : null;
+            $visited = !empty($p['visited_at']) ? substr($p['visited_at'], 0, 10) : null;
+
+            Place::create([
+                'user_id' => $user->id,
+                'category_id' => $catId,
+                'name' => $p['name'],
+                'phone' => $p['phone'] ?? null,
+                'address' => $p['address'] ?? null,
+                'road_address' => $p['road_address'] ?? null,
+                'lat' => $lat,
+                'lng' => $lng,
+                'memo' => $p['memo'] ?? null,
+                'status' => $p['status'] ?? 'planned',
+                'visited_at' => $visited,
+                'is_overseas' => !empty($p['is_overseas']),
+                'sort_order' => ++$maxSort,
+                'is_visible' => true,
+                'is_public' => false,
+            ]);
+            $imported++;
+        }
+
+        return response()->json(['ok' => true, 'imported' => $imported]);
+    }
+
     public function edit(Place $place, Request $request)
     {
         abort_unless($place->user_id === $request->user()?->id, 403);

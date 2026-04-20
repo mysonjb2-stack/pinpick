@@ -40,6 +40,12 @@ return [
         'redirect' => env('GOOGLE_REDIRECT'),
     ],
 
+    'naver' => [
+        'client_id' => env('NAVER_LOGIN_CLIENT_ID'),
+        'client_secret' => env('NAVER_LOGIN_CLIENT_SECRET'),
+        'redirect' => env('NAVER_LOGIN_REDIRECT'),
+    ],
+
     'kakao_local' => [
         'rest_api_key' => env('KAKAO_REST_API_KEY'),
         'js_key' => env('KAKAO_JS_KEY'),

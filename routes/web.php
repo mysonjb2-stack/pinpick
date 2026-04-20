@@ -19,13 +19,18 @@ Route::get('/login', fn() => view('auth.login'))->name('login');
 
 // 소셜 로그인
 Route::get('/auth/{provider}', [SocialAuthController::class, 'redirect'])
-    ->where('provider', 'kakao|google');
+    ->where('provider', 'kakao|google|naver');
 Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])
-    ->where('provider', 'kakao|google');
+    ->where('provider', 'kakao|google|naver');
 Route::post('/logout', [SocialAuthController::class, 'logout'])->name('logout');
 
 // 장소 (create 폼은 비로그인도 접근 가능 - 게스트는 localStorage 저장)
 Route::get('/places/create', [PlaceController::class, 'create'])->name('places.create');
+
+// 비로그인 전용 장소 상세 (localStorage 데이터를 클라이언트에서 hydrate)
+Route::get('/guest/places/{localId}', [PlaceController::class, 'showGuest'])
+    ->where('localId', '[A-Za-z0-9_\-]+')
+    ->name('guest.places.show');
 Route::middleware('auth')->group(function () {
     Route::post('/places', [PlaceController::class, 'store'])->name('places.store');
     Route::get('/places/{place}', [PlaceController::class, 'show'])->name('places.show');
@@ -34,6 +39,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/places/{place}', [PlaceController::class, 'destroy'])->name('places.destroy');
     Route::delete('/api/place-images/{placeImage}', [PlaceController::class, 'destroyImage'])->name('api.place-images.destroy');
     Route::patch('/api/places/{place}/reorder', [PlaceController::class, 'reorder'])->name('api.places.reorder');
+    Route::post('/api/places/import-guest', [PlaceController::class, 'importGuest'])->name('api.places.import-guest');
 
     // 카테고리 전체보기
     Route::get('/categories/{category}', [CategoryController::class, 'show'])->name('categories.show');

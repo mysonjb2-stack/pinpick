@@ -17,6 +17,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Event::listen(SocialiteWasCalled::class, function (SocialiteWasCalled $event) {
             $event->extendSocialite('kakao', \SocialiteProviders\Kakao\KakaoProvider::class);
+            $event->extendSocialite('naver', \SocialiteProviders\Naver\Provider::class);
         });
     }
 }
