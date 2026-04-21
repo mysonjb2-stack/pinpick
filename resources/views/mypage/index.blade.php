@@ -17,7 +17,7 @@
                 😀
             @endif
         </div>
-        <div>
+        <div class="pp-profile__info">
             <div class="pp-profile__name">
                 {{ $user->name }}
                 @if($user->email)
@@ -29,26 +29,30 @@
                 · 저장 장소 {{ $placeCount }}개
             </div>
         </div>
+        <a href="{{ route('mypage.profile.edit') }}" class="pp-profile__edit" aria-label="프로필 수정">수정</a>
     </div>
 
     <div class="pp-menu">
-        <a href="#" class="pp-menu__item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+        <a href="{{ route('mypage.categories') }}" class="pp-menu__item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
             카테고리 관리
             <span class="pp-menu__arrow">›</span>
         </a>
-        <a href="#" class="pp-menu__item">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
-            여행 루트 ({{ $trips->count() }})
+        <a href="{{ route('notices') }}" class="pp-menu__item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+            공지사항
             <span class="pp-menu__arrow">›</span>
         </a>
-        <form method="POST" action="{{ route('logout') }}">@csrf
-            <button type="submit" class="pp-menu__item" style="width:100%;text-align:left">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
-                로그아웃
-                <span class="pp-menu__arrow">›</span>
-            </button>
-        </form>
+        <a href="{{ route('faq') }}" class="pp-menu__item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+            FAQ
+            <span class="pp-menu__arrow">›</span>
+        </a>
+        <a href="{{ route('terms') }}" class="pp-menu__item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
+            이용약관
+            <span class="pp-menu__arrow">›</span>
+        </a>
     </div>
 @else
     <div class="pp-empty" style="padding-top:80px">

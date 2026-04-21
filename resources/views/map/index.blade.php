@@ -210,6 +210,21 @@
     // 저장된 뷰포트가 있으면 복원(뒤로가기 등), 없으면 첫 방문 → geolocation으로 현재 위치
     const _hasSavedView = !!(sessionStorage.getItem('pp_map_naver_view') || sessionStorage.getItem('pp_map_google_view'));
 
+    // 현위치 캐시 (30분 TTL) — 내 지도 재진입 시 제주도→현위치 깜빡임 제거
+    const GEO_TTL = 30 * 60 * 1000;
+    function readGeoCache() {
+        try {
+            const o = JSON.parse(localStorage.getItem('pp_last_geo') || 'null');
+            if (!o || !Number.isFinite(o.lat) || !Number.isFinite(o.lng)) return null;
+            if (Date.now() - (o.ts || 0) > GEO_TTL) return null;
+            return o;
+        } catch (e) { return null; }
+    }
+    function writeGeoCache(lat, lng) {
+        try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat, lng, ts: Date.now() })); } catch (e) {}
+    }
+    const _cachedGeo = _forceMe ? readGeoCache() : null;
+
     const _savedScope = sessionStorage.getItem('pp_map_scope');
     let currentScope = (_savedScope === 'domestic' || _savedScope === 'overseas') ? _savedScope : @json($defaultScope);
     let currentCat = sessionStorage.getItem('pp_map_cat') || 'all';
@@ -220,12 +235,14 @@
         if (nMap) return;
         if (typeof naver === 'undefined' || !naver.maps) return;
         const domestic = places.filter(p => !p.is_overseas);
-        const c = domestic.length
-            ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
-            : new naver.maps.LatLng(37.5665, 126.9780);
+        const c = _cachedGeo
+            ? new naver.maps.LatLng(_cachedGeo.lat, _cachedGeo.lng)
+            : (domestic.length
+                ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
+                : new naver.maps.LatLng(37.5665, 126.9780));
         const savedN = JSON.parse(sessionStorage.getItem('pp_map_naver_view') || 'null');
         const nCenter = savedN ? new naver.maps.LatLng(savedN.lat, savedN.lng) : c;
-        const nZoom = savedN ? savedN.zoom : 13;
+        const nZoom = savedN ? savedN.zoom : (_cachedGeo ? 15 : 13);
         nMap = new naver.maps.Map('pp-map-naver', {
             center: nCenter, zoom: nZoom,
             mapTypeControl: false, zoomControl: false,
@@ -362,11 +379,14 @@
     let _initialGeolocated = false;
     function tryInitialGeolocate() {
         if (_initialGeolocated || _hasSavedView) return;
-        if (!navigator.geolocation) { _initialGeolocated = true; return; }
         _initialGeolocated = true;
+        // 캐시된 현위치로 이미 중앙화됐으면 재요청 생략
+        if (_cachedGeo) return;
+        if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition((pos) => {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
+            writeGeoCache(lat, lng);
             if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
                 nMap.setCenter(new naver.maps.LatLng(lat, lng));
                 nMap.setZoom(13);
@@ -532,9 +552,8 @@
         if (currentScope === 'domestic') renderNaver(currentCat);
         else renderGoogle(currentCat);
         updateRegions();
-        // 지역이 1개 이하일 땐 지역 칩이 안 나오므로 자동으로 장소 영역으로 이동
-        if (regionCount() < 2) fitToFilteredPlaces();
-        maybeShowCrossScopePrompt();
+        fitToFilteredPlaces();
+        if (!maybeShowEmptyCategory()) maybeShowCrossScopePrompt();
         updateFabCategory();
     });
 
@@ -551,6 +570,24 @@
     emptyEl.addEventListener('click', (e) => {
         if (e.target.dataset.role === 'close') closeEmptyPrompt();
     });
+
+    function maybeShowEmptyCategory() {
+        if (currentCat === 'all') return false;
+        const catId = String(currentCat);
+        const total = places.filter(p => String(p.category_id) === catId);
+        if (total.length > 0) { closeEmptyPrompt(); return false; }
+        const catName = CATEGORY_NAMES[currentCat] || '장소';
+        emptyTitleEl.textContent = `아직 저장한 "${catName}" 장소가 없어요`;
+        emptySubEl.textContent = '';
+        emptyGoBtn.textContent = '장소 추가하기';
+        emptyGoBtn.onclick = () => {
+            closeEmptyPrompt();
+            location.href = '/places/create?category=' + encodeURIComponent(currentCat);
+        };
+        emptyEl.hidden = false;
+        emptyEl.setAttribute('aria-hidden', 'false');
+        return true;
+    }
 
     function maybeShowCrossScopePrompt() {
         if (currentCat === 'all') { closeEmptyPrompt(); return; }
@@ -659,6 +696,7 @@
         navigator.geolocation.getCurrentPosition((pos) => {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
+            writeGeoCache(lat, lng);
             if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
                 const ll = new naver.maps.LatLng(lat, lng);
                 nMap.setCenter(ll);

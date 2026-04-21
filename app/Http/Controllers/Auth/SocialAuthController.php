@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Laravel\Socialite\Facades\Socialite;
 
 class SocialAuthController extends Controller
@@ -54,6 +55,8 @@ class SocialAuthController extends Controller
         }
 
         Auth::login($user, true);
+
+        Cookie::queue('pp_last_login', $provider, 60 * 24 * 365, '/', null, false, false);
 
         return redirect('/');
     }

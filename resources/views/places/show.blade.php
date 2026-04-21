@@ -4,8 +4,8 @@
 
 @section('header')
 <header class="pp-header">
-    <button class="pp-header__icon" onclick="ppShowBack()" aria-label="뒤로">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    <button class="pp-header__icon pp-header__back" onclick="ppShowBack()" aria-label="뒤로">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     </button>
     <div class="pp-header__title">장소 상세</div>
     <div class="pp-header__spacer"></div>

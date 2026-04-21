@@ -7,10 +7,10 @@
     <title>@yield('title', '핀픽') · 핀픽</title>
     <meta name="description" content="내가 저장한 장소를 빠르게 꺼내 쓰는 나만의 지도">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icon-192.png') }}">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('icon-512.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+    <link rel="icon" href="{{ asset('favicon.ico') }}?v={{ filemtime(public_path('favicon.ico')) }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icon-192.png') }}?v={{ filemtime(public_path('icon-192.png')) }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('icon-512.png') }}?v={{ filemtime(public_path('icon-512.png')) }}">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v={{ filemtime(public_path('apple-touch-icon.png')) }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
     @stack('head')

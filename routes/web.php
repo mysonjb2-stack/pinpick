@@ -14,6 +14,15 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/map', [MapController::class, 'index'])->name('map');
 Route::view('/explore', 'explore.index')->name('explore');
 Route::get('/mypage', [MyPageController::class, 'index'])->name('mypage');
+Route::middleware('auth')->group(function () {
+    Route::get('/mypage/profile/edit', [MyPageController::class, 'editProfile'])->name('mypage.profile.edit');
+    Route::post('/mypage/profile', [MyPageController::class, 'updateProfile'])->name('mypage.profile.update');
+    Route::delete('/mypage/account', [MyPageController::class, 'destroyAccount'])->name('mypage.account.destroy');
+    Route::get('/mypage/categories', [MyPageController::class, 'categories'])->name('mypage.categories');
+});
+Route::get('/notices', [MyPageController::class, 'notices'])->name('notices');
+Route::get('/faq', [MyPageController::class, 'faq'])->name('faq');
+Route::get('/terms', [MyPageController::class, 'terms'])->name('terms');
 
 Route::get('/login', fn() => view('auth.login'))->name('login');
 
@@ -39,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/places/{place}', [PlaceController::class, 'destroy'])->name('places.destroy');
     Route::delete('/api/place-images/{placeImage}', [PlaceController::class, 'destroyImage'])->name('api.place-images.destroy');
     Route::patch('/api/places/{place}/reorder', [PlaceController::class, 'reorder'])->name('api.places.reorder');
+    Route::post('/api/places/reorder-all', [PlaceController::class, 'bulkReorder'])->name('api.places.reorder-all');
     Route::post('/api/places/import-guest', [PlaceController::class, 'importGuest'])->name('api.places.import-guest');
 
     // 카테고리 전체보기

@@ -31,13 +31,15 @@ class CategoryController extends Controller
             'name' => 'required|string|max:30',
         ]);
 
-        $maxOrder = Category::where('user_id', $request->user()->id)->max('sort_order') ?? 0;
+        $userId = $request->user()->id;
+
+        Category::where('user_id', $userId)->increment('sort_order');
 
         $cat = Category::create([
-            'user_id'    => $request->user()->id,
+            'user_id'    => $userId,
             'name'       => $data['name'],
             'icon'       => '📌',
-            'sort_order' => $maxOrder + 1,
+            'sort_order' => 0,
             'is_default' => false,
         ]);
 

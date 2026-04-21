@@ -5,7 +5,7 @@
 @section('header')
 <header class="yg-header">
     <div class="yg-header__brand">
-        <img src="{{ asset('icon-192.png') }}" alt="" class="yg-header__logo-ico" width="28" height="28">
+        <img src="{{ asset('icon-192.png') }}?v={{ filemtime(public_path('icon-192.png')) }}" alt="" class="yg-header__logo-ico" width="28" height="28">
         <div class="yg-header__brand-text">
             <span class="yg-header__logo">핀픽,</span>
             <span class="yg-header__sub">나만의 지도</span>
@@ -70,10 +70,10 @@
             </div>
             @auth
             <div class="pp-hero2__head-actions">
-                <button type="button" class="yg-catorder__btn pp-hero2__edit-btn" id="catOrderEditBtnHero">
+                <a href="{{ route('mypage.categories') }}" class="yg-catorder__btn pp-hero2__edit-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
                     카테고리 추가/수정
-                </button>
+                </a>
             </div>
             @endauth
         </div>
@@ -332,6 +332,7 @@
                     <div class="pp-sortfilter__group">
                         <div class="pp-sortfilter__gtitle">정렬</div>
                         <button type="button" class="pp-sortfilter__opt is-active" data-sort="created_desc">최근 등록순</button>
+                        <button type="button" class="pp-sortfilter__opt" data-sort="custom">내 순서</button>
                         <button type="button" class="pp-sortfilter__opt" data-sort="created_asc">오래된 순</button>
                         <button type="button" class="pp-sortfilter__opt" data-sort="name">이름순</button>
                     </div>
@@ -369,7 +370,7 @@
         @auth
         <div class="pp-mine-grid" id="ppMineGrid">
             @forelse($myPlaces as $p)
-                <a href="{{ route('places.show', $p) }}" class="pp-mine-grid__item" data-cat="{{ $p->category_id }}" data-name="{{ $p->name }}" data-created="{{ $p->created_at->timestamp }}" data-status="{{ $p->status }}">
+                <a href="{{ route('places.show', $p) }}" class="pp-mine-grid__item" data-id="{{ $p->id }}" data-cat="{{ $p->category_id }}" data-name="{{ $p->name }}" data-created="{{ $p->created_at->timestamp }}" data-status="{{ $p->status }}" data-order="{{ $p->sort_order }}">
                     @php
                         $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null);
                         $mapThumb = (!$thumbUrl && $p->lat && $p->lng)
@@ -385,6 +386,10 @@
                         @if($p->status === 'visited' && $p->visited_at)
                             <span class="pp-mine-grid__date">{{ $p->visited_at->format('Y.m.d') }}</span>
                         @endif
+                        <div class="pp-mine-grid__reorder" aria-hidden="true">
+                            <button type="button" class="pp-mine-grid__arrow" data-dir="up" aria-label="위로">↑</button>
+                            <button type="button" class="pp-mine-grid__arrow" data-dir="down" aria-label="아래로">↓</button>
+                        </div>
                     </div>
                     <div class="pp-mine-grid__body">
                         <div class="pp-mine-grid__name">{{ $p->name }}</div>
@@ -420,7 +425,7 @@
         <address class="pp-footer__biz-content">
             <span>(주) 맵큐브</span>
             <p>주소 : 경기도 성남시 분당구 황새울로 354 8층</p>
-            <p>대표이사 : 이학영 | 사업자등록번호: 230-81-13255 | 통신판매번호 : 2023-성남분당A-0360 | 전화번호 : 1670-1376 | 전자우편주소 : help.mamap@gmail.com</p>
+            <p>대표이사 : 이학영 | 사업자등록번호: 230-81-13255 | 통신판매번호 : 2023-성남분당A-0360 | 전화번호 : 1670-1376 | 전자우편주소 : help.mapcube@gmail.com</p>
         </address>
         <div class="pp-footer__policy">
             <a href="#">이용약관</a> ㅣ <a href="#">개인정보 수집이용</a> ㅣ <a href="#">위치정보 이용약관</a>
@@ -542,11 +547,60 @@
                 if (currentSort === 'name') {
                     return (a.dataset.name || '').localeCompare(b.dataset.name || '', 'ko');
                 }
+                if (currentSort === 'custom') {
+                    const ao = +a.dataset.order || 0, bo = +b.dataset.order || 0;
+                    if (ao !== bo) return ao - bo;
+                    const ac = +a.dataset.created || 0, bc = +b.dataset.created || 0;
+                    return bc - ac;
+                }
                 const av = +a.dataset.created || 0, bv = +b.dataset.created || 0;
                 return currentSort === 'created_asc' ? av - bv : bv - av;
             });
             items.forEach(el => mineGrid.appendChild(el));
             if (mineEmptyEl) mineGrid.appendChild(mineEmptyEl);
+            mineGrid.classList.toggle('is-reorder', currentSort === 'custom');
+        }
+
+        // ── 내 순서 화살표: DOM swap + debounce로 전체 순서 저장 ──
+        let _reorderTimer = null;
+        function persistMineOrder() {
+            const ids = Array.from(mineGrid.querySelectorAll('.pp-mine-grid__item'))
+                .map(el => +el.dataset.id).filter(Number.isFinite);
+            if (!ids.length) return;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            fetch('{{ route('api.places.reorder-all') }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ order: ids })
+            }).catch(() => {});
+            // 로컬 dataset.order 동기화 (다음 렌더 시 일관성)
+            ids.forEach((id, i) => {
+                const el = mineGrid.querySelector(`.pp-mine-grid__item[data-id="${id}"]`);
+                if (el) el.dataset.order = String(i);
+            });
+        }
+        if (mineGrid) {
+            mineGrid.addEventListener('click', (e) => {
+                const arrow = e.target.closest('.pp-mine-grid__arrow');
+                if (!arrow) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (currentSort !== 'custom') return;
+                const card = arrow.closest('.pp-mine-grid__item');
+                if (!card) return;
+                const visible = Array.from(mineGrid.querySelectorAll('.pp-mine-grid__item'))
+                    .filter(el => el.style.display !== 'none');
+                const idx = visible.indexOf(card);
+                const dir = arrow.dataset.dir === 'up' ? -1 : 1;
+                const swapIdx = idx + dir;
+                if (idx < 0 || swapIdx < 0 || swapIdx >= visible.length) return;
+                if (dir === -1) mineGrid.insertBefore(card, visible[swapIdx]);
+                else mineGrid.insertBefore(visible[swapIdx], card);
+                card.classList.add('pp-mine-grid__item--moved');
+                setTimeout(() => card.classList.remove('pp-mine-grid__item--moved'), 500);
+                if (_reorderTimer) clearTimeout(_reorderTimer);
+                _reorderTimer = setTimeout(persistMineOrder, 500);
+            });
         }
 
         function applyCatFilter(cat, catName) {
@@ -600,7 +654,7 @@
         const sfBtn = document.getElementById('ppSortFilterBtn');
         const sfMenu = document.getElementById('ppSortFilterMenu');
         const sfLabel = document.getElementById('ppSortFilterLabel');
-        const sortLabels = { 'created_desc':'최근 등록순', 'created_asc':'오래된 순', 'name':'이름순' };
+        const sortLabels = { 'created_desc':'최근 등록순', 'created_asc':'오래된 순', 'name':'이름순', 'custom':'내 순서' };
         const statusLabels = { 'all':'', 'planned':'방문예정', 'visited':'방문완료' };
         function refreshSfLabel() {
             const parts = [sortLabels[currentSort]];
@@ -785,18 +839,18 @@
 
             const newId = j.item.id;
 
-            // 1) hidden meta 섹션 추가 (카테고리 관리 리스트의 데이터 소스)
+            // 1) hidden meta 섹션 추가 — 맨 위로 (카테고리 관리 리스트의 데이터 소스)
             const metaWrap = document.querySelector('.yg-mycat-meta');
             if (metaWrap) {
                 const sec = document.createElement('section');
                 sec.className = 'yg-mycat';
                 sec.dataset.catId = newId;
-                sec.dataset.sort = String(metaWrap.children.length);
+                sec.dataset.sort = '0';
                 sec.innerHTML = `<span class="yg-mycat__catname">${escHtml(trimmed)}</span>`;
-                metaWrap.appendChild(sec);
+                metaWrap.prepend(sec);
             }
 
-            // 2) 히어로 탭 버튼 추가
+            // 2) 히어로 탭 버튼 추가 — '전체' 탭 바로 다음(가장 앞)
             const heroTabs = document.getElementById('ppHeroTabs');
             if (heroTabs) {
                 const btn = document.createElement('button');
@@ -804,7 +858,9 @@
                 btn.className = 'pp-hero2__tab';
                 btn.dataset.cat = newId;
                 btn.textContent = trimmed;
-                heroTabs.appendChild(btn);
+                const allBtn = heroTabs.querySelector('.pp-hero2__tab[data-cat="all"]');
+                if (allBtn && allBtn.nextSibling) heroTabs.insertBefore(btn, allBtn.nextSibling);
+                else heroTabs.appendChild(btn);
             }
 
             // 3) 카테고리 관리 리스트에도 즉시 반영

@@ -370,6 +370,22 @@ class PlaceController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function bulkReorder(Request $request)
+    {
+        $data = $request->validate([
+            'order' => 'required|array',
+            'order.*' => 'integer',
+        ]);
+        $userId = $request->user()->id;
+        $ids = array_values(array_unique($data['order']));
+        $valid = Place::where('user_id', $userId)->whereIn('id', $ids)->pluck('id')->all();
+        foreach ($ids as $i => $id) {
+            if (!in_array($id, $valid)) continue;
+            Place::where('id', $id)->where('user_id', $userId)->update(['sort_order' => $i]);
+        }
+        return response()->json(['ok' => true]);
+    }
+
     public function destroyImage(PlaceImage $placeImage, Request $request)
     {
         $place = $placeImage->place;

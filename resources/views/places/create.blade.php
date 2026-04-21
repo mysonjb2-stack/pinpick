@@ -5,8 +5,8 @@
 
 @section('header')
 <header class="pp-header">
-    <button class="pp-header__icon" onclick="history.back()" aria-label="뒤로">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    <button class="pp-header__icon pp-header__back" onclick="history.back()" aria-label="뒤로">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     </button>
     <div class="pp-header__title">{{ $editMode ? '장소 수정' : '장소 추가' }}</div>
 </header>
@@ -1141,7 +1141,7 @@ catAddBtn.addEventListener('click', async () => {
         const r = await fetch('{{ route('api.categories.store') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
         const j = await r.json();
         if (!j.ok) { ppToast('추가 실패', true); return; }
-        catState.push({ id: j.item.id, name: j.item.name, is_default: false });
+        catState.unshift({ id: j.item.id, name: j.item.name, is_default: false });
         renderCatOrderList();
         renderChips();
         ppToast('새 카테고리가 추가되었어요');
