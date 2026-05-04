@@ -193,10 +193,43 @@
                 <div class="sl__recent-head">최근 검색어</div>
                 <ul class="sl__recent-list" id="slRecentList"></ul>
             </div>
-            {{-- 자동완성 결과 리스트 --}}
+            {{-- 자동완성 결과 리스트 (리스트 뷰) --}}
             <div class="sl__ac" id="slAc" hidden>
                 <div class="sl__ac-list" id="slAcList"></div>
             </div>
+            {{-- 검색 결과 지도 뷰 --}}
+            <div class="sl__result" id="slResult" hidden>
+                <div class="sl__result-map-area">
+                    <div class="sl__result-map" id="slResultMapNaver"></div>
+                    <div class="sl__result-map" id="slResultMapGoogle" style="display:none"></div>
+                    <div class="sl__result-top" id="slResultTop" hidden>
+                        <div class="sl__result-notice" id="slResultNotice">결과가 많아요. 내 주변부터 보여드려요</div>
+                        <div class="sl__region-chips" id="slRegionChips"></div>
+                    </div>
+                </div>
+                <div class="sl__result-sheet" id="slResultSheet">
+                    <div class="sl__result-sheet__bar" id="slSheetBar">
+                        <div class="sl__result-sheet__handle"></div>
+                    </div>
+                    <div class="sl__result-sheet__scroll" id="slSheetScroll"></div>
+                </div>
+                <div class="sl__result-iw" id="slIw" hidden>
+                    <button type="button" class="sl__result-iw__close" id="slIwClose" aria-label="닫기">&times;</button>
+                    <div class="sl__result-iw__body">
+                        <div class="sl__result-iw__name" id="slIwName"></div>
+                        <div class="sl__result-iw__meta">
+                            <span class="sl__result-iw__dist" id="slIwDist"></span>
+                            <span class="sl__result-iw__addr" id="slIwAddr"></span>
+                        </div>
+                    </div>
+                    <button type="button" class="sl__result-iw__save" id="slIwSave">저장하기</button>
+                </div>
+            </div>
+            {{-- 뷰 토글 버튼 (지도↔리스트) --}}
+            <button type="button" class="sl__view-toggle" id="slViewToggle" hidden>
+                <svg id="slViewToggleIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                <span id="slViewToggleText">리스트</span>
+            </button>
             {{-- 결과 없음 --}}
             <div class="sl__empty" id="slEmpty" hidden>
                 <div class="sl__empty-icon">🔍</div>
@@ -221,11 +254,12 @@
                 <button type="button" class="sl__mappin-gps" id="slGps" aria-label="현위치">
                     <svg viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="8"/></svg>
                 </button>
-            </div>
-            {{-- 하단 주소 + 저장 --}}
-            <div class="sl__mappin-bottom">
-                <div class="sl__mappin-addr" id="slMappinAddr">지도를 움직여 위치를 지정하세요</div>
-                <button type="button" class="sl__mappin-save" id="slMappinSave">이 위치로 저장</button>
+                {{-- 하단 주소 + 주변 장소 + 저장 --}}
+                <div class="sl__mappin-bottom">
+                    <div class="sl__mappin-addr" id="slMappinAddr">지도를 움직여 위치를 지정하세요</div>
+                    <div class="sl__mappin-nearby" id="slMappinNearby"></div>
+                    <button type="button" class="sl__mappin-save" id="slMappinSave">이 위치로 저장</button>
+                </div>
             </div>
         </div>
     </div>
@@ -369,12 +403,14 @@ function openSL() {
     setTimeout(() => slInput.focus(), 350);
     renderRecent();
     showKeywordInit();
+    refreshGeo();
 }
 function closeSL() {
     SL.classList.remove('is-open');
     document.body.style.overflow = '';
     slInput.value = '';
     slClear.hidden = true;
+    resultViewMode = 'map';
     showKeywordInit();
 }
 
@@ -470,6 +506,10 @@ function renderRecent() {
 function showKeywordInit() {
     slAc.hidden = true;
     slEmpty.hidden = true;
+    document.getElementById('slResult').hidden = true;
+    document.getElementById('slViewToggle').hidden = true;
+    document.getElementById('slIw').hidden = true;
+    document.getElementById('slResultTop').hidden = true;
     slRecent.hidden = false;
     renderRecent();
 }
@@ -477,59 +517,39 @@ function showKeywordInit() {
 // 카테고리 아이콘 매핑 (국내 카카오)
 function getCategoryIcon(cat) {
     if (!cat) return '📍';
-    if (/음식점|맛집/.test(cat)) return '🍽';
-    if (/카페/.test(cat)) return '☕';
-    if (/숙박|호텔|모텔|펜션/.test(cat)) return '🏨';
-    if (/관광|여행|문화/.test(cat)) return '🎭';
-    if (/쇼핑|마트|백화점/.test(cat)) return '🛍';
-    if (/병원|약국|의료/.test(cat)) return '🏥';
+    if (/음식점|맛집|restaurant|food|bakery|meal_delivery/.test(cat)) return '🍽';
+    if (/카페|cafe|coffee/.test(cat)) return '☕';
+    if (/숙박|호텔|모텔|펜션|lodging|hotel|resort/.test(cat)) return '🏨';
+    if (/관광|여행|문화|museum|tourist|amusement|landmark/.test(cat)) return '🎭';
+    if (/쇼핑|마트|백화점|shopping|store|mall|market/.test(cat)) return '🛍';
+    if (/병원|약국|의료|hospital|pharmacy|doctor|health/.test(cat)) return '🏥';
     if (/주차|주유/.test(cat)) return '🅿️';
-    if (/편의점/.test(cat)) return '🏪';
-    if (/지하철|버스|교통/.test(cat)) return '🚇';
+    if (/편의점|convenience/.test(cat)) return '🏪';
+    if (/지하철|버스|교통|airport|station|transit/.test(cat)) return '🚇';
     return '📍';
 }
 
-// 해외 Google 타입 아이콘 매핑
-function getGoogleTypeIcon(types) {
-    if (!types || !types.length) return '📍';
-    const t = types.join(' ');
-    if (/restaurant|food|meal|bakery/.test(t)) return '🍽';
-    if (/cafe|coffee/.test(t)) return '☕';
-    if (/lodging|hotel|motel|resort/.test(t)) return '🏨';
-    if (/museum|tourist|amusement|landmark/.test(t)) return '🎭';
-    if (/shopping|store|mall|market/.test(t)) return '🛍';
-    if (/hospital|pharmacy|doctor|health/.test(t)) return '🏥';
-    if (/airport|station|transit/.test(t)) return '🚇';
-    return '📍';
-}
 
 async function doSearch(q) {
     const isOverseas = currentRegion === 'overseas';
-
     try {
-        if (isOverseas) {
-            // 해외: Google Autocomplete
-            const r = await fetch('/api/search/overseas/autocomplete?q=' + encodeURIComponent(q));
-            const data = await r.json();
-            const suggestions = data.suggestions || [];
-            if (!suggestions.length) {
-                slRecent.hidden = true; slAc.hidden = true; slEmpty.hidden = false;
-                return;
-            }
-            slRecent.hidden = true; slEmpty.hidden = true; slAc.hidden = false;
-            renderAcOverseas(suggestions);
-        } else {
-            // 국내: Kakao 키워드 검색
-            const r = await fetch('/api/search?q=' + encodeURIComponent(q));
-            const data = await r.json();
-            const docs = data.documents || [];
-            if (!docs.length) {
-                slRecent.hidden = true; slAc.hidden = true; slEmpty.hidden = false;
-                return;
-            }
-            slRecent.hidden = true; slEmpty.hidden = true; slAc.hidden = false;
-            renderAcDomestic(docs);
+        const params = new URLSearchParams({ q });
+        if (userLat !== null) { params.set('lat', userLat); params.set('lng', userLng); }
+        const url = (isOverseas ? '/api/search/overseas?' : '/api/search?') + params.toString();
+        const r = await fetch(url);
+        const data = await r.json();
+        const docs = data.documents || [];
+        if (!docs.length) {
+            slRecent.hidden = true; slAc.hidden = true;
+            document.getElementById('slResult').hidden = true;
+            document.getElementById('slViewToggle').hidden = true;
+            slEmpty.hidden = false;
+            return;
         }
+        renderAcDomestic(docs);
+        resultViewMode = 'map';
+        updateViewToggleBtn();
+        showResultMapView(docs);
     } catch (e) {
         slAcList.innerHTML = '<div class="sl__error">검색 중 오류가 발생했어요</div>';
         slAc.hidden = false;
@@ -552,35 +572,6 @@ function renderAcDomestic(docs) {
     });
 }
 
-// 해외 자동완성 렌더링 (Google Autocomplete 결과)
-function renderAcOverseas(suggestions) {
-    slAcList.innerHTML = suggestions.map((s, i) => `
-        <div class="sl__ac-item" data-i="${i}">
-            <div class="sl__ac-icon">${getGoogleTypeIcon(s.types)}</div>
-            <div class="sl__ac-body">
-                <div class="sl__ac-name">${escapeHtml(s.name)}</div>
-                <div class="sl__ac-desc">${escapeHtml(s.description)}</div>
-            </div>
-        </div>
-    `).join('');
-    slAcList.querySelectorAll('.sl__ac-item').forEach(el => {
-        el.addEventListener('click', async () => {
-            const s = suggestions[+el.dataset.i];
-            // 로딩 표시
-            el.classList.add('is-loading');
-            try {
-                const r = await fetch('/api/place/detail?place_id=' + encodeURIComponent(s.place_id));
-                const d = await r.json();
-                if (d.error) { alert('장소 정보를 불러올 수 없어요'); return; }
-                pickPlace(d);
-            } catch (e) {
-                alert('네트워크 오류가 발생했어요');
-            } finally {
-                el.classList.remove('is-loading');
-            }
-        });
-    });
-}
 
 function pickPlace(d) {
     const _q = (slInput.value || '').trim();
@@ -630,6 +621,475 @@ function pickPlace(d) {
 }
 
 document.getElementById('slManual').addEventListener('click', () => { closeSL(); document.getElementById('f_name').focus(); });
+
+// =========================================
+// 2-1) 검색 결과 지도 뷰
+// =========================================
+let resultMapNaver = null, resultMapGoogle = null;
+let resultNaverInited = false, resultGoogleInited = false;
+let rMarkers = [], grMarkers = [];
+let clusterMarkers = [], gClusterMarkers = [];
+let lastDocs = [];
+let lastAllDocs = [];
+let resultViewMode = 'map';
+let selIdx = -1;
+let userLat = null, userLng = null;
+let activeRegion = null;
+let regionGroups = [];
+
+// localStorage 캐시에서 즉시 복원
+try {
+    const cached = JSON.parse(localStorage.getItem('pp_last_geo') || 'null');
+    if (cached && cached.lat && cached.lng) { userLat = cached.lat; userLng = cached.lng; }
+} catch(e) {}
+
+function refreshGeo() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(p => {
+        userLat = p.coords.latitude; userLng = p.coords.longitude;
+        try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat: userLat, lng: userLng })); } catch(e) {}
+    }, () => {}, { enableHighAccuracy: false, timeout: 5000 });
+}
+refreshGeo();
+
+function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371, toRad = v => v * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function fmtDist(km) { return km < 1 ? Math.round(km * 1000) + 'm' : km.toFixed(1) + 'km'; }
+
+const PIN_GRAY = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="34" viewBox="0 0 24 34"><path d="M12 1C5.9 1 1 5.9 1 12c0 8 11 20 11 20s11-12 11-20C23 5.9 18.1 1 12 1z" fill="#9CA3AF" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#fff"/></svg>');
+const PIN_GOLD = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38"><path d="M14 1C7 1 1 7 1 14c0 9.5 13 22 13 22s13-12.5 13-22C27 7 21 1 14 1z" fill="#C9A13A" stroke="#fff" stroke-width="2"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>');
+
+function buildRPin(name, active) {
+    const color = active ? '#C9A13A' : '#9CA3AF';
+    return `<div class="sl__rpin-anchor"><div class="sl__rpin${active ? ' is-active' : ''}">
+        <svg viewBox="0 0 24 34" width="24" height="34"><path d="M12 1C5.9 1 1 5.9 1 12c0 8 11 20 11 20s11-12 11-20C23 5.9 18.1 1 12 1z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#fff"/></svg>
+        <span class="sl__rpin__name">${escapeHtml(name || '')}</span>
+    </div></div>`;
+}
+
+function extractRegion(d) {
+    const addr = d.road_address_name || d.address_name || '';
+    const m = addr.match(/^(서울|부산|대구|인천|광주|대전|울산|세종|경기|충북|충남|전북|전남|경북|경남|강원|제주)/);
+    if (m) return m[1];
+    const p = addr.match(/^(\S+?)(특별시|광역시|특별자치시|특별자치도|도)\s/);
+    if (p) return p[1];
+    const first = addr.split(/[\s,]+/)[0];
+    return first || '기타';
+}
+
+function buildRegionGroups(docs) {
+    const groups = {};
+    docs.forEach(d => {
+        const r = extractRegion(d);
+        if (!groups[r]) groups[r] = [];
+        groups[r].push(d);
+    });
+    return Object.entries(groups).map(([name, items]) => {
+        const cLat = items.reduce((s, d) => s + (+d.y), 0) / items.length;
+        const cLng = items.reduce((s, d) => s + (+d.x), 0) / items.length;
+        const dist = userLat !== null ? haversine(userLat, userLng, cLat, cLng) : 9999;
+        return { name, items, cLat, cLng, dist };
+    }).sort((a, b) => a.dist - b.dist);
+}
+
+function showResultMapView(docs) {
+    const slResult = document.getElementById('slResult');
+    slResult.hidden = false;
+    slRecent.hidden = true;
+    slEmpty.hidden = true;
+    slAc.hidden = true;
+    document.getElementById('slViewToggle').hidden = false;
+
+    lastAllDocs = docs;
+    selIdx = -1;
+    activeRegion = null;
+    document.getElementById('slIw').hidden = true;
+    document.getElementById('slResultSheet').classList.remove('is-expanded');
+
+    const isOverseas = currentRegion === 'overseas';
+    document.getElementById('slResultMapNaver').style.display = isOverseas ? 'none' : 'block';
+    document.getElementById('slResultMapGoogle').style.display = isOverseas ? 'block' : 'none';
+
+    const THRESHOLD = 10;
+    const isClustered = docs.length >= THRESHOLD && userLat !== null;
+
+    if (isClustered) {
+        regionGroups = buildRegionGroups(docs);
+        showClusteredUI(docs, isOverseas);
+    } else {
+        regionGroups = [];
+        document.getElementById('slResultTop').hidden = true;
+        lastDocs = docs;
+        if (isOverseas) {
+            initResultGMap();
+            setTimeout(() => renderGRMarkers(docs), 100);
+        } else {
+            initResultNMap();
+            setTimeout(() => renderNRMarkers(docs), 100);
+        }
+        renderSheet(docs);
+    }
+}
+
+function showClusteredUI(allDocs, isOverseas) {
+    document.getElementById('slResultTop').hidden = false;
+    renderRegionChips();
+
+    if (isOverseas) {
+        initResultGMap();
+    } else {
+        initResultNMap();
+    }
+
+    activeRegion = 'nearby';
+    applyRegionFilter(isOverseas);
+}
+
+function renderRegionChips() {
+    const box = document.getElementById('slRegionChips');
+    let html = `<button type="button" class="sl__region-chip is-active" data-region="nearby">📍 내 주변</button>`;
+    regionGroups.forEach(g => {
+        html += `<button type="button" class="sl__region-chip" data-region="${escapeHtml(g.name)}">${escapeHtml(g.name)} <span style="opacity:.6">${g.items.length}</span></button>`;
+    });
+    box.innerHTML = html;
+    box.querySelectorAll('.sl__region-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            box.querySelectorAll('.sl__region-chip').forEach(b => b.classList.remove('is-active'));
+            btn.classList.add('is-active');
+            activeRegion = btn.dataset.region;
+            document.getElementById('slIw').hidden = true;
+            selIdx = -1;
+            applyRegionFilter(currentRegion === 'overseas');
+        });
+    });
+}
+
+function applyRegionFilter(isOverseas) {
+    clearClusterMarkers();
+
+    let filteredDocs;
+    if (activeRegion === 'nearby') {
+        filteredDocs = [...lastAllDocs].sort((a, b) =>
+            haversine(userLat, userLng, +a.y, +a.x) - haversine(userLat, userLng, +b.y, +b.x)
+        ).slice(0, 5);
+    } else {
+        const group = regionGroups.find(g => g.name === activeRegion);
+        filteredDocs = group ? [...group.items].sort((a, b) =>
+            haversine(userLat, userLng, +a.y, +a.x) - haversine(userLat, userLng, +b.y, +b.x)
+        ) : lastAllDocs;
+    }
+    lastDocs = filteredDocs;
+    renderSheet(filteredDocs);
+
+    if (isOverseas) {
+        setTimeout(() => {
+            renderGRMarkers(filteredDocs);
+            if (activeRegion === 'nearby') renderGClusterMarkers();
+        }, 100);
+    } else {
+        setTimeout(() => {
+            renderNRMarkers(filteredDocs);
+            if (activeRegion === 'nearby') renderNClusterMarkers();
+        }, 100);
+    }
+}
+
+function clearClusterMarkers() {
+    clusterMarkers.forEach(m => m.setMap(null));
+    clusterMarkers = [];
+    gClusterMarkers.forEach(m => m.setMap(null));
+    gClusterMarkers = [];
+}
+
+function buildClusterHtml(name, count) {
+    return `<div class="sl__cluster-anchor"><div class="sl__cluster">
+        <div class="sl__cluster__bubble">${count}</div>
+        <div class="sl__cluster__name">${escapeHtml(name)}</div>
+    </div></div>`;
+}
+
+function renderNClusterMarkers() {
+    if (!resultMapNaver) return;
+    regionGroups.forEach(g => {
+        const nearestGroup = regionGroups[0];
+        if (g === nearestGroup) return;
+        const pos = new naver.maps.LatLng(g.cLat, g.cLng);
+        const m = new naver.maps.Marker({
+            position: pos, map: resultMapNaver,
+            icon: { content: buildClusterHtml(g.name, g.items.length), anchor: new naver.maps.Point(0, 0) },
+            zIndex: 50,
+        });
+        naver.maps.Event.addListener(m, 'click', () => {
+            const chip = document.querySelector(`.sl__region-chip[data-region="${g.name}"]`);
+            if (chip) chip.click();
+        });
+        clusterMarkers.push(m);
+    });
+}
+
+function renderGClusterMarkers() {
+    if (!resultMapGoogle) return;
+    regionGroups.forEach(g => {
+        const nearestGroup = regionGroups[0];
+        if (g === nearestGroup) return;
+        const pos = { lat: g.cLat, lng: g.cLng };
+        const canvas = document.createElement('canvas');
+        canvas.width = 48; canvas.height = 48;
+        const ctx = canvas.getContext('2d');
+        ctx.beginPath(); ctx.arc(24, 24, 20, 0, Math.PI * 2);
+        ctx.fillStyle = '#F2B544'; ctx.fill();
+        ctx.strokeStyle = 'rgba(242,181,68,0.3)'; ctx.lineWidth = 4; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(g.items.length), 24, 24);
+        const m = new google.maps.Marker({
+            position: pos, map: resultMapGoogle,
+            icon: { url: canvas.toDataURL(), scaledSize: new google.maps.Size(48, 48), anchor: new google.maps.Point(24, 24) },
+            label: { text: g.name, color: '#2b211e', fontSize: '10px', fontWeight: '700', className: 'pp-gmarker-label' },
+            zIndex: 50,
+        });
+        m.addListener('click', () => {
+            const chip = document.querySelector(`.sl__region-chip[data-region="${g.name}"]`);
+            if (chip) chip.click();
+        });
+        gClusterMarkers.push(m);
+    });
+}
+
+function initResultNMap() {
+    if (typeof naver === 'undefined') return;
+    if (resultNaverInited) {
+        if (resultMapNaver) setTimeout(() => naver.maps.Event.trigger(resultMapNaver, 'resize'), 50);
+        return;
+    }
+    resultNaverInited = true;
+    resultMapNaver = new naver.maps.Map('slResultMapNaver', {
+        center: new naver.maps.LatLng(37.5665, 126.978),
+        zoom: 15, zoomControl: false, scaleControl: false, mapDataControl: false,
+    });
+}
+
+async function initResultGMap() {
+    if (typeof google === 'undefined') return;
+    if (resultGoogleInited) {
+        if (resultMapGoogle) setTimeout(() => google.maps.event.trigger(resultMapGoogle, 'resize'), 50);
+        return;
+    }
+    resultGoogleInited = true;
+    try {
+        await _gmReady;
+        resultMapGoogle = new google.maps.Map(document.getElementById('slResultMapGoogle'), {
+            center: { lat: 37.5665, lng: 126.978 }, zoom: 15, disableDefaultUI: true,
+        });
+    } catch (e) { console.error('Result GMap init:', e); }
+}
+
+function clearNRMarkers() { rMarkers.forEach(m => m.setMap(null)); rMarkers = []; }
+function clearGRMarkers() { grMarkers.forEach(m => m.setMap(null)); grMarkers = []; }
+
+function renderNRMarkers(docs) {
+    clearNRMarkers();
+    if (!docs.length || !resultMapNaver) return;
+    const bounds = new naver.maps.LatLngBounds();
+    docs.forEach((d, i) => {
+        const pos = new naver.maps.LatLng(+d.y, +d.x);
+        const m = new naver.maps.Marker({
+            position: pos, map: resultMapNaver,
+            icon: { content: buildRPin(d.place_name, false), anchor: new naver.maps.Point(0, 0) },
+            zIndex: 100,
+        });
+        m._idx = i;
+        naver.maps.Event.addListener(m, 'click', () => selectResult(i));
+        rMarkers.push(m);
+        bounds.extend(pos);
+    });
+    if (docs.length === 1) {
+        resultMapNaver.setCenter(new naver.maps.LatLng(+docs[0].y, +docs[0].x));
+        resultMapNaver.setZoom(16);
+    } else {
+        resultMapNaver.fitBounds(bounds, { top: 40, right: 40, bottom: 180, left: 40 });
+    }
+}
+
+function renderGRMarkers(docs) {
+    clearGRMarkers();
+    if (!docs.length || !resultMapGoogle) return;
+    const bounds = new google.maps.LatLngBounds();
+    docs.forEach((d, i) => {
+        const pos = { lat: +d.y, lng: +d.x };
+        const m = new google.maps.Marker({
+            position: pos, map: resultMapGoogle, title: d.place_name || '',
+            icon: {
+                url: 'data:image/svg+xml;charset=UTF-8,' + PIN_GRAY,
+                scaledSize: new google.maps.Size(24, 34),
+                anchor: new google.maps.Point(12, 34),
+                labelOrigin: new google.maps.Point(12, -8),
+            },
+            label: { text: d.place_name || '', color: '#2b211e', fontSize: '11px', fontWeight: '600', className: 'pp-gmarker-label' },
+        });
+        m._idx = i;
+        m.addListener('click', () => selectResult(i));
+        grMarkers.push(m);
+        bounds.extend(pos);
+    });
+    if (docs.length === 1) {
+        resultMapGoogle.setCenter({ lat: +docs[0].y, lng: +docs[0].x });
+        resultMapGoogle.setZoom(16);
+    } else {
+        resultMapGoogle.fitBounds(bounds, { top: 40, right: 40, bottom: 180, left: 40 });
+    }
+}
+
+function renderSheet(docs) {
+    const scroll = document.getElementById('slSheetScroll');
+    scroll.innerHTML = docs.map((d, i) => {
+        const icon = getCategoryIcon(d.category_group_name);
+        let dist = '';
+        if (userLat !== null && d.y && d.x) {
+            dist = `<span class="sl__sheet-dist">${fmtDist(haversine(userLat, userLng, +d.y, +d.x))}</span>`;
+        }
+        const region = regionGroups.length ? `<span class="sl__sheet-region">${escapeHtml(extractRegion(d))}</span>` : '';
+        return `<div class="sl__sheet-item" data-idx="${i}">
+            <div class="sl__sheet-icon">${icon}</div>
+            <div class="sl__sheet-body">
+                <div class="sl__sheet-name">${escapeHtml(d.place_name)}</div>
+                <div class="sl__sheet-addr">${region}${escapeHtml(d.road_address_name || d.address_name || '')}</div>
+            </div>
+            ${dist}
+        </div>`;
+    }).join('');
+    scroll.querySelectorAll('.sl__sheet-item').forEach(el => {
+        el.addEventListener('click', () => selectResult(+el.dataset.idx));
+    });
+}
+
+function selectResult(idx) {
+    if (idx < 0 || idx >= lastDocs.length) return;
+    const d = lastDocs[idx];
+    const prev = selIdx;
+    selIdx = idx;
+    const isOverseas = currentRegion === 'overseas';
+
+    if (isOverseas && resultMapGoogle) {
+        grMarkers.forEach((m, i) => {
+            const sel = i === idx;
+            m.setIcon({
+                url: 'data:image/svg+xml;charset=UTF-8,' + (sel ? PIN_GOLD : PIN_GRAY),
+                scaledSize: new google.maps.Size(sel ? 28 : 24, sel ? 38 : 34),
+                anchor: new google.maps.Point(sel ? 14 : 12, sel ? 38 : 34),
+                labelOrigin: new google.maps.Point(sel ? 14 : 12, -8),
+            });
+            m.setZIndex(sel ? 200 : 100);
+        });
+        resultMapGoogle.panTo({ lat: +d.y, lng: +d.x });
+    } else if (resultMapNaver) {
+        rMarkers.forEach((m, i) => {
+            m.setIcon({
+                content: buildRPin(lastDocs[i].place_name, i === idx),
+                anchor: new naver.maps.Point(0, 0),
+            });
+            m.setZIndex(i === idx ? 200 : 100);
+        });
+        resultMapNaver.panTo(new naver.maps.LatLng(+d.y, +d.x));
+    }
+
+    document.querySelectorAll('.sl__sheet-item').forEach((el, i) => {
+        el.classList.toggle('is-active', i === idx);
+    });
+    const item = document.querySelector(`.sl__sheet-item[data-idx="${idx}"]`);
+    if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    showIw(d);
+}
+
+function showIw(d) {
+    document.getElementById('slIwName').textContent = d.place_name || '';
+    document.getElementById('slIwAddr').textContent = d.road_address_name || d.address_name || '';
+    const distEl = document.getElementById('slIwDist');
+    distEl.textContent = (userLat !== null && d.y && d.x) ? fmtDist(haversine(userLat, userLng, +d.y, +d.x)) : '';
+    document.getElementById('slIw').hidden = false;
+    document.getElementById('slIw')._doc = d;
+}
+
+document.getElementById('slIwClose').addEventListener('click', () => {
+    document.getElementById('slIw').hidden = true;
+});
+document.getElementById('slIwSave').addEventListener('click', () => {
+    const d = document.getElementById('slIw')._doc;
+    if (d) pickPlace(d);
+});
+
+function updateViewToggleBtn() {
+    const label = document.getElementById('slViewToggleText');
+    const icon = document.getElementById('slViewToggleIcon');
+    if (resultViewMode === 'map') {
+        label.textContent = '리스트';
+        icon.innerHTML = '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>';
+    } else {
+        label.textContent = '지도';
+        icon.innerHTML = '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/>';
+    }
+}
+
+document.getElementById('slViewToggle').addEventListener('click', () => {
+    if (resultViewMode === 'map') {
+        resultViewMode = 'list';
+        document.getElementById('slResult').hidden = true;
+        slAc.hidden = false;
+    } else {
+        resultViewMode = 'map';
+        slAc.hidden = true;
+        document.getElementById('slResult').hidden = false;
+        if (currentRegion === 'overseas' && resultMapGoogle) {
+            google.maps.event.trigger(resultMapGoogle, 'resize');
+        } else if (resultMapNaver) {
+            naver.maps.Event.trigger(resultMapNaver, 'resize');
+        }
+    }
+    updateViewToggleBtn();
+});
+
+// 바텀시트 드래그
+(function() {
+    const bar = document.getElementById('slSheetBar');
+    const sheet = document.getElementById('slResultSheet');
+    let dragging = false, startY = 0, startH = 0;
+
+    bar.addEventListener('touchstart', e => {
+        dragging = true;
+        startY = e.touches[0].clientY;
+        startH = sheet.offsetHeight;
+        sheet.style.transition = 'none';
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        const dy = startY - e.touches[0].clientY;
+        const parent = sheet.parentElement;
+        if (!parent) return;
+        const maxH = parent.offsetHeight * 0.85;
+        const minH = 80;
+        sheet.style.height = Math.max(minH, Math.min(maxH, startH + dy)) + 'px';
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+        if (!dragging) return;
+        dragging = false;
+        sheet.style.transition = '';
+        const parent = sheet.parentElement;
+        if (!parent) return;
+        const threshold = parent.offsetHeight * 0.5;
+        if (sheet.offsetHeight > threshold) {
+            sheet.classList.add('is-expanded');
+        } else {
+            sheet.classList.remove('is-expanded');
+        }
+        sheet.style.height = '';
+    });
+})();
 
 // =========================================
 // 주소 직접입력 / 다음 우편번호 검색
@@ -716,7 +1176,9 @@ async function getQueryResults() {
     const isOverseas = currentRegion === 'overseas';
     const endpoint = isOverseas ? '/api/search/overseas' : '/api/search';
     try {
-        const r = await fetch(endpoint + '?q=' + encodeURIComponent(q));
+        const params = new URLSearchParams({ q });
+        if (userLat !== null) { params.set('lat', userLat); params.set('lng', userLng); }
+        const r = await fetch(endpoint + '?' + params.toString());
         const data = await r.json();
         return (data.documents || []).filter(d => d.x && d.y);
     } catch (e) {}
@@ -747,14 +1209,12 @@ function clearNaverMarkers() {
 
 function buildPinpickMarkerHtml(name) {
     const label = escapeHtml(name || '');
-    return `
-        <div class="pp-mappin">
+    return `<div class="pp-mappin-anchor"><div class="pp-mappin">
             <div class="pp-mappin__bubble">
                 <span class="pp-mappin__pin"></span>
                 <span class="pp-mappin__label">${label}</span>
             </div>
-        </div>
-    `;
+        </div></div>`;
 }
 
 function renderNaverMappinMarkers(docs) {
@@ -834,14 +1294,16 @@ function initNaverMappinMap(initialLoc) {
     }
     mappinInited = true;
 
-    const center = initialLoc
-        ? new naver.maps.LatLng(initialLoc.lat, initialLoc.lng)
+    const loc = initialLoc
+        || (userLat !== null ? { lat: userLat, lng: userLng } : null);
+    const center = loc
+        ? new naver.maps.LatLng(loc.lat, loc.lng)
         : new naver.maps.LatLng(37.5665, 126.9780);
     mappinMap = new naver.maps.Map('slMappinMap', {
         center: center, zoom: 15,
         zoomControl: false, scaleControl: false, mapDataControl: false,
     });
-    if (!initialLoc) moveToCurrentLocation('naver');
+    if (!loc) moveToCurrentLocation('naver');
     naver.maps.Event.addListener(mappinMap, 'idle', () => {
         clearTimeout(geoTimer);
         geoTimer = setTimeout(() => reverseGeocodeNaver(), 200);
@@ -860,13 +1322,15 @@ async function initGoogleMappinMap(initialLoc) {
     try {
         await _gmReady;
         await new Promise(r => setTimeout(r, 50));
-        const center = initialLoc
-            ? { lat: initialLoc.lat, lng: initialLoc.lng }
+        const loc = initialLoc
+            || (userLat !== null ? { lat: userLat, lng: userLng } : null);
+        const center = loc
+            ? { lat: loc.lat, lng: loc.lng }
             : { lat: 37.5665, lng: 126.9780 };
         gMappinMap = new google.maps.Map(document.getElementById('slMappinMapGoogle'), {
             center: center, zoom: 15, disableDefaultUI: true,
         });
-        if (!initialLoc) moveToCurrentLocation('google');
+        if (!loc) moveToCurrentLocation('google');
         gMappinMap.addListener('idle', () => {
             clearTimeout(geoTimer);
             geoTimer = setTimeout(() => reverseGeocodeGoogle(), 200);
@@ -934,12 +1398,51 @@ function reverseGeocodeNaver() {
     if (!mappinMap) return;
     const c = mappinMap.getCenter();
     doReverseGeocode(c.lat(), c.lng(), 'naver');
+    fetchNearbyPlaces(c.lat(), c.lng());
 }
 
 function reverseGeocodeGoogle() {
     if (!gMappinMap) return;
     const c = gMappinMap.getCenter();
     doReverseGeocode(c.lat(), c.lng(), 'google');
+    fetchNearbyPlaces(c.lat(), c.lng());
+}
+
+async function fetchNearbyPlaces(lat, lng) {
+    const box = document.getElementById('slMappinNearby');
+    box.innerHTML = '<div class="sl__nearby-loading">주변 장소 검색 중...</div>';
+    try {
+        const r = await fetch(`/api/search/nearby?lat=${lat}&lng=${lng}`);
+        const data = await r.json();
+        const docs = data.documents || [];
+        if (!docs.length) {
+            box.innerHTML = '<div class="sl__nearby-empty">이 근처에 등록된 장소가 없어요</div>';
+            return;
+        }
+        box.innerHTML = '<div class="sl__nearby-title">📍 주변 장소</div>' +
+            docs.map(d => {
+                const dist = d.distance ? `<span class="sl__nearby-dist">${d.distance >= 1000 ? (d.distance/1000).toFixed(1)+'km' : d.distance+'m'}</span>` : '';
+                const cat = d.category_group_name || '';
+                return `<button type="button" class="sl__nearby-item" data-doc='${JSON.stringify(d).replace(/'/g,"&#39;")}'>
+                    <div class="sl__nearby-info">
+                        <span class="sl__nearby-name">${escapeHtml(d.place_name)}</span>
+                        ${cat ? `<span class="sl__nearby-cat">${escapeHtml(cat)}</span>` : ''}
+                    </div>
+                    <div class="sl__nearby-meta">
+                        <span class="sl__nearby-addr">${escapeHtml(d.road_address_name || d.address_name || '')}</span>
+                        ${dist}
+                    </div>
+                </button>`;
+            }).join('');
+        box.querySelectorAll('.sl__nearby-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const d = JSON.parse(btn.dataset.doc);
+                pickPlace(d);
+            });
+        });
+    } catch(e) {
+        box.innerHTML = '<div class="sl__nearby-empty">장소를 불러올 수 없어요</div>';
+    }
 }
 
 // =========================================

@@ -473,14 +473,76 @@ class PlaceController extends Controller
         $key = config('services.kakao_local.rest_api_key');
         if (!$key) return response()->json(['documents' => [], 'error' => 'no_key']);
 
-        $res = \Illuminate\Support\Facades\Http::withHeaders([
-            'Authorization' => 'KakaoAK ' . $key,
-        ])->get('https://dapi.kakao.com/v2/local/search/keyword.json', [
+        $params = [
             'query' => $q,
             'size' => 15,
-        ]);
+        ];
 
-        return response()->json($res->json());
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+        if ($lat && $lng && is_numeric($lat) && is_numeric($lng)) {
+            $params['y'] = $lat;
+            $params['x'] = $lng;
+            $params['sort'] = 'distance';
+        }
+
+        $res = \Illuminate\Support\Facades\Http::withHeaders([
+            'Authorization' => 'KakaoAK ' . $key,
+        ])->get('https://dapi.kakao.com/v2/local/search/keyword.json', $params);
+
+        $data = $res->json();
+        $docs = $data['documents'] ?? [];
+
+        $nq = str_replace(' ', '', $q);
+        $exact = array_values(array_filter($docs, function ($d) use ($nq) {
+            return str_contains(str_replace(' ', '', $d['place_name'] ?? ''), $nq);
+        }));
+
+        if (count($exact) > 0) {
+            $data['documents'] = $exact;
+        }
+
+        return response()->json($data);
+    }
+
+    public function searchNearby(Request $request)
+    {
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+        if (!$lat || !$lng || !is_numeric($lat) || !is_numeric($lng)) {
+            return response()->json(['documents' => []]);
+        }
+
+        $key = config('services.kakao_local.rest_api_key');
+        if (!$key) return response()->json(['documents' => []]);
+
+        $categories = ['FD6', 'CE7', 'AT4', 'CT1', 'AD5', 'HP8'];
+        $all = [];
+        $seen = [];
+
+        foreach ($categories as $cat) {
+            $res = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'KakaoAK ' . $key,
+            ])->get('https://dapi.kakao.com/v2/local/search/category.json', [
+                'category_group_code' => $cat,
+                'x' => $lng,
+                'y' => $lat,
+                'radius' => 20,
+                'sort' => 'distance',
+                'size' => 10,
+            ]);
+
+            foreach (($res->json()['documents'] ?? []) as $doc) {
+                $id = $doc['id'] ?? '';
+                if ($id && isset($seen[$id])) continue;
+                $seen[$id] = true;
+                $all[] = $doc;
+            }
+        }
+
+        usort($all, fn($a, $b) => ($a['distance'] ?? 9999) <=> ($b['distance'] ?? 9999));
+
+        return response()->json(['documents' => array_slice($all, 0, 15)]);
     }
 
     // Google Places API (New) Text Search 프록시
@@ -492,15 +554,28 @@ class PlaceController extends Controller
         $key = config('services.google_places.api_key');
         if (!$key) return response()->json(['documents' => [], 'error' => 'no_key']);
 
+        $body = [
+            'textQuery' => $q,
+            'languageCode' => 'ko',
+            'maxResultCount' => 15,
+        ];
+
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+        if ($lat && $lng && is_numeric($lat) && is_numeric($lng)) {
+            $body['locationBias'] = [
+                'circle' => [
+                    'center' => ['latitude' => (float) $lat, 'longitude' => (float) $lng],
+                    'radius' => 50000.0,
+                ],
+            ];
+        }
+
         $res = \Illuminate\Support\Facades\Http::withHeaders([
             'Content-Type' => 'application/json',
             'X-Goog-Api-Key' => $key,
             'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.location,places.primaryType,places.regularOpeningHours',
-        ])->post('https://places.googleapis.com/v1/places:searchText', [
-            'textQuery' => $q,
-            'languageCode' => 'ko',
-            'maxResultCount' => 15,
-        ]);
+        ])->post('https://places.googleapis.com/v1/places:searchText', $body);
 
         $data = $res->json();
         $places = $data['places'] ?? [];

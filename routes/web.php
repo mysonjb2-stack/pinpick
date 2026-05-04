@@ -70,6 +70,7 @@ Route::get('/api/places/public', [PlaceController::class, 'placesPublicByTheme']
 Route::get('/api/search/overseas/autocomplete', [PlaceController::class, 'autocompleteOverseas'])->name('api.search.overseas.autocomplete');
 Route::get('/api/search/overseas', [PlaceController::class, 'searchOverseas'])->name('api.search.overseas');
 Route::get('/api/search', [PlaceController::class, 'search'])->name('api.search');
+Route::get('/api/search/nearby', [PlaceController::class, 'searchNearby'])->name('api.search.nearby');
 Route::get('/api/place/detail', [PlaceController::class, 'placeDetail'])->name('api.place.detail');
 Route::get('/api/geocode/reverse', [PlaceController::class, 'reverseGeocode'])->name('api.geocode.reverse');
 Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi'])->name('api.geocode.forward');

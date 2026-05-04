@@ -2684,7 +2684,7 @@ body { background: #f8f5f2; }
 
 /* ===== 지도에서 찍기 탭 ===== */
 .sl__mappin-wrap {
-  flex: 1; position: relative; overflow: hidden;
+  position: relative; width: 100%; height: 100%;
 }
 .sl__mappin-map { position: absolute; inset: 0; width: 100%; height: 100%; }
 .sl__mappin-pin {
@@ -2694,22 +2694,25 @@ body { background: #f8f5f2; }
   filter: drop-shadow(0 3px 6px rgba(0,0,0,0.25));
 }
 .sl__mappin-gps {
-  position: absolute; right: 14px; bottom: 14px;
+  position: absolute; right: 14px; top: 14px;
   width: 40px; height: 40px; border-radius: 50%;
   background: #fff; border: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; z-index: 10;
+  cursor: pointer; z-index: 20;
 }
 .sl__mappin-bottom {
-  flex: 0 0 auto;
-  padding: 16px;
-  border-top: 1px solid #eee1d5;
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 15;
+  padding: 14px 16px;
   background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
 }
 .sl__mappin-addr {
   font-size: 14px; color: #333; font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sl__mappin-save {
@@ -2717,6 +2720,360 @@ body { background: #f8f5f2; }
   background: #FF4B6E; color: #fff; border: none;
   border-radius: 12px; font-size: 15px; font-weight: 800;
   cursor: pointer;
+}
+
+/* 지도찍기 — 주변 장소 목록 */
+.sl__mappin-nearby {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+.sl__nearby-loading, .sl__nearby-empty {
+  font-size: 13px; color: var(--pp-text-sub, #8a7a6c);
+  text-align: center; padding: 12px 0;
+}
+.sl__nearby-title {
+  font-size: 13px; font-weight: 700; color: var(--pp-primary, #2b211e);
+  margin-bottom: 8px;
+}
+.sl__nearby-item {
+  display: block; width: 100%;
+  background: none; border: none;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--pp-line, #eee1d5);
+  text-align: left; cursor: pointer;
+}
+.sl__nearby-item:last-child { border-bottom: none; }
+.sl__nearby-item:active { background: #faf5f0; }
+.sl__nearby-info {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 3px;
+}
+.sl__nearby-name {
+  font-size: 14px; font-weight: 600; color: var(--pp-primary, #2b211e);
+}
+.sl__nearby-cat {
+  font-size: 11px; color: var(--pp-text-sub, #8a7a6c);
+  background: #f5efe8; border-radius: 4px; padding: 1px 5px;
+}
+.sl__nearby-meta {
+  display: flex; align-items: center; gap: 6px;
+}
+.sl__nearby-addr {
+  font-size: 12px; color: var(--pp-text-sub, #8a7a6c);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.sl__nearby-dist {
+  font-size: 11px; color: #C9A13A; font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ===== 검색 결과 지도 뷰 ===== */
+.sl__pane { position: relative; }
+
+.sl__result {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sl__result[hidden] { display: none; }
+
+.sl__result-map-area {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+.sl__result-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 뷰 토글 버튼 */
+.sl__view-toggle {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 30;
+  background: #fff;
+  border: 1px solid var(--pp-line);
+  border-radius: 10px;
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pp-text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+}
+.sl__view-toggle[hidden] { display: none; }
+
+/* 바텀시트 */
+.sl__result-sheet {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 35%;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  transition: height .3s ease;
+  z-index: 20;
+}
+.sl__result-sheet.is-expanded { height: 80%; }
+
+.sl__result-sheet__bar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 6px;
+  cursor: grab;
+}
+.sl__result-sheet__handle {
+  width: 36px;
+  height: 4px;
+  background: #d4ccc4;
+  border-radius: 2px;
+}
+.sl__result-sheet__scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 시트 아이템 */
+.sl__sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f5ede3;
+  cursor: pointer;
+  transition: background .15s;
+}
+.sl__sheet-item:active { background: #f0f4ff; }
+.sl__sheet-item.is-active {
+  background: #fdf6ee;
+  border-left: 3px solid #C9A13A;
+}
+
+.sl__sheet-icon {
+  flex: 0 0 36px; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  background: #f8f5f2; border-radius: 10px;
+}
+.sl__sheet-body { flex: 1; min-width: 0; }
+.sl__sheet-name {
+  font-size: 15px; font-weight: 700; color: #2b211e;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sl__sheet-addr {
+  font-size: 12px; color: #888; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sl__sheet-dist {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pp-text-sub);
+  white-space: nowrap;
+}
+.sl__sheet-region {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: #b0a898;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* 인포윈도우 */
+.sl__result-iw {
+  position: absolute;
+  left: 16px; right: 16px;
+  bottom: calc(35% + 12px);
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 16px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: bottom .3s ease;
+}
+.sl__result-iw[hidden] { display: none; }
+.sl__result-sheet.is-expanded ~ .sl__result-iw { bottom: calc(80% + 12px); }
+
+.sl__result-iw__close {
+  position: absolute;
+  top: 8px; right: 10px;
+  background: none; border: none;
+  font-size: 20px; color: #999;
+  cursor: pointer; line-height: 1;
+  padding: 2px;
+}
+.sl__result-iw__body { flex: 1; min-width: 0; }
+.sl__result-iw__name {
+  font-size: 15px; font-weight: 800; color: #2b211e;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-right: 20px;
+}
+.sl__result-iw__meta {
+  display: flex; gap: 8px; align-items: center;
+  margin-top: 4px;
+  font-size: 12px; color: #888;
+}
+.sl__result-iw__dist {
+  font-weight: 700; color: var(--pp-accent);
+  white-space: nowrap;
+}
+.sl__result-iw__addr {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sl__result-iw__save {
+  flex: 0 0 auto;
+  background: #C9A13A; color: #fff; border: none;
+  padding: 10px 16px; border-radius: 10px;
+  font-size: 13px; font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sl__result-iw__save:active { background: #b38c2e; }
+
+/* 검색 결과 마커 (네이버용 HTML 마커) */
+.sl__rpin-anchor {
+  width: 0; height: 0;
+  overflow: visible;
+}
+.sl__rpin {
+  position: absolute;
+  bottom: 0; left: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.sl__rpin.is-active {
+  z-index: 10;
+}
+.sl__rpin__name {
+  background: rgba(255,255,255,0.92);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2b211e;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  margin-top: -2px;
+  line-height: 1.4;
+}
+
+/* 검색 결과 상단 (안내 + 지역 칩) */
+.sl__result-top {
+  position: absolute;
+  top: 8px; left: 0; right: 0;
+  z-index: 15;
+  padding: 0 16px;
+  pointer-events: none;
+}
+.sl__result-top > * { pointer-events: auto; }
+.sl__result-top[hidden] { display: none; }
+
+.sl__result-notice {
+  text-align: center;
+  font-size: 12px; color: #666;
+  background: rgba(255,255,255,0.92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  padding: 6px 14px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.sl__region-chips {
+  display: flex; gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.sl__region-chips::-webkit-scrollbar { display: none; }
+
+.sl__region-chip {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  background: rgba(255,255,255,0.92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 0.5px solid #d4ccc4;
+  color: #666;
+  transition: all .2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.sl__region-chip.is-active {
+  background: var(--pp-primary);
+  color: #fff;
+  border-color: var(--pp-primary);
+}
+
+/* 클러스터 마커 */
+.sl__cluster-anchor {
+  width: 0; height: 0;
+  overflow: visible;
+}
+.sl__cluster {
+  position: absolute;
+  left: 0; top: 0;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.sl__cluster:active { transform: translate(-50%, -50%) scale(0.95); }
+.sl__cluster__bubble {
+  min-width: 40px; height: 40px;
+  border-radius: 20px;
+  background: #F2B544;
+  color: #fff;
+  font-weight: 800; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 12px;
+  box-shadow: 0 2px 8px rgba(242,181,68,0.45), 0 0 0 3px rgba(242,181,68,0.2);
+}
+.sl__cluster__name {
+  margin-top: 3px;
+  font-size: 10px; font-weight: 700;
+  color: #2b211e;
+  background: rgba(255,255,255,0.88);
+  padding: 1px 6px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  white-space: nowrap;
 }
 
 /* ── 푸터 사업자정보 ── */
@@ -2772,12 +3129,16 @@ body { background: #f8f5f2; }
 /* ============================================
    지도 검색 결과 마커 (네이버 HTML 마커)
 ============================================ */
+.pp-mappin-anchor {
+  width: 0; height: 0;
+  overflow: visible;
+}
 .pp-mappin {
-  position: relative;
+  position: absolute;
+  left: 0; top: 0;
+  transform: translate(-16px, -50%);
   display: inline-block;
   cursor: pointer;
-  /* 핀 중심(왼쪽 패딩 8px + 핀 반경 8px = 16px)이 좌표가 되도록 */
-  transform: translate(-16px, -50%);
   pointer-events: auto;
 }
 .pp-mappin__bubble {
