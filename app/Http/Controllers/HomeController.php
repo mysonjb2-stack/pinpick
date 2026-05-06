@@ -24,35 +24,14 @@ class HomeController extends Controller
         $q = trim((string) $request->input('q', ''));
 
         $myPlaces = collect();
-        if ($request->user()) {
-            $query = Place::where('user_id', $request->user()->id)
-                ->where('is_visible', true)
-                ->with(['category', 'images', 'themes'])
-                ->orderBy('sort_order')
-                ->latest();
-
-            if ($selectedCategory) {
-                $query->where('category_id', $selectedCategory);
-            }
-            if ($q !== '') {
-                $query->where(function ($w) use ($q) {
-                    $w->where('name', 'like', "%{$q}%")
-                      ->orWhere('memo', 'like', "%{$q}%")
-                      ->orWhere('address', 'like', "%{$q}%");
-                });
-            }
-            $myPlaces = $query->limit(100)->get();
-        }
-
-        // 카테고리별 가장 최근 저장 장소 (홈 슬라이더용 — 필터 무관)
         $categoryLatest = collect();
         $recentPlaces = collect();
         $savedCount = 0;
         $weekNewCount = 0;
+
         if ($request->user()) {
             $uid = $request->user()->id;
 
-            // 사용자 전체 visible 장소를 한 번에 로드 후 파생값 계산 (쿼리 3개 → 1개)
             $allPlaces = Place::where('user_id', $uid)
                 ->where('is_visible', true)
                 ->with(['category', 'images', 'themes'])
@@ -64,6 +43,19 @@ class HomeController extends Controller
             $categoryLatest = $allPlaces->groupBy('category_id')->map(fn($g) => $g->first());
             $weekAgo = now()->subDays(7);
             $weekNewCount = $allPlaces->filter(fn($p) => $p->created_at >= $weekAgo)->count();
+
+            $filtered = $allPlaces;
+            if ($selectedCategory) {
+                $filtered = $filtered->where('category_id', $selectedCategory);
+            }
+            if ($q !== '') {
+                $filtered = $filtered->filter(fn($p) =>
+                    str_contains($p->name, $q) ||
+                    str_contains($p->memo ?? '', $q) ||
+                    str_contains($p->address ?? '', $q)
+                );
+            }
+            $myPlaces = $filtered->sortBy('sort_order')->values()->take(100);
         }
 
         $curation = $this->curation();

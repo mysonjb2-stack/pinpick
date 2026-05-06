@@ -118,7 +118,7 @@
     var center = places.length
         ? new naver.maps.LatLng(+places[0].lat, +places[0].lng)
         : new naver.maps.LatLng(37.5665, 126.9780);
-    var map = new naver.maps.Map('catShowMap', { center: center, zoom: 13 });
+    var map = new naver.maps.Map('catShowMap', { center: center, zoom: 13, mapTypeControl: false, zoomControl: false, scaleControl: false, mapDataControl: false });
     console.log('[cat-map] Map created');
 
     if (!places.length) return;

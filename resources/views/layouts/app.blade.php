@@ -45,11 +45,14 @@
 @stack('scripts')
 <script>
 (function(){
+    var pageTime = Date.now();
+    var STALE_MS = 30 * 60 * 1000;
     window.addEventListener('pageshow', function(e){
-        if (e.persisted) { window.location.reload(); }
+        if (e.persisted && (Date.now() - pageTime > STALE_MS)) {
+            window.location.reload();
+        }
     });
     var hiddenAt = null;
-    var STALE_MS = 30 * 60 * 1000;
     document.addEventListener('visibilitychange', function(){
         if (document.visibilityState === 'hidden') {
             hiddenAt = Date.now();
@@ -59,6 +62,21 @@
             if (idle > STALE_MS) { window.location.reload(); }
         }
     });
+
+    // 터치 시작 시 링크 프리페치 — 탭→이동 사이 ~100ms 동안 미리 로드
+    var prefetched = {};
+    document.addEventListener('touchstart', function(e) {
+        var a = e.target.closest('a[href]');
+        if (!a) return;
+        var url = a.href;
+        if (!url || url === location.href || prefetched[url]) return;
+        if (url.indexOf(location.origin) !== 0) return;
+        prefetched[url] = true;
+        var link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = url;
+        document.head.appendChild(link);
+    }, { passive: true });
 })();
 </script>
 </body>

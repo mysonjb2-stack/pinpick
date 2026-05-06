@@ -77,6 +77,11 @@ class NaverPlaceMatcher
 
             $placeId = $this->urlParser->extractPlaceId($best['link'] ?? '');
             if (!$placeId) {
+                // link가 네이버 플레이스 URL이 아닌 경우 (SNS, 홈페이지 등)
+                // 모바일 검색 HTML에서 place_id 추출 시도
+                $placeId = $this->fallbackMobileSearch($name, $address);
+            }
+            if (!$placeId) {
                 Cache::put($cacheKey, 'NO_MATCH', self::CACHE_TTL_SECONDS);
                 return null;
             }
@@ -161,5 +166,38 @@ class NaverPlaceMatcher
         $a = sin($dLat / 2) ** 2
             + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
         return 2 * $R * asin(min(1.0, sqrt($a)));
+    }
+
+    /**
+     * 네이버 로컬 검색 link가 플레이스 URL이 아닐 때,
+     * 모바일 검색(m_local)에서 place_id를 추출하는 폴백.
+     */
+    private function fallbackMobileSearch(string $name, ?string $address): ?string
+    {
+        try {
+            $q = $address ? $name . ' ' . $address : $name;
+            $url = 'https://m.search.naver.com/search.naver?' . http_build_query([
+                'query' => $q,
+                'where' => 'm_local',
+            ]);
+
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+                'Accept' => 'text/html',
+            ])->timeout(self::HTTP_TIMEOUT + 2)->get($url);
+
+            if (!$response->successful()) return null;
+
+            $body = $response->body();
+            if (preg_match('#data-loc_plc-doc-id="(\d{5,})"#', $body, $m)) {
+                return $m[1];
+            }
+            if (preg_match('#m\.place\.naver\.com/place/(\d{5,})#', $body, $m)) {
+                return $m[1];
+            }
+        } catch (\Throwable $e) {
+            Log::info('naver fallback mobile search failed', ['name' => $name, 'error' => $e->getMessage()]);
+        }
+        return null;
     }
 }

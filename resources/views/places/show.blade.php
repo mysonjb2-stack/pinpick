@@ -174,7 +174,7 @@
     $phoneTel = $place->phone ? preg_replace('/[^0-9+]/', '', $place->phone) : '';
 
     // 예약 폴백 허용 테마 슬러그 (naver_place_id 없을 때 "네이버 예약" 검색 딥링크 노출)
-    $naverFallbackThemes = ['food', 'beauty', 'stay', 'medical'];
+    $naverFallbackThemes = ['food', 'beauty', 'stay', 'medical', 'cafe'];
     $placeThemeSlugs = $place->themes->pluck('slug')->all();
     $isNaverFallbackTheme = count(array_intersect($naverFallbackThemes, $placeThemeSlugs)) > 0;
 
@@ -349,7 +349,7 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
         const map = new naver.maps.Map(el, {
             center: pos, zoom: 16, minZoom: 10,
             draggable: true, pinchZoom: true, scrollWheel: false, disableDoubleTapZoom: false,
-            mapTypeControl: false, zoomControl: false, logoControlOptions: { position: naver.maps.Position.BOTTOM_LEFT }
+            mapTypeControl: false, zoomControl: false, scaleControl: false, mapDataControl: false, logoControl: false
         });
         new naver.maps.Marker({ position: pos, map: map, title: name });
     }
@@ -453,7 +453,6 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
     closeBtn.addEventListener('click', close);
     prevBtn.addEventListener('click', prev);
     nextBtn.addEventListener('click', next);
-    lb.addEventListener('click', (e) => { if (e.target === lb || e.target === stage) close(); });
     document.addEventListener('keydown', (e) => {
         if (lb.hidden) return;
         if (e.key === 'Escape') close();
@@ -461,22 +460,129 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
         else if (e.key === 'ArrowRight') next();
     });
 
-    // 터치 스와이프 (좌/우 네비, 아래로 당기면 닫기)
-    let tsX = 0, tsY = 0, tsTime = 0;
-    stage.addEventListener('touchstart', (e) => {
-        const t = e.changedTouches[0];
-        tsX = t.clientX; tsY = t.clientY; tsTime = Date.now();
+    // 통합 제스처: 핀치줌 · 패닝 · 스와이프 · 더블탭 · 배경탭닫기
+    let sc = 1, tx = 0, ty = 0;
+    const SC_MIN = 1, SC_MAX = 5;
+    let mode = 'idle'; // idle | pinch | pan | swipe
+    let pinchDist0 = 0, pinchSc0 = 1, pinchMid0 = null, pinchTx0 = 0, pinchTy0 = 0;
+    let panX0 = 0, panY0 = 0, panTx0 = 0, panTy0 = 0;
+    let tapX = 0, tapY = 0, tapTime = 0, lastTapTime = 0;
+    let moved = false;
+
+    function apply() {
+        imgEl.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + sc + ')';
+    }
+    function resetZoom() { sc = 1; tx = 0; ty = 0; imgEl.style.transform = ''; }
+    function animateZoom(toSc, toTx, toTy) {
+        imgEl.style.transition = 'transform .25s ease-out';
+        sc = toSc; tx = toTx; ty = toTy; apply();
+        setTimeout(() => { imgEl.style.transition = 'none'; }, 260);
+    }
+    const origRender = render;
+    render = function() { resetZoom(); origRender(); };
+
+    function dist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+    function mid(a, b) { return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; }
+
+    stage.addEventListener('touchstart', function(e) {
+        var t = e.touches;
+        if (t.length === 2) {
+            mode = 'pinch';
+            pinchDist0 = dist(t[0], t[1]);
+            pinchSc0 = sc;
+            pinchMid0 = mid(t[0], t[1]);
+            pinchTx0 = tx; pinchTy0 = ty;
+        } else if (t.length === 1 && mode !== 'pinch') {
+            mode = sc > 1 ? 'pan' : 'swipe';
+            moved = false;
+            var p = t[0];
+            tapX = p.clientX; tapY = p.clientY; tapTime = Date.now();
+            panX0 = p.clientX; panY0 = p.clientY;
+            panTx0 = tx; panTy0 = ty;
+        }
     }, { passive: true });
-    stage.addEventListener('touchend', (e) => {
-        const t = e.changedTouches[0];
-        const dx = t.clientX - tsX;
-        const dy = t.clientY - tsY;
-        const dt = Date.now() - tsTime;
-        if (dt > 600) return;
-        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-            dx < 0 ? next() : prev();
-        } else if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
-            close();
+
+    stage.addEventListener('touchmove', function(e) {
+        var t = e.touches;
+        if (mode === 'pinch' && t.length >= 2) {
+            e.preventDefault();
+            var d = dist(t[0], t[1]);
+            var ns = Math.min(SC_MAX, Math.max(SC_MIN, pinchSc0 * (d / pinchDist0)));
+            var m = mid(t[0], t[1]);
+            var r = ns / pinchSc0;
+            tx = m.x - r * (pinchMid0.x - pinchTx0);
+            ty = m.y - r * (pinchMid0.y - pinchTy0);
+            sc = ns;
+            apply();
+            moved = true;
+        } else if (mode === 'pan' && t.length === 1) {
+            e.preventDefault();
+            var p = t[0];
+            tx = panTx0 + (p.clientX - panX0);
+            ty = panTy0 + (p.clientY - panY0);
+            apply();
+            moved = true;
+        } else if (mode === 'swipe' && t.length === 1) {
+            moved = true;
+        }
+    }, { passive: false });
+
+    stage.addEventListener('touchend', function(e) {
+        if (e.touches.length > 0) {
+            if (mode === 'pinch' && e.touches.length === 1) {
+                var p = e.touches[0];
+                panX0 = p.clientX; panY0 = p.clientY;
+                panTx0 = tx; panTy0 = ty;
+                mode = 'pan';
+            }
+            return;
+        }
+        var prevMode = mode;
+        mode = 'idle';
+
+        if (prevMode === 'pinch') {
+            if (sc <= 1.05) animateZoom(1, 0, 0);
+            return;
+        }
+
+        var p = e.changedTouches[0];
+        var dx = p.clientX - tapX, dy = p.clientY - tapY;
+        var dt = Date.now() - tapTime;
+
+        // 더블탭
+        if (!moved && dt < 250 && (Date.now() - lastTapTime) < 300) {
+            lastTapTime = 0;
+            if (sc > 1) {
+                animateZoom(1, 0, 0);
+            } else {
+                var rect = imgEl.getBoundingClientRect();
+                var ns = 2.5;
+                var ox = p.clientX - rect.left, oy = p.clientY - rect.top;
+                animateZoom(ns, tx - ox * (ns - 1), ty - oy * (ns - 1));
+            }
+            return;
+        }
+        lastTapTime = (!moved && dt < 250) ? Date.now() : 0;
+
+        if (prevMode === 'pan') {
+            if (sc <= 1.05) animateZoom(1, 0, 0);
+            return;
+        }
+
+        // 스와이프 (1x일 때만)
+        if (dt < 400 && sc <= 1) {
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+                dx < 0 ? next() : prev(); return;
+            }
+            if (dy > 70 && Math.abs(dy) > Math.abs(dx)) {
+                close(); return;
+            }
+        }
+
+        // 배경 탭 닫기
+        if (!moved && dt < 250 && (e.target === stage || e.target === imgEl && sc <= 1)) {
+            // 더블탭 대기 중이면 닫지 않음
+            if (!lastTapTime) close();
         }
     }, { passive: true });
 })();

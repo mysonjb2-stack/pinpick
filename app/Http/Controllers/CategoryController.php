@@ -149,9 +149,13 @@ class CategoryController extends Controller
     /**
      * 사용자가 자기 카테고리가 없으면 시스템 기본을 복제
      */
+    private static array $checkedUsers = [];
+
     public static function ensureUserCategories($user): void
     {
         if (!$user) return;
+        if (isset(self::$checkedUsers[$user->id])) return;
+        self::$checkedUsers[$user->id] = true;
 
         $exists = Category::where('user_id', $user->id)->exists();
         if ($exists) return;
