@@ -1412,7 +1412,9 @@ async function fetchNearbyPlaces(lat, lng) {
     const box = document.getElementById('slMappinNearby');
     box.innerHTML = '<div class="sl__nearby-loading">주변 장소 검색 중...</div>';
     try {
-        const r = await fetch(`/api/search/nearby?lat=${lat}&lng=${lng}`);
+        const isOverseas = currentRegion === 'overseas';
+        const endpoint = isOverseas ? '/api/search/nearby-overseas' : '/api/search/nearby';
+        const r = await fetch(`${endpoint}?lat=${lat}&lng=${lng}`);
         const data = await r.json();
         const docs = data.documents || [];
         if (!docs.length) {

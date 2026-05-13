@@ -545,6 +545,72 @@ class PlaceController extends Controller
         return response()->json(['documents' => array_slice($all, 0, 15)]);
     }
 
+    public function searchNearbyOverseas(Request $request)
+    {
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+        if (!$lat || !$lng || !is_numeric($lat) || !is_numeric($lng)) {
+            return response()->json(['documents' => []]);
+        }
+
+        $key = config('services.google_places.api_key');
+        if (!$key) return response()->json(['documents' => [], 'error' => 'no_key']);
+
+        $body = [
+            'includedTypes' => ['restaurant', 'cafe', 'tourist_attraction', 'lodging', 'shopping_mall', 'museum', 'park', 'bar', 'bakery', 'spa'],
+            'locationRestriction' => [
+                'circle' => [
+                    'center' => ['latitude' => (float) $lat, 'longitude' => (float) $lng],
+                    'radius' => 500.0,
+                ],
+            ],
+            'maxResultCount' => 15,
+            'languageCode' => 'ko',
+        ];
+
+        $res = \Illuminate\Support\Facades\Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'X-Goog-Api-Key' => $key,
+            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.location,places.primaryType,places.regularOpeningHours',
+        ])->post('https://places.googleapis.com/v1/places:searchNearby', $body);
+
+        $data = $res->json();
+        $places = $data['places'] ?? [];
+
+        $origin = ['lat' => (float) $lat, 'lng' => (float) $lng];
+        $documents = array_map(function ($p) use ($origin) {
+            $pLat = (float) ($p['location']['latitude'] ?? 0);
+            $pLng = (float) ($p['location']['longitude'] ?? 0);
+            $distance = $this->haversineDistance($origin['lat'], $origin['lng'], $pLat, $pLng);
+
+            return [
+                'id' => $p['id'] ?? '',
+                'place_name' => $p['displayName']['text'] ?? '',
+                'road_address_name' => $p['formattedAddress'] ?? '',
+                'address_name' => $p['formattedAddress'] ?? '',
+                'phone' => $p['internationalPhoneNumber'] ?? '',
+                'opening_hours' => $p['regularOpeningHours']['weekdayDescriptions'] ?? null,
+                'x' => (string) ($p['location']['longitude'] ?? ''),
+                'y' => (string) ($p['location']['latitude'] ?? ''),
+                'category_group_name' => $p['primaryType'] ?? '',
+                'distance' => $distance,
+            ];
+        }, $places);
+
+        usort($documents, fn($a, $b) => ($a['distance'] ?? 9999) <=> ($b['distance'] ?? 9999));
+
+        return response()->json(['documents' => $documents]);
+    }
+
+    private function haversineDistance($lat1, $lng1, $lat2, $lng2)
+    {
+        $r = 6371000;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        return (int) round($r * 2 * atan2(sqrt($a), sqrt(1 - $a)));
+    }
+
     // Google Places API (New) Text Search 프록시
     public function searchOverseas(Request $request)
     {
