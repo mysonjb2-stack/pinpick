@@ -41,6 +41,10 @@
             </div>
             <span class="pp-badge pp-badge--planned" id="ppGuestBadge">방문예정</span>
         </div>
+        <div class="pp-info-row pp-info-row--original" id="ppGuestOrigRow" hidden>
+            <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/></svg>
+            <span id="ppGuestOrig"></span>
+        </div>
         <div class="pp-info-row" id="ppGuestAddrRow" hidden>
             <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span id="ppGuestAddr"></span>
@@ -166,6 +170,11 @@
     if (p.status === 'visited') {
         badge.textContent = '방문완료';
         badge.className = 'pp-badge pp-badge--visited';
+    }
+
+    if (p.original_name && p.original_name !== p.name) {
+        document.getElementById('ppGuestOrig').textContent = p.original_name;
+        document.getElementById('ppGuestOrigRow').hidden = false;
     }
 
     const addr = p.road_address || p.address || '';

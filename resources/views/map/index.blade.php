@@ -223,7 +223,7 @@
     function writeGeoCache(lat, lng) {
         try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat, lng, ts: Date.now() })); } catch (e) {}
     }
-    const _cachedGeo = _forceMe ? readGeoCache() : null;
+    const _cachedGeo = !_hasSavedView ? readGeoCache() : null;
 
     const _savedScope = sessionStorage.getItem('pp_map_scope');
     let currentScope = (_savedScope === 'domestic' || _savedScope === 'overseas') ? _savedScope : @json($defaultScope);
@@ -237,11 +237,9 @@
         const domestic = places.filter(p => !p.is_overseas);
         const c = _cachedGeo
             ? new naver.maps.LatLng(_cachedGeo.lat, _cachedGeo.lng)
-            : (_forceMe
-                ? new naver.maps.LatLng(37.5665, 126.9780)
-                : (domestic.length
-                    ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
-                    : new naver.maps.LatLng(37.5665, 126.9780)));
+            : (domestic.length
+                ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
+                : new naver.maps.LatLng(37.5665, 126.9780));
         const savedN = JSON.parse(sessionStorage.getItem('pp_map_naver_view') || 'null');
         const nCenter = savedN ? new naver.maps.LatLng(savedN.lat, savedN.lng) : c;
         const nZoom = savedN ? savedN.zoom : (_cachedGeo ? 15 : 13);

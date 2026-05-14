@@ -60,6 +60,12 @@
             </div>
             <span class="pp-badge pp-badge--{{ $place->status }}">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
         </div>
+        @if($place->original_name && $place->original_name !== $place->name)
+            <div class="pp-info-row pp-info-row--original">
+                <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/></svg>
+                <span>{{ $place->original_name }}</span>
+            </div>
+        @endif
         @if($place->road_address || $place->address)
             <div class="pp-info-row">
                 <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -358,7 +364,7 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
         const pos = { lat, lng };
         const map = new google.maps.Map(el, {
             center: pos, zoom: 16,
-            disableDefaultUI: true, zoomControl: false, gestureHandling: 'cooperative'
+            disableDefaultUI: true, zoomControl: false, gestureHandling: 'greedy'
         });
         new google.maps.Marker({ position: pos, map, title: name });
     }

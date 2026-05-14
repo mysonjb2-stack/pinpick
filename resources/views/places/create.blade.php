@@ -108,6 +108,7 @@
             <input type="hidden" name="google_place_id" id="f_gpid" value="{{ $editMode ? $place->google_place_id : '' }}">
             <input type="hidden" name="is_overseas" id="f_overseas" value="{{ $editMode && $place->is_overseas ? '1' : '0' }}">
             <input type="hidden" name="opening_hours" id="f_hours" value="{{ $editMode && $place->opening_hours ? json_encode($place->opening_hours) : '' }}">
+            <input type="hidden" name="original_name" id="f_original_name" value="{{ $editMode ? $place->original_name : '' }}">
         </div>
 
         <div class="pp-field">
@@ -577,6 +578,7 @@ function pickPlace(d) {
     const _q = (slInput.value || '').trim();
     if (_q) saveRecent(_q);
     document.getElementById('f_name').value = d.place_name || '';
+    document.getElementById('f_original_name').value = d.place_name || '';
     document.getElementById('f_phone').value = d.phone || '';
     document.getElementById('f_hours').value = d.opening_hours ? JSON.stringify(d.opening_hours) : '';
     document.getElementById('f_road').value = d.road_address_name || d.address_name || '';
@@ -660,13 +662,23 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 function fmtDist(km) { return km < 1 ? Math.round(km * 1000) + 'm' : km.toFixed(1) + 'km'; }
 
-const PIN_GRAY = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="34" viewBox="0 0 24 34"><path d="M12 1C5.9 1 1 5.9 1 12c0 8 11 20 11 20s11-12 11-20C23 5.9 18.1 1 12 1z" fill="#9CA3AF" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#fff"/></svg>');
-const PIN_GOLD = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38"><path d="M14 1C7 1 1 7 1 14c0 9.5 13 22 13 22s13-12.5 13-22C27 7 21 1 14 1z" fill="#C9A13A" stroke="#fff" stroke-width="2"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>');
+const PIN_GRAY = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44"><path d="M16 2C8.3 2 2 8.3 2 16c0 10.5 14 25 14 25s14-14.5 14-25C30 8.3 23.7 2 16 2z" fill="#E85D5D" stroke="#fff" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="#fff"/></svg>');
+const PIN_GOLD = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="38" height="50" viewBox="0 0 38 50"><path d="M19 2C9.6 2 2 9.6 2 19c0 12.5 17 29 17 29s17-16.5 17-29C36 9.6 28.4 2 19 2z" fill="#C9A13A" stroke="#fff" stroke-width="2.5"/><circle cx="19" cy="19" r="6" fill="#fff"/></svg>');
 
 function buildRPin(name, active) {
-    const color = active ? '#C9A13A' : '#9CA3AF';
+    const color = active ? '#C9A13A' : '#E85D5D';
+    const w = active ? 38 : 32;
+    const h = active ? 50 : 44;
+    const vb = active ? '0 0 38 50' : '0 0 32 44';
+    const cx = active ? 19 : 16;
+    const cy = active ? 19 : 16;
+    const cr = active ? 6 : 5;
+    const sw = active ? 2.5 : 2;
+    const pathD = active
+        ? 'M19 2C9.6 2 2 9.6 2 19c0 12.5 17 29 17 29s17-16.5 17-29C36 9.6 28.4 2 19 2z'
+        : 'M16 2C8.3 2 2 8.3 2 16c0 10.5 14 25 14 25s14-14.5 14-25C30 8.3 23.7 2 16 2z';
     return `<div class="sl__rpin-anchor"><div class="sl__rpin${active ? ' is-active' : ''}">
-        <svg viewBox="0 0 24 34" width="24" height="34"><path d="M12 1C5.9 1 1 5.9 1 12c0 8 11 20 11 20s11-12 11-20C23 5.9 18.1 1 12 1z" fill="${color}" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="#fff"/></svg>
+        <svg viewBox="${vb}" width="${w}" height="${h}"><path d="${pathD}" fill="${color}" stroke="#fff" stroke-width="${sw}"/><circle cx="${cx}" cy="${cy}" r="${cr}" fill="#fff"/></svg>
         <span class="sl__rpin__name">${escapeHtml(name || '')}</span>
     </div></div>`;
 }
@@ -869,6 +881,7 @@ function initResultNMap() {
     resultMapNaver = new naver.maps.Map('slResultMapNaver', {
         center: new naver.maps.LatLng(37.5665, 126.978),
         zoom: 15, zoomControl: false, scaleControl: false, mapDataControl: false,
+        scrollWheel: true, draggable: true, pinchZoom: true,
     });
 }
 
@@ -883,6 +896,7 @@ async function initResultGMap() {
         await _gmReady;
         resultMapGoogle = new google.maps.Map(document.getElementById('slResultMapGoogle'), {
             center: { lat: 37.5665, lng: 126.978 }, zoom: 15, disableDefaultUI: true,
+            gestureHandling: 'greedy',
         });
     } catch (e) { console.error('Result GMap init:', e); }
 }
@@ -924,11 +938,11 @@ function renderGRMarkers(docs) {
             position: pos, map: resultMapGoogle, title: d.place_name || '',
             icon: {
                 url: 'data:image/svg+xml;charset=UTF-8,' + PIN_GRAY,
-                scaledSize: new google.maps.Size(24, 34),
-                anchor: new google.maps.Point(12, 34),
-                labelOrigin: new google.maps.Point(12, -8),
+                scaledSize: new google.maps.Size(32, 44),
+                anchor: new google.maps.Point(16, 44),
+                labelOrigin: new google.maps.Point(16, -10),
             },
-            label: { text: d.place_name || '', color: '#2b211e', fontSize: '11px', fontWeight: '600', className: 'pp-gmarker-label' },
+            label: { text: d.place_name || '', color: '#2b211e', fontSize: '12px', fontWeight: '700', className: 'pp-gmarker-label' },
         });
         m._idx = i;
         m.addListener('click', () => selectResult(i));
@@ -978,9 +992,9 @@ function selectResult(idx) {
             const sel = i === idx;
             m.setIcon({
                 url: 'data:image/svg+xml;charset=UTF-8,' + (sel ? PIN_GOLD : PIN_GRAY),
-                scaledSize: new google.maps.Size(sel ? 28 : 24, sel ? 38 : 34),
-                anchor: new google.maps.Point(sel ? 14 : 12, sel ? 38 : 34),
-                labelOrigin: new google.maps.Point(sel ? 14 : 12, -8),
+                scaledSize: new google.maps.Size(sel ? 38 : 32, sel ? 50 : 44),
+                anchor: new google.maps.Point(sel ? 19 : 16, sel ? 50 : 44),
+                labelOrigin: new google.maps.Point(sel ? 19 : 16, -10),
             });
             m.setZIndex(sel ? 200 : 100);
         });
@@ -1302,6 +1316,7 @@ function initNaverMappinMap(initialLoc) {
     mappinMap = new naver.maps.Map('slMappinMap', {
         center: center, zoom: 15,
         zoomControl: false, scaleControl: false, mapDataControl: false,
+        scrollWheel: true, draggable: true, pinchZoom: true,
     });
     if (!loc) moveToCurrentLocation('naver');
     naver.maps.Event.addListener(mappinMap, 'idle', () => {
@@ -1329,6 +1344,7 @@ async function initGoogleMappinMap(initialLoc) {
             : { lat: 37.5665, lng: 126.9780 };
         gMappinMap = new google.maps.Map(document.getElementById('slMappinMapGoogle'), {
             center: center, zoom: 15, disableDefaultUI: true,
+            gestureHandling: 'greedy',
         });
         if (!loc) moveToCurrentLocation('google');
         gMappinMap.addListener('idle', () => {

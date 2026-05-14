@@ -383,6 +383,7 @@
                         @endif
                         @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                         <span class="pp-mine-grid__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                        <span class="pp-mine-grid__region {{ $p->is_overseas ? 'is-overseas' : '' }}">{{ $p->is_overseas ? '해외' : '국내' }}</span>
                         @if($p->status === 'visited' && $p->visited_at)
                             <span class="pp-mine-grid__date">{{ $p->visited_at->format('Y.m.d') }}</span>
                         @endif
@@ -440,33 +441,58 @@
 @push('scripts')
 @auth
 <script>
-// 비로그인 저장 장소 → 로그인 계정으로 이관
+// 비로그인 저장 장소 → 로그인 계정으로 이관 (확인 후)
 (function() {
     const KEY = 'pinpick_guest_places';
     let list;
     try { list = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return; }
     if (!Array.isArray(list) || !list.length) return;
 
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    fetch('/api/places/import-guest', {
-        method: 'POST',
-        headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ places: list })
-    })
-    .then(r => r.ok ? r.json() : Promise.reject(r))
-    .then(j => {
-        if (j && j.ok) {
-            localStorage.removeItem(KEY);
-            const n = j.imported || list.length;
-            const toast = document.createElement('div');
-            toast.textContent = `저장했던 장소 ${n}개를 내 지도로 옮겼어요`;
-            toast.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#2b211e;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22);letter-spacing:-.01em';
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2400);
-            setTimeout(() => location.reload(), 600);
-        }
-    })
-    .catch(() => {});
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px';
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:16px;padding:28px 24px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+            <div style="font-size:28px;margin-bottom:12px">📍</div>
+            <div style="font-size:15px;font-weight:700;color:#2b211e;margin-bottom:6px">비회원 장소 동기화</div>
+            <div style="font-size:13.5px;color:#6b5e52;line-height:1.5;margin-bottom:20px">비회원으로 등록된 장소 <b>${list.length}개</b>를<br>내 계정으로 가져올까요?</div>
+            <div style="display:flex;gap:8px">
+                <button id="ppGuestSkip" style="flex:1;padding:12px 0;border:1px solid #e0d6cc;border-radius:10px;background:#fff;color:#6b5e52;font-size:14px;font-weight:600;cursor:pointer">안할래요</button>
+                <button id="ppGuestSync" style="flex:1;padding:12px 0;border:none;border-radius:10px;background:#2b211e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">동기화</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    document.getElementById('ppGuestSkip').addEventListener('click', () => {
+        localStorage.removeItem(KEY);
+        overlay.remove();
+    });
+
+    document.getElementById('ppGuestSync').addEventListener('click', () => {
+        const btn = document.getElementById('ppGuestSync');
+        btn.textContent = '동기화 중…';
+        btn.disabled = true;
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        fetch('/api/places/import-guest', {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ places: list })
+        })
+        .then(r => r.ok ? r.json() : Promise.reject(r))
+        .then(j => {
+            if (j && j.ok) {
+                localStorage.removeItem(KEY);
+                overlay.remove();
+                const n = j.imported || list.length;
+                const toast = document.createElement('div');
+                toast.textContent = `장소 ${n}개를 내 지도로 옮겼어요`;
+                toast.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#2b211e;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22);letter-spacing:-.01em';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2400);
+                setTimeout(() => location.reload(), 600);
+            }
+        })
+        .catch(() => { btn.textContent = '다시 시도'; btn.disabled = false; });
+    });
 })();
 </script>
 @endauth
@@ -994,6 +1020,7 @@
                 ${thumbImg}
                 <span class="pp-mine-grid__ph">📌</span>
                 <span class="pp-mine-grid__badge">${badge}</span>
+                <span class="pp-mine-grid__region ${p.is_overseas ? 'is-overseas' : ''}">${p.is_overseas ? '해외' : '국내'}</span>
                 ${dateHtml}
             </div>
             <div class="pp-mine-grid__body">

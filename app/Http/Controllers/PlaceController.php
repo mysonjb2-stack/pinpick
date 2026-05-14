@@ -53,6 +53,7 @@ class PlaceController extends Controller
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
             'theme_ids' => ['nullable', 'array', 'max:2'],
             'theme_ids.*' => ['integer', 'exists:themes,id'],
+            'original_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $themeIds = $data['theme_ids'] ?? [];
@@ -231,6 +232,7 @@ class PlaceController extends Controller
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
             'theme_ids' => ['nullable', 'array', 'max:2'],
             'theme_ids.*' => ['integer', 'exists:themes,id'],
+            'original_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $themeIds = $data['theme_ids'] ?? [];
@@ -646,8 +648,14 @@ class PlaceController extends Controller
         $data = $res->json();
         $places = $data['places'] ?? [];
 
-        // 카카오 형식으로 통일 (프론트 코드 공유)
-        $documents = array_map(function ($p) {
+        $places = array_filter($places, function ($p) {
+            $lat = $p['location']['latitude'] ?? 0;
+            $lng = $p['location']['longitude'] ?? 0;
+            $isKorea = $lat >= 33.0 && $lat <= 38.7 && $lng >= 124.5 && $lng <= 132.0;
+            return !$isKorea;
+        });
+
+        $documents = array_values(array_map(function ($p) {
             return [
                 'id' => $p['id'] ?? '',
                 'place_name' => $p['displayName']['text'] ?? '',
@@ -659,7 +667,7 @@ class PlaceController extends Controller
                 'y' => (string) ($p['location']['latitude'] ?? ''),
                 'category_group_name' => $p['primaryType'] ?? '',
             ];
-        }, $places);
+        }, $places));
 
         return response()->json(['documents' => $documents]);
     }

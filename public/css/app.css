@@ -157,6 +157,10 @@ input, select, textarea { font: inherit; color: inherit; }
 .pp-info-row--sub {
   color: var(--pp-text-sub);
 }
+.pp-info-row--original {
+  color: var(--pp-text-sub);
+  font-size: 12.5px;
+}
 .pp-info-row__ico {
   flex: 0 0 14px;
   margin-top: 3px;
@@ -4140,8 +4144,17 @@ body { background: #f8f5f2; }
     font-size: 11px; padding: 3px 8px; border-radius: 999px;
     letter-spacing: -0.2px;
 }
-.pp-mine-grid__date {
+.pp-mine-grid__region {
     position: absolute; top: 8px; right: 8px;
+    background: rgba(46,125,50,.78); color: #fff;
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+    letter-spacing: 0.2px;
+}
+.pp-mine-grid__region.is-overseas {
+    background: rgba(21,101,192,.78);
+}
+.pp-mine-grid__date {
+    position: absolute; top: 32px; right: 8px;
     background: rgba(0,0,0,.55); color: #fff;
     font-size: 11px; padding: 3px 8px; border-radius: 999px;
     letter-spacing: -0.2px;
