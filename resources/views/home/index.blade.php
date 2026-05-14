@@ -1254,7 +1254,11 @@
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) return reject(new Error('no-geo'));
             navigator.geolocation.getCurrentPosition(
-                pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                pos => {
+                    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat: coords.lat, lng: coords.lng, ts: Date.now() })); } catch (e) {}
+                    resolve(coords);
+                },
                 err => reject(err),
                 { enableHighAccuracy: false, timeout: 5000, maximumAge: 1000 * 60 * 30 }
             );

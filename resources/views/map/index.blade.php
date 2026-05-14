@@ -237,9 +237,11 @@
         const domestic = places.filter(p => !p.is_overseas);
         const c = _cachedGeo
             ? new naver.maps.LatLng(_cachedGeo.lat, _cachedGeo.lng)
-            : (domestic.length
-                ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
-                : new naver.maps.LatLng(37.5665, 126.9780));
+            : (_forceMe
+                ? new naver.maps.LatLng(37.5665, 126.9780)
+                : (domestic.length
+                    ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
+                    : new naver.maps.LatLng(37.5665, 126.9780)));
         const savedN = JSON.parse(sessionStorage.getItem('pp_map_naver_view') || 'null');
         const nCenter = savedN ? new naver.maps.LatLng(savedN.lat, savedN.lng) : c;
         const nZoom = savedN ? savedN.zoom : (_cachedGeo ? 15 : 13);
@@ -498,6 +500,7 @@
         scopeEl.querySelectorAll('.yg-segtab__btn').forEach(b => b.classList.remove('is-active'));
         btn.classList.add('is-active');
         applyScope(btn.dataset.scope);
+        filterCatTabs();
     });
 
     function fitToFilteredPlaces() {
@@ -542,6 +545,24 @@
     }
 
     const tabs = document.getElementById('ppMapTabs');
+    function filterCatTabs() {
+        const overseas = currentScope === 'overseas';
+        tabs.querySelectorAll('.pp-map-tab').forEach(btn => {
+            const cat = btn.dataset.cat;
+            if (cat === 'all') return;
+            const hasPlace = places.some(p => String(p.category_id) === String(cat) && (!!p.is_overseas) === overseas);
+            btn.style.display = hasPlace ? '' : 'none';
+        });
+        const active = tabs.querySelector('.pp-map-tab.is-active');
+        if (active && active.style.display === 'none') {
+            const allBtn = tabs.querySelector('.pp-map-tab[data-cat="all"]');
+            tabs.querySelectorAll('.pp-map-tab').forEach(b => b.classList.remove('is-active'));
+            allBtn.classList.add('is-active');
+            currentCat = 'all';
+            sessionStorage.setItem('pp_map_cat', 'all');
+        }
+    }
+    filterCatTabs();
     tabs.addEventListener('click', (e) => {
         const btn = e.target.closest('.pp-map-tab');
         if (!btn) return;
