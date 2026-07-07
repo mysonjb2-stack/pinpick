@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', '공지사항')
+@section('page_title', '공지사항 | 핀픽')
 @section('app_class', 'pp-app--form')
 
 @section('header')

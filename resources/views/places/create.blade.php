@@ -1,6 +1,7 @@
 @php $editMode = isset($place); @endphp
 @extends('layouts.app')
-@section('title', $editMode ? '장소 수정' : '장소 추가')
+@section('page_title', ($editMode ? '장소 수정' : '장소 추가') . ' | 핀픽')
+@section('robots_meta', '<meta name="robots" content="noindex">')
 @section('app_class', 'pp-app--form')
 
 @section('header')

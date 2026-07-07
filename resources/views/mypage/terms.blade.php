@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', '이용약관')
+@section('page_title', '이용약관 | 핀픽')
 @section('app_class', 'pp-app--form')
 
 @section('header')

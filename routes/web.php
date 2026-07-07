@@ -7,9 +7,11 @@ use App\Http\Controllers\MapController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\PlaceController;
 use App\Http\Controllers\PublicPlaceController;
+use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\TrendingController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/map', [MapController::class, 'index'])->name('map');
 Route::view('/explore', 'explore.index')->name('explore');

@@ -1,5 +1,6 @@
 @extends('layouts.app')
-@section('title', '로그인')
+@section('page_title', '로그인 | 핀픽')
+@section('robots_meta', '<meta name="robots" content="noindex">')
 
 @section('content')
 @php

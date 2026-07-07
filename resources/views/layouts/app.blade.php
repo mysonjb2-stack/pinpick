@@ -4,8 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#ffa51a">
-    <title>@yield('title', '핀픽') · 핀픽</title>
-    <meta name="description" content="내가 저장한 장소를 빠르게 꺼내 쓰는 나만의 지도">
+    <meta name="naver-site-verification" content="8fc3a513aca43a1416d55813adba83f8baf6a28a" />
+    <title>@yield('page_title', '나만의 장소, 나만의 지도 | 핀픽')</title>
+    <meta name="description" content="@yield('meta_description', '맛집, 카페, 여행지, 가고싶은 곳까지 — 내 장소를 모두 저장하고 쉽게 꺼내쓰는 나만의 지도앱, 핀픽. 로그인 없이 바로 시작하세요.')">
+    @yield('robots_meta')
+    @php $canonicalUrl = View::yieldContent('canonical', url()->current()); @endphp
+    <link rel="canonical" href="{{ $canonicalUrl }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="핀픽">
+    <meta property="og:title" content="@yield('og_title', '나만의 장소, 나만의 지도 | 핀픽')">
+    <meta property="og:description" content="@yield('og_description', '가고싶은 곳을 핀으로 저장하고 쉽게 꺼내쓰는 나만의 지도')">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
+    <meta property="og:image" content="@yield('og_image', asset('images/og-image.png'))">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" href="{{ asset('favicon.ico') }}?v={{ filemtime(public_path('favicon.ico')) }}" sizes="any">
     <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icon-192.png') }}?v={{ filemtime(public_path('icon-192.png')) }}">

@@ -1,6 +1,31 @@
 @extends('layouts.app')
-@section('title', '핀픽')
+@section('page_title', '나만의 장소, 나만의 지도 | 핀픽')
+@section('meta_description', '맛집, 카페, 여행지, 가고싶은 곳까지 — 내 장소를 모두 저장하고 쉽게 꺼내쓰는 나만의 지도앱, 핀픽. 로그인 없이 바로 시작하세요.')
+@section('canonical', 'https://mypinpick.net')
 @section('app_class', 'pp-app--home')
+
+@push('head')
+<script type="application/ld+json">
+{!! json_encode([
+    '@context' => 'https://schema.org',
+    '@graph' => [
+        [
+            '@type' => 'WebSite',
+            'name' => '핀픽',
+            'alternateName' => 'Pinpick',
+            'url' => 'https://mypinpick.net',
+        ],
+        [
+            '@type' => 'Organization',
+            'name' => '핀픽',
+            'alternateName' => 'Pinpick',
+            'url' => 'https://mypinpick.net',
+            'logo' => 'https://mypinpick.net/icon-512.png',
+        ],
+    ],
+], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) !!}
+</script>
+@endpush
 
 @section('header')
 <header class="yg-header">

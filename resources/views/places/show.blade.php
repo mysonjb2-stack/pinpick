@@ -1,5 +1,6 @@
 @extends('layouts.app')
-@section('title', $place->name)
+@section('page_title', $place->name . ' | 핀픽')
+@section('robots_meta', '<meta name="robots" content="noindex">')
 @section('app_class', 'pp-app--detail')
 
 @section('header')

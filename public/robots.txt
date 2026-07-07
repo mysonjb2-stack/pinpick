@@ -1,2 +1,14 @@
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /mypage
+Disallow: /mypage/
+Disallow: /login
+Disallow: /auth/
+Disallow: /logout
+Disallow: /api/
+Disallow: /places/
+Disallow: /guest/
+Disallow: /map
+Disallow: /categories/
+
+Sitemap: https://mypinpick.net/sitemap.xml

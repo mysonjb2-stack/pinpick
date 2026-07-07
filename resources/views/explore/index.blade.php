@@ -1,5 +1,6 @@
 @extends('layouts.app')
-@section('title', '탐색')
+@section('page_title', '장소 둘러보기 | 핀픽')
+@section('meta_description', '다양한 맛집, 카페, 여행지를 둘러보고 나만의 지도에 저장하세요. 카테고리별 큐레이션으로 새로운 장소를 발견합니다.')
 @section('app_class', 'pp-app--home')
 
 @section('header')

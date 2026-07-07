@@ -1,5 +1,6 @@
 @extends('layouts.app')
-@section('title', '프로필 수정')
+@section('page_title', '프로필 수정 | 핀픽')
+@section('robots_meta', '<meta name="robots" content="noindex">')
 @section('app_class', 'pp-app--form')
 
 @section('header')

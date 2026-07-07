@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="naver-site-verification" content="8fc3a513aca43a1416d55813adba83f8baf6a28a" />
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
