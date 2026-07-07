@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('page_title', $place->name . ' | 핀픽')
-@section('robots_meta', '<meta name="robots" content="noindex">')
+@section('noindex', true)
 @section('app_class', 'pp-app--detail')
 
 @section('header')
@@ -96,8 +96,10 @@
         @if($place->memo)
             <div style="margin-top:12px;padding:12px;background:var(--pp-bg-soft);border-radius:10px;font-size:13.5px">{{ $place->memo }}</div>
         @endif
-        @if($place->visited_at)
+        @if($place->status === 'visited' && $place->visited_at)
             <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)">방문일: {{ $place->visited_at->format('Y.m.d') }}</div>
+        @elseif($place->status === 'planned')
+            <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)">등록일: {{ $place->created_at->format('Y.m.d') }}</div>
         @endif
     </div>
 

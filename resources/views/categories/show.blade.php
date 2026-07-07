@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('page_title', $category->name . ' | 핀픽')
-@section('robots_meta', '<meta name="robots" content="noindex">')
+@section('noindex', true)
 
 @section('header')
 <header class="pp-header">

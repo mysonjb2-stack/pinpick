@@ -7,7 +7,9 @@
     <meta name="naver-site-verification" content="8fc3a513aca43a1416d55813adba83f8baf6a28a" />
     <title>@yield('page_title', '나만의 장소, 나만의 지도 | 핀픽')</title>
     <meta name="description" content="@yield('meta_description', '맛집, 카페, 여행지, 가고싶은 곳까지 — 내 장소를 모두 저장하고 쉽게 꺼내쓰는 나만의 지도앱, 핀픽. 로그인 없이 바로 시작하세요.')">
-    @yield('robots_meta')
+    @if(View::yieldContent('noindex'))
+    <meta name="robots" content="noindex">
+    @endif
     @php $canonicalUrl = View::yieldContent('canonical', url()->current()); @endphp
     <link rel="canonical" href="{{ $canonicalUrl }}">
     <meta property="og:type" content="website">

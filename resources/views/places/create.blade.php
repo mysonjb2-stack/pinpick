@@ -1,7 +1,7 @@
 @php $editMode = isset($place); @endphp
 @extends('layouts.app')
 @section('page_title', ($editMode ? '장소 수정' : '장소 추가') . ' | 핀픽')
-@section('robots_meta', '<meta name="robots" content="noindex">')
+@section('noindex', true)
 @section('app_class', 'pp-app--form')
 
 @section('header')
@@ -190,6 +190,14 @@
 
         {{-- 키워드 검색 탭 --}}
         <div class="sl__pane is-active" data-pane="keyword">
+            {{-- 주변 인기 장소 --}}
+            <div class="sl__popular" id="slPopular" hidden>
+                <div class="sl__popular-head">
+                    <span class="sl__popular-title">내 위치 주변 장소 추천</span>
+                    <span class="sl__popular-sub" id="slPopularSub">내 위치 기준</span>
+                </div>
+                <div class="sl__popular-scroll" id="slPopularScroll"></div>
+            </div>
             {{-- 최근 검색어 --}}
             <div class="sl__recent" id="slRecent">
                 <div class="sl__recent-head">최근 검색어</div>
@@ -514,6 +522,70 @@ function showKeywordInit() {
     document.getElementById('slResultTop').hidden = true;
     slRecent.hidden = false;
     renderRecent();
+    loadPopularPlaces();
+}
+
+let _popularLoaded = false;
+let _popularCache = null;
+let _popularFetching = false;
+function loadPopularPlaces() {
+    const box = document.getElementById('slPopular');
+    if (_popularLoaded) { if (_popularCache) box.hidden = false; return; }
+    if (userLat === null) {
+        if (!navigator.geolocation) { fetchPopularFallback(); return; }
+        navigator.geolocation.getCurrentPosition(p => {
+            userLat = p.coords.latitude; userLng = p.coords.longitude;
+            try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat: userLat, lng: userLng })); } catch(e) {}
+            fetchPopular();
+        }, () => { fetchPopularFallback(); }, { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 });
+    } else {
+        fetchPopular();
+    }
+}
+function fetchPopularFallback() {
+    userLat = 37.5665; userLng = 126.9780;
+    document.getElementById('slPopularSub').textContent = '서울 기준';
+    fetchPopular();
+}
+function isInKorea(lat, lng) {
+    return lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132;
+}
+async function fetchPopular() {
+    if (_popularFetching) return;
+    _popularFetching = true;
+    try {
+        const overseas = !isInKorea(userLat, userLng);
+        const endpoint = overseas ? '/api/search/nearby-overseas' : '/api/search/nearby';
+        const r = await fetch(`${endpoint}?lat=${userLat}&lng=${userLng}`);
+        const data = await r.json();
+        const docs = (data.documents || []).slice(0, 15);
+        if (!docs.length) return;
+        _popularLoaded = true;
+        _popularCache = docs;
+        renderPopular(docs);
+    } catch(e) {}
+}
+function renderPopular(docs) {
+    const box = document.getElementById('slPopular');
+    const scroll = document.getElementById('slPopularScroll');
+    scroll.innerHTML = docs.map(d => {
+        const icon = getCategoryIcon(d.category_group_name);
+        const cat = d.category_group_name || '';
+        const dist = d.distance ? (d.distance >= 1000 ? (d.distance/1000).toFixed(1)+'km' : d.distance+'m') : '';
+        return `<button type="button" class="sl__popular-card" data-doc='${JSON.stringify(d).replace(/'/g,"&#39;")}'>
+            <div class="sl__popular-icon">${icon}</div>
+            <div class="sl__popular-name">${escapeHtml(d.place_name)}</div>
+            <div class="sl__popular-cat">${escapeHtml(cat)}</div>
+            ${dist ? `<div class="sl__popular-dist">${dist}</div>` : ''}
+        </button>`;
+    }).join('');
+    scroll.querySelectorAll('.sl__popular-card').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const d = JSON.parse(btn.dataset.doc);
+            pickPlace(d);
+        });
+    });
+    box.hidden = false;
 }
 
 // 카테고리 아이콘 매핑 (국내 카카오)
@@ -533,6 +605,7 @@ function getCategoryIcon(cat) {
 
 
 async function doSearch(q) {
+    document.getElementById('slPopular').hidden = true;
     const isOverseas = currentRegion === 'overseas';
     try {
         const params = new URLSearchParams({ q });

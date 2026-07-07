@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('page_title', '내 지도 | 핀픽')
-@section('robots_meta', '<meta name="robots" content="noindex">')
+@section('noindex', true)
 @section('app_class', 'pp-app--map')
 
 @section('content')
@@ -20,6 +20,8 @@
     <div id="pp-map-naver" class="pp-map"{{ $defaultScope === 'domestic' ? '' : ' hidden' }}></div>
     <div id="pp-map-google" class="pp-map"{{ $defaultScope === 'overseas' ? '' : ' hidden' }}></div>
     <div class="pp-map-credit" id="ppMapCredit">지도: NAVER</div>
+</div>
+<div class="pp-map-locate-anchor">
     <button type="button" class="pp-map-locate" id="ppMapLocate" aria-label="현재 위치">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
@@ -378,23 +380,47 @@
 
     // 저장된 뷰포트 없을 때만 현재 위치로 초기 중앙화 (첫 방문 또는 세션 만료)
     let _initialGeolocated = false;
+    let userLocMarkerN = null, userLocMarkerG = null;
+    function showMyLocation(lat, lng) {
+        if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
+            if (userLocMarkerN) userLocMarkerN.setMap(null);
+            userLocMarkerN = new naver.maps.Marker({
+                position: new naver.maps.LatLng(lat, lng), map: nMap,
+                icon: { content: '<div class="pp-loc-dot"></div>', anchor: new naver.maps.Point(8, 8) },
+                zIndex: 1000,
+            });
+        }
+        if (gMap && typeof google !== 'undefined') {
+            if (userLocMarkerG) userLocMarkerG.setMap(null);
+            userLocMarkerG = new google.maps.Marker({
+                position: { lat, lng }, map: gMap,
+                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#2E7FFF', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 3 },
+                zIndex: 1000,
+            });
+        }
+    }
     function tryInitialGeolocate() {
-        if (_initialGeolocated || _hasSavedView) return;
+        if (_initialGeolocated) return;
         _initialGeolocated = true;
-        // 캐시된 현위치로 이미 중앙화됐으면 재요청 생략
-        if (_cachedGeo) return;
+        if (_cachedGeo) {
+            showMyLocation(_cachedGeo.lat, _cachedGeo.lng);
+            return;
+        }
         if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition((pos) => {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
             writeGeoCache(lat, lng);
-            if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
-                nMap.setCenter(new naver.maps.LatLng(lat, lng));
-                nMap.setZoom(13);
-            } else if (currentScope === 'overseas' && gMap && typeof google !== 'undefined') {
-                gMap.setCenter({ lat, lng });
-                gMap.setZoom(13);
+            if (!_hasSavedView) {
+                if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
+                    nMap.setCenter(new naver.maps.LatLng(lat, lng));
+                    nMap.setZoom(13);
+                } else if (currentScope === 'overseas' && gMap && typeof google !== 'undefined') {
+                    gMap.setCenter({ lat, lng });
+                    gMap.setZoom(13);
+                }
             }
+            showMyLocation(lat, lng);
         }, () => {}, { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 });
     }
 
@@ -451,16 +477,14 @@
         updateLocateBtnPosSafe();
     }
     function updateLocateBtnPosSafe() {
-        const btn = document.getElementById('ppMapLocate');
-        if (!btn) return;
+        const anchor = document.querySelector('.pp-map-locate-anchor');
+        if (!anchor) return;
         const sheetEl = document.getElementById('ppMapSheet');
-        let offset = 0;
-        if (!sheetEl.hidden) {
-            offset = sheetEl.offsetHeight + 10;
-        } else if (!regionsEl.hidden) {
-            offset = regionsEl.offsetHeight + 10;
-        }
-        btn.style.setProperty('--locate-offset', offset + 'px');
+        const sheetOpen = sheetEl && !sheetEl.hidden;
+        const regionsOpen = !regionsEl.hidden;
+        anchor.classList.toggle('has-sheet', sheetOpen);
+        anchor.classList.toggle('no-regions', !sheetOpen && !regionsOpen);
+        anchor.classList.remove(sheetOpen ? 'no-regions' : 'has-sheet');
     }
 
     regionsListEl.addEventListener('click', (e) => {
@@ -642,16 +666,10 @@
     const msDetail = document.getElementById('ppMsDetail');
     const msClose = document.getElementById('ppMapSheetClose');
     const msThumb = document.getElementById('ppMsThumb');
-
     const locateBtn = document.getElementById('ppMapLocate');
+
     function updateLocateBtnPos() {
-        let offset = 0;
-        if (!sheet.hidden) {
-            offset = sheet.offsetHeight + 10;
-        } else if (!regionsEl.hidden) {
-            offset = regionsEl.offsetHeight + 10;
-        }
-        locateBtn.style.setProperty('--locate-offset', offset + 'px');
+        updateLocateBtnPosSafe();
     }
 
     function openSheet(p) {
@@ -708,8 +726,10 @@
         }
     }
 
-    // ===== 현위치 =====
-    let userLocMarker = null;
+    // ===== 현위치 버튼 =====
+    function isInKorea(lat, lng) {
+        return lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132;
+    }
     locateBtn.addEventListener('click', () => {
         if (!navigator.geolocation) { alert('위치 기능을 지원하지 않는 브라우저입니다'); return; }
         locateBtn.classList.add('is-active');
@@ -717,30 +737,20 @@
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
             writeGeoCache(lat, lng);
-            if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
-                const ll = new naver.maps.LatLng(lat, lng);
-                nMap.setCenter(ll);
+            const inKorea = isInKorea(lat, lng);
+            const needScope = inKorea ? 'domestic' : 'overseas';
+            if (currentScope !== needScope) {
+                scopeEl.querySelectorAll('.yg-segtab__btn').forEach(b => b.classList.toggle('is-active', b.dataset.scope === needScope));
+                applyScope(needScope);
+            }
+            if (needScope === 'domestic' && nMap && typeof naver !== 'undefined') {
+                nMap.setCenter(new naver.maps.LatLng(lat, lng));
                 nMap.setZoom(15);
-                if (userLocMarker && userLocMarker.setMap) userLocMarker.setMap(null);
-                userLocMarker = new naver.maps.Marker({
-                    position: ll, map: nMap,
-                    icon: { content: '<div class="pp-loc-dot"></div>', anchor: new naver.maps.Point(8, 8) },
-                    zIndex: 1000,
-                });
-            } else if (currentScope === 'overseas' && gMap && typeof google !== 'undefined') {
+            } else if (needScope === 'overseas' && gMap && typeof google !== 'undefined') {
                 gMap.setCenter({ lat, lng });
                 gMap.setZoom(15);
-                if (userLocMarker && userLocMarker.setMap) userLocMarker.setMap(null);
-                userLocMarker = new google.maps.Marker({
-                    position: { lat, lng }, map: gMap,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        scale: 8, fillColor: '#2E7FFF', fillOpacity: 1,
-                        strokeColor: '#fff', strokeWeight: 3,
-                    },
-                    zIndex: 1000,
-                });
             }
+            showMyLocation(lat, lng);
         }, (err) => {
             locateBtn.classList.remove('is-active');
             alert('위치를 가져올 수 없어요');

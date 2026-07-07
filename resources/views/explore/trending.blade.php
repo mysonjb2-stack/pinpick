@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('page_title', '트렌딩 장소 전체보기 | 핀픽')
-@section('robots_meta', '<meta name="robots" content="noindex">')
+@section('noindex', true)
 @section('app_class', 'pp-app--xp')
 
 @section('content')

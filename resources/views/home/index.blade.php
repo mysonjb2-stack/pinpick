@@ -33,7 +33,7 @@
         <img src="{{ asset('icon-192.png') }}?v={{ filemtime(public_path('icon-192.png')) }}" alt="" class="yg-header__logo-ico" width="28" height="28">
         <div class="yg-header__brand-text">
             <span class="yg-header__logo">핀픽,</span>
-            <span class="yg-header__sub">나만의 지도</span>
+            <span class="yg-header__sub">나만의 장소 · 나만의 지도</span>
         </div>
     </div>
     <div class="yg-header__actions">
@@ -74,7 +74,7 @@
                 @auth
                     <h2 class="pp-hero2__title" id="ppHeroTitle" data-people="{{ auth()->user()->name }}님의 지도" data-mine="내 장소">{{ auth()->user()->name }}님의 지도</h2>
                 @else
-                    <h2 class="pp-hero2__title" id="ppHeroTitle">나만의 지도를 시작해보세요</h2>
+                    <h2 class="pp-hero2__title" id="ppHeroTitle">나만의 다양한 장소를 저장해보세요</h2>
                     <div class="pp-guest-cta" id="ppGuestLoginCta" hidden>
                         <div class="pp-guest-cta__title">간편 로그인하고 더 많이 저장해보세요</div>
                         <ul class="pp-guest-cta__features">
@@ -448,17 +448,28 @@
     {{-- 푸터 사업자정보 --}}
     <footer class="pp-footer">
         <div class="pp-footer__logo">핀픽</div>
-        <address class="pp-footer__biz-content">
+        <div class="pp-footer__policy">
+            <a href="#">이용약관</a> ㅣ <a href="#">개인정보 수집이용</a> ㅣ <a href="#">위치정보 이용약관</a>
+        </div>
+        <button type="button" class="pp-footer__biz-toggle" id="ppBizToggle">
+            사업자 정보
+            <svg class="pp-footer__biz-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <address class="pp-footer__biz-content" id="ppBizContent" hidden>
             <span>(주) 맵큐브</span>
             <p>주소 : 경기도 성남시 분당구 황새울로 354 8층</p>
             <p>대표이사 : 이학영 | 사업자등록번호: 230-81-13255 | 통신판매번호 : 2023-성남분당A-0360 | 전화번호 : 1670-1376 | 전자우편주소 : help.mapcube@gmail.com</p>
         </address>
-        <div class="pp-footer__policy">
-            <a href="#">이용약관</a> ㅣ <a href="#">개인정보 수집이용</a> ㅣ <a href="#">위치정보 이용약관</a>
-        </div>
-        <div class="pp-footer__notice">(주)맵큐브는 통신판매중개자로서 통신판매의 당사자가 아니며, 상품예약, 이용 및 환불 등과 관련한 의무와 책임은 각 판매자에게 있습니다.</div>
         <div class="pp-footer__copy">&copy; {{ date('Y') }} 핀픽. All rights reserved.</div>
     </footer>
+    <script>
+    document.getElementById('ppBizToggle').addEventListener('click', function() {
+        const content = document.getElementById('ppBizContent');
+        const open = content.hidden;
+        content.hidden = !open;
+        this.classList.toggle('is-open', open);
+    });
+    </script>
 
 </div>
 @endsection

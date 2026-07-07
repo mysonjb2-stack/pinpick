@@ -529,9 +529,9 @@ class PlaceController extends Controller
                 'category_group_code' => $cat,
                 'x' => $lng,
                 'y' => $lat,
-                'radius' => 20,
+                'radius' => 500,
                 'sort' => 'distance',
-                'size' => 10,
+                'size' => 15,
             ]);
 
             foreach (($res->json()['documents'] ?? []) as $doc) {

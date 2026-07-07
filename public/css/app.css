@@ -396,30 +396,59 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 
 /* 현위치 버튼 */
+.pp-map-locate-anchor {
+  position: fixed;
+  bottom: calc(var(--pp-nav-h) + 110px + env(safe-area-inset-bottom, 0px));
+  left: 0; right: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  pointer-events: none;
+  z-index: 500;
+  transition: bottom .25s ease;
+}
+.pp-map-locate-anchor.no-regions {
+  bottom: calc(var(--pp-nav-h) + 24px + env(safe-area-inset-bottom, 0px));
+}
+.pp-map-locate-anchor.has-sheet {
+  bottom: calc(var(--pp-nav-h) + 160px + env(safe-area-inset-bottom, 0px));
+}
 .pp-map-locate {
-  --locate-offset: 0px;
-  position: fixed; right: 12px;
-  bottom: calc(var(--pp-nav-h) + 12px + var(--locate-offset) + env(safe-area-inset-bottom, 0px));
-  width: 36px; height: 36px;
+  position: absolute; right: 16px; bottom: 0;
+  width: 44px; height: 44px;
   border-radius: 50%;
   background: #fff;
   border: 1px solid var(--pp-line);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   display: flex; align-items: center; justify-content: center;
-  color: var(--pp-text);
+  color: var(--pp-sub);
   cursor: pointer;
-  z-index: 85;
-  transition: bottom .2s ease, transform .15s;
+  pointer-events: auto;
+  transition: transform .15s;
 }
-.pp-map-locate svg { width: 16px; height: 16px; }
-.pp-map-locate:active { transform: scale(0.95); }
-.pp-map-locate.is-active { color: var(--pp-primary); }
+.pp-map-locate svg { width: 20px; height: 20px; }
+.pp-map-locate:active { transform: scale(0.92); }
+.pp-map-locate.is-active { color: #2E7FFF; }
 /* 네이버맵 현위치 점 */
 .pp-loc-dot {
   width: 16px; height: 16px; border-radius: 50%;
   background: #2E7FFF;
   border: 3px solid #fff;
   box-shadow: 0 0 0 2px rgba(46, 127, 255, 0.25);
+  position: relative;
+}
+.pp-loc-dot::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 16px; height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: rgba(46, 127, 255, 0.3);
+  animation: pp-loc-pulse 2s ease-out infinite;
+}
+@keyframes pp-loc-pulse {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(3.5); opacity: 0; }
 }
 
 /* 지도 빈 카테고리 안내 모달 */
@@ -2616,6 +2645,49 @@ body { background: #f8f5f2; }
 }
 .sl__pane.is-active { display: flex; }
 
+/* 주변 인기 장소 */
+.sl__popular { padding: 16px 0 8px; }
+.sl__popular[hidden] { display: none; }
+.sl__popular-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0 16px 10px;
+}
+.sl__popular-title { font-size: 15px; font-weight: 700; color: var(--pp-text); }
+.sl__popular-sub { font-size: 11px; color: var(--pp-primary); font-weight: 600; }
+.sl__popular-scroll {
+  display: flex; gap: 10px;
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 0 16px 8px;
+  scrollbar-width: none;
+}
+.sl__popular-scroll::-webkit-scrollbar { display: none; }
+.sl__popular-card {
+  flex-shrink: 0; width: 120px;
+  scroll-snap-align: start;
+  background: #fff;
+  border: 1px solid var(--pp-line);
+  border-radius: 14px;
+  padding: 14px 10px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+  text-align: center;
+}
+.sl__popular-card:active { transform: scale(0.97); }
+.sl__popular-card:hover { border-color: var(--pp-primary); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.sl__popular-icon { font-size: 28px; line-height: 1; margin-bottom: 2px; }
+.sl__popular-name {
+  font-size: 13px; font-weight: 600; color: var(--pp-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sl__popular-cat {
+  font-size: 11px; color: var(--pp-text-sub);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sl__popular-dist { font-size: 11px; color: var(--pp-primary); font-weight: 600; }
+
 /* 최근 검색어 */
 .sl__recent { padding: 8px 16px; overflow-y: auto; flex: 1; }
 .sl__recent-head {
@@ -3100,6 +3172,15 @@ body { background: #f8f5f2; }
   color: #aaa;
   margin-bottom: 8px;
 }
+.pp-footer__biz-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: none; padding: 0;
+  font-size: 12px; color: #999; cursor: pointer;
+  margin-bottom: 6px;
+}
+.pp-footer__biz-arrow { transition: transform .2s; }
+.pp-footer__biz-toggle.is-open .pp-footer__biz-arrow { transform: rotate(180deg); }
+.pp-footer__biz-content[hidden] { display: none; }
 .pp-footer__biz-content {
   margin-bottom: 10px;
 }
