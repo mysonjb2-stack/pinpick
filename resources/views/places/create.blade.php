@@ -155,7 +155,7 @@
 </div>
 
 <div class="pp-form-submit">
-    <button class="pp-btn pp-btn--block" type="submit" form="placeForm" id="placeSubmitBtn" disabled>{{ $editMode ? '수정하기' : '저장하기' }}</button>
+    <button class="pp-btn pp-btn--block" type="submit" form="placeForm" id="placeSubmitBtn"{{ $editMode ? '' : ' disabled' }}>{{ $editMode ? '수정하기' : '저장하기' }}</button>
 </div>
 
 {{-- ===== 장소 검색 레이어 (풀스크린 슬라이드업) ===== --}}
@@ -350,7 +350,9 @@ var _gmReady = new Promise(function(resolve) { window.__gmcb = resolve; });
     const roadEl = document.getElementById('f_road');
     const addrEl = document.getElementById('f_addr');
     const themeWrap = document.getElementById('themeChips');
+    const isEditMode = @json($editMode);
     if (!btn) return;
+    if (isEditMode) return; // 수정 모드에서는 항상 활성화
 
     function check() {
         const hasName  = (nameEl?.value || '').trim() !== '';

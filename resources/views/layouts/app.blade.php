@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#ffa51a">
     <meta name="naver-site-verification" content="8fc3a513aca43a1416d55813adba83f8baf6a28a" />
+    <meta name="google-site-verification" content="2mqKDLK12Nw5E2pimrdTIryzolgiC_A-icMVU0FZSzk" />
     <title>@yield('page_title', '나만의 장소, 나만의 지도 | 핀픽')</title>
     <meta name="description" content="@yield('meta_description', '맛집, 카페, 여행지, 가고싶은 곳까지 — 내 장소를 모두 저장하고 쉽게 꺼내쓰는 나만의 지도앱, 핀픽. 로그인 없이 바로 시작하세요.')">
     @if(View::yieldContent('noindex'))
@@ -27,6 +28,8 @@
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
     @stack('head')
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HQK3JQ1XEJ"></script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-HQK3JQ1XEJ');</script>
 </head>
 <body>
 <div class="pp-app @yield('app_class')">

@@ -48,14 +48,13 @@ fi
 
 log "캐시 재빌드 (프로덕션 최적화)"
 php artisan config:cache >/dev/null
-php artisan view:cache   >/dev/null
 if [ "$QUICK" = "0" ]; then
     php artisan route:cache >/dev/null
     php artisan event:cache >/dev/null
 fi
 
 log "PHP-FPM 재시작 (OPcache 초기화)"
-sudo systemctl reload php8.3-fpm
+sudo systemctl restart php8.3-fpm
 
 log "storage 심볼릭 링크 확인"
 if [ ! -L public/storage ]; then

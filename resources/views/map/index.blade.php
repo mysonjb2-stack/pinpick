@@ -214,7 +214,7 @@
     const _hasSavedView = !!(sessionStorage.getItem('pp_map_naver_view') || sessionStorage.getItem('pp_map_google_view'));
 
     // 현위치 캐시 (30분 TTL) — 내 지도 재진입 시 제주도→현위치 깜빡임 제거
-    const GEO_TTL = 30 * 60 * 1000;
+    const GEO_TTL = 24 * 60 * 60 * 1000;
     function readGeoCache() {
         try {
             const o = JSON.parse(localStorage.getItem('pp_last_geo') || 'null');
@@ -240,7 +240,7 @@
         const domestic = places.filter(p => !p.is_overseas);
         const c = _cachedGeo
             ? new naver.maps.LatLng(_cachedGeo.lat, _cachedGeo.lng)
-            : (domestic.length
+            : ((!_forceMe && domestic.length)
                 ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
                 : new naver.maps.LatLng(37.5665, 126.9780));
         const savedN = JSON.parse(sessionStorage.getItem('pp_map_naver_view') || 'null');

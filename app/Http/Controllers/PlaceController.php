@@ -388,6 +388,38 @@ class PlaceController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function quickAddImages(Place $place, Request $request)
+    {
+        abort_unless($place->user_id === $request->user()?->id, 403);
+
+        $request->validate([
+            'images' => ['required', 'array', 'max:5'],
+            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
+        ]);
+
+        $existingCount = $place->images()->count();
+        $processor = app(ImageProcessor::class);
+        $added = 0;
+
+        foreach ($request->file('images', []) as $i => $file) {
+            if ($existingCount + $i + 1 > 5) break;
+            try {
+                $path = $processor->processPlaceImage($file, 'places/' . $place->id);
+            } catch (\Throwable $e) {
+                Log::warning('quick image failed: ' . $e->getMessage(), ['place_id' => $place->id]);
+                continue;
+            }
+            PlaceImage::create([
+                'place_id' => $place->id,
+                'path' => $path,
+                'sort_order' => $existingCount + $i,
+            ]);
+            $added++;
+        }
+
+        return redirect()->route('places.show', $place)->with('success', "이미지 {$added}장이 추가되었어요.");
+    }
+
     public function destroyImage(PlaceImage $placeImage, Request $request)
     {
         $place = $placeImage->place;

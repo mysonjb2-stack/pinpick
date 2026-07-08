@@ -706,6 +706,36 @@ input, select, textarea { font: inherit; color: inherit; }
 .pp-show-images__item img {
   width: 100%; height: 100%; object-fit: cover; display: block;
 }
+.pp-show-images__add {
+  flex: 0 0 auto;
+}
+.pp-show-images__add-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 80px; height: 120px;
+  border: 2px dashed var(--pp-border, #d5d0cb);
+  border-radius: 12px; cursor: pointer;
+  color: var(--pp-text-sub, #999);
+  transition: border-color .2s, color .2s, background .2s;
+}
+.pp-show-images__add-btn:active {
+  background: var(--pp-bg-soft, #f5f0eb);
+}
+.pp-show-images__add-label {
+  font-size: 11px; margin-top: 4px;
+}
+.pp-show-images__add-btn.is-uploading {
+  pointer-events: none; opacity: .5;
+}
+.pp-show-images__add-btn.is-uploading svg {
+  animation: pp-spin .8s linear infinite;
+}
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+.pp-show-images__add--solo .pp-show-images__add-btn {
+  width: 100%; height: 100px;
+}
+.pp-show-images--empty {
+  margin-bottom: 16px;
+}
 
 /* 칩 줄바꿈 (테마 선택 등) */
 .pp-chips--wrap {

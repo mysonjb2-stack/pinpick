@@ -27,7 +27,7 @@
 
 @section('content')
 <div style="padding:16px">
-    {{-- 이미지 갤러리 (사용자 업로드 우선, 없으면 지도 썸네일) --}}
+    {{-- 이미지 갤러리 (사용자 업로드 우선, 없으면 지도 썸네일 + 빠른 추가) --}}
     @if($place->images->count())
     <div class="pp-show-images" id="ppShowImages">
         @foreach($place->images as $i => $img)
@@ -35,12 +35,39 @@
             <img src="{{ $img->url }}" alt="{{ $place->name }}" loading="lazy">
         </div>
         @endforeach
+        @if($place->images->count() < 5)
+        <form class="pp-show-images__add" action="{{ route('api.places.quick-images', $place) }}" method="POST" enctype="multipart/form-data" id="ppQuickImgForm">
+            @csrf
+            <label class="pp-show-images__add-btn" aria-label="이미지 추가">
+                <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="24" height="24"><path d="M12 5v14M5 12h14"/></svg>
+            </label>
+        </form>
+        @endif
     </div>
     @elseif($place->thumbnail)
-    <div class="pp-show-images">
+    <div class="pp-show-images pp-show-images--with-add">
         <div class="pp-show-images__item">
             <img src="{{ asset('storage/' . $place->thumbnail) }}" alt="{{ $place->name }}">
         </div>
+        <form class="pp-show-images__add" action="{{ route('api.places.quick-images', $place) }}" method="POST" enctype="multipart/form-data" id="ppQuickImgForm">
+            @csrf
+            <label class="pp-show-images__add-btn" aria-label="이미지 추가">
+                <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="24" height="24"><path d="M12 5v14M5 12h14"/></svg>
+            </label>
+        </form>
+    </div>
+    @else
+    <div class="pp-show-images pp-show-images--empty">
+        <form class="pp-show-images__add pp-show-images__add--solo" action="{{ route('api.places.quick-images', $place) }}" method="POST" enctype="multipart/form-data" id="ppQuickImgForm">
+            @csrf
+            <label class="pp-show-images__add-btn" aria-label="이미지 추가">
+                <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="28" height="28"><path d="M12 5v14M5 12h14"/></svg>
+                <span class="pp-show-images__add-label">사진 추가</span>
+            </label>
+        </form>
     </div>
     @endif
 
@@ -288,6 +315,19 @@
     @endif
 @endif
 <script>
+// 빠른 이미지 추가 (파일 선택 시 자동 업로드)
+(function(){
+    const input = document.getElementById('ppQuickImgInput');
+    const form = document.getElementById('ppQuickImgForm');
+    if (!input || !form) return;
+    input.addEventListener('change', function(){
+        if (!this.files.length) return;
+        const btn = form.querySelector('.pp-show-images__add-btn');
+        btn.classList.add('is-uploading');
+        form.submit();
+    });
+})();
+
 // 헤더 더보기 메뉴 (수정/삭제)
 (function(){
     const wrap = document.getElementById('ppMoreWrap');
