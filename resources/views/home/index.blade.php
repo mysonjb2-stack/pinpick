@@ -348,6 +348,9 @@
         @auth
         <div class="pp-mine-sechead">
             <h3 class="pp-mine-sechead__title">전체 장소</h3>
+            <button type="button" class="pp-share-btn" id="ppShareBtn" hidden aria-label="공유">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            </button>
             <div class="pp-sortfilter" id="ppSortFilter">
                 <button type="button" class="pp-sortfilter__btn" id="ppSortFilterBtn" aria-expanded="false">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M11 18h2"/></svg>
@@ -472,6 +475,41 @@
     </script>
 
 </div>
+
+{{-- 공유 바텀시트 --}}
+@auth
+<div class="pp-share-sheet" id="ppShareSheet">
+    <div class="pp-share-sheet__backdrop" data-close-share></div>
+    <div class="pp-share-sheet__panel">
+        <div class="pp-share-sheet__handle"></div>
+        <h3 class="pp-share-sheet__title">장소 공유</h3>
+        <div class="pp-share-sheet__field">
+            <label class="pp-share-sheet__label">공유 제목</label>
+            <input type="text" class="pp-share-sheet__input" id="ppShareTitle" maxlength="100">
+        </div>
+        <div class="pp-share-sheet__field">
+            <label class="pp-share-sheet__label">장소명 표시 방식</label>
+            <label class="pp-share-sheet__radio">
+                <input type="radio" name="shareMode" value="original" checked>
+                <span>기본 장소명으로 보내기</span>
+            </label>
+            <label class="pp-share-sheet__radio">
+                <input type="radio" name="shareMode" value="custom">
+                <span>내가 지은 이름과 메모 포함</span>
+            </label>
+            <p class="pp-share-sheet__hint" id="ppShareModeHint" hidden>직접 입력한 장소명과 메모가 상대방에게 그대로 보여요</p>
+        </div>
+        <div class="pp-share-sheet__buttons">
+            <button type="button" class="pp-btn pp-btn--kakao-share" id="ppShareKakao">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.7 6.78-.2.74-.75 2.81-.86 3.25-.14.55.2.54.42.4.17-.12 2.7-1.84 3.79-2.58.64.1 1.3.15 1.95.15 5.52 0 10-3.58 10-8S17.52 3 12 3z"/></svg>
+                카카오톡으로 공유
+            </button>
+            <button type="button" class="pp-btn pp-btn--ghost" id="ppShareCopyLink">링크 복사</button>
+        </div>
+    </div>
+</div>
+@endauth
+
 @endsection
 
 @push('scripts')
@@ -529,6 +567,131 @@
         })
         .catch(() => { btn.textContent = '다시 시도'; btn.disabled = false; });
     });
+})();
+</script>
+
+{{-- 공유 기능 JS --}}
+<script>
+(function() {
+    const shareBtn = document.getElementById('ppShareBtn');
+    const shareSheet = document.getElementById('ppShareSheet');
+    if (!shareBtn || !shareSheet) return;
+
+    const titleInput = document.getElementById('ppShareTitle');
+    const modeHint = document.getElementById('ppShareModeHint');
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    let currentCatId = null;
+
+    document.querySelectorAll('input[name="shareMode"]').forEach(r => {
+        r.addEventListener('change', () => { modeHint.hidden = r.value !== 'custom' || !r.checked; });
+    });
+
+    shareBtn.addEventListener('click', () => {
+        const activeTab = document.querySelector('#ppHeroTabs .pp-hero2__tab.is-active');
+        if (!activeTab || activeTab.dataset.cat === 'all') return;
+        currentCatId = activeTab.dataset.cat;
+        titleInput.value = activeTab.textContent.trim();
+        shareSheet.classList.add('is-open');
+    });
+
+    shareSheet.querySelectorAll('[data-close-share]').forEach(el => {
+        el.addEventListener('click', () => { shareSheet.classList.remove('is-open'); });
+    });
+
+    async function createShare() {
+        const mode = document.querySelector('input[name="shareMode"]:checked')?.value || 'original';
+        const catId = parseInt(currentCatId);
+        if (!catId) { showToast('카테고리를 선택해주세요'); return null; }
+        const body = { category_id: catId, title: titleInput.value.trim() || '공유', name_display_mode: mode };
+
+        try {
+            const res = await fetch('/api/share', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                showToast(err.message || '공유 생성에 실패했어요');
+                return null;
+            }
+            return await res.json();
+        } catch (e) {
+            showToast('네트워크 오류가 발생했어요');
+            return null;
+        }
+    }
+
+    function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+        }
+        return fallbackCopy(text);
+    }
+
+    function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+    }
+
+    document.getElementById('ppShareCopyLink').addEventListener('click', async () => {
+        try {
+            const data = await createShare();
+            if (!data) return;
+            shareSheet.classList.remove('is-open');
+            await copyToClipboard(data.url);
+            showToast('링크가 복사됐어요');
+        } catch (e) {
+            showToast('오류가 발생했어요');
+        }
+    });
+
+    document.getElementById('ppShareKakao').addEventListener('click', async () => {
+        try {
+            const data = await createShare();
+            if (!data) return;
+            shareSheet.classList.remove('is-open');
+
+            if (typeof Kakao === 'undefined') {
+                const s = document.createElement('script');
+                s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js';
+                s.onload = () => { sendKakaoShare(data); };
+                s.onerror = () => { showToast('카카오 SDK를 불러오지 못했어요'); };
+                document.head.appendChild(s);
+            } else {
+                sendKakaoShare(data);
+            }
+        } catch (e) {
+            showToast('오류가 발생했어요');
+        }
+    });
+
+    function sendKakaoShare(data) {
+        if (!Kakao.isInitialized()) Kakao.init('{{ config("services.kakao.js_key") }}');
+        Kakao.Share.sendDefault({
+            objectType: 'feed',
+            content: {
+                title: data.title,
+                description: '장소 ' + data.place_count + '개 · 나만의 장소, 나만의 지도 핀픽',
+                imageUrl: data.thumbnail_url || '{{ asset("images/og-image.png") }}',
+                link: { mobileWebUrl: data.url, webUrl: data.url },
+            },
+            buttons: [{ title: '장소 확인하기', link: { mobileWebUrl: data.url, webUrl: data.url } }],
+        });
+    }
+
+    function showToast(msg) {
+        let t = document.getElementById('ppToast');
+        if (!t) { t = document.createElement('div'); t.id = 'ppToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
+        t.textContent = msg;
+        t.classList.add('is-show');
+        setTimeout(() => t.classList.remove('is-show'), 2500);
+    }
 })();
 </script>
 @endauth
@@ -703,6 +866,8 @@
                 const base = fabLink.dataset.createBase;
                 fabLink.href = (cat && cat !== 'all') ? base + '?category=' + encodeURIComponent(cat) : base;
             }
+            const shareBtn = document.getElementById('ppShareBtn');
+            if (shareBtn) shareBtn.hidden = (cat === 'all');
         }
         heroTabs.addEventListener('click', (e) => {
             const btn = e.target.closest('.pp-hero2__tab');
@@ -1018,6 +1183,11 @@
 // 게스트 localStorage 장소 hydrate → 통합 그리드에 렌더
 @guest
 (function() {
+    // 일회성 게스트 데이터 초기화 (phone/opening_hours 추가)
+    if (!localStorage.getItem('_pp_reset_0709b')) {
+        localStorage.removeItem('pinpick_guest_places');
+        localStorage.setItem('_pp_reset_0709b', '1');
+    }
     const grid = document.getElementById('ppMineGrid');
     if (!grid) return;
     const list = JSON.parse(localStorage.getItem('pinpick_guest_places') || '[]');
@@ -1044,9 +1214,12 @@
         const dateHtml = (p.status === 'visited' && p.visited_at)
             ? `<span class="pp-mine-grid__date">${escapeHtml(String(p.visited_at).slice(0,10).replaceAll('-','.'))}</span>` : '';
         const hasLatLng = Number.isFinite(+p.lat) && Number.isFinite(+p.lng);
-        const thumbImg = hasLatLng
-            ? `<img class="pp-mine-grid__thumb-img" alt="${escapeHtml(p.name)} 위치 지도" loading="lazy" src="/api/static-map?lat=${encodeURIComponent(p.lat)}&lng=${encodeURIComponent(p.lng)}&overseas=${p.is_overseas ? 1 : 0}&w=320&h=320" onerror="this.remove()">`
-            : '';
+        let thumbImg = '';
+        if (p.thumbnail_url) {
+            thumbImg = `<img class="pp-mine-grid__thumb-img" alt="${escapeHtml(p.name)}" loading="lazy" src="${escapeHtml(p.thumbnail_url)}" onerror="this.remove()">`;
+        } else if (hasLatLng) {
+            thumbImg = `<img class="pp-mine-grid__thumb-img" alt="${escapeHtml(p.name)} 위치 지도" loading="lazy" src="/api/static-map?lat=${encodeURIComponent(p.lat)}&lng=${encodeURIComponent(p.lng)}&overseas=${p.is_overseas ? 1 : 0}&w=320&h=320" onerror="this.remove()">`;
+        }
         const card = document.createElement('a');
         card.className = 'pp-mine-grid__item';
         card.href = '/guest/places/' + encodeURIComponent(p.id);

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Http;
 use Laravel\Socialite\Facades\Socialite;
 
 class SocialAuthController extends Controller
@@ -59,6 +61,48 @@ class SocialAuthController extends Controller
         Cookie::queue('pp_last_login', $provider, 60 * 24 * 365, '/', null, false, false);
 
         return redirect('/');
+    }
+
+    public function nativeKakaoLogin(Request $request)
+    {
+        $token = $request->input('access_token');
+        if (!$token) {
+            return response()->json(['error' => 'access_token 필요'], 422);
+        }
+
+        $response = Http::withToken($token)->get('https://kapi.kakao.com/v2/user/me');
+        if ($response->failed()) {
+            return response()->json(['error' => '카카오 인증 실패'], 401);
+        }
+
+        $kakaoUser = $response->json();
+        $providerId = (string) $kakaoUser['id'];
+        $account = $kakaoUser['kakao_account'] ?? [];
+        $profile = $account['profile'] ?? [];
+        $email = $account['email'] ?? null;
+
+        $user = User::where('provider', 'kakao')
+            ->where('provider_id', $providerId)
+            ->first();
+
+        if (!$user && $email) {
+            $user = User::where('email', $email)->first();
+        }
+
+        if (!$user) {
+            $user = User::create([
+                'provider' => 'kakao',
+                'provider_id' => $providerId,
+                'name' => $profile['nickname'] ?? '핀픽러',
+                'email' => $email,
+                'profile_image' => $profile['profile_image_url'] ?? null,
+            ]);
+        }
+
+        Auth::login($user, true);
+        Cookie::queue('pp_last_login', 'kakao', 60 * 24 * 365, '/', null, false, false);
+
+        return response()->json(['success' => true, 'redirect' => '/']);
     }
 
     public function logout()

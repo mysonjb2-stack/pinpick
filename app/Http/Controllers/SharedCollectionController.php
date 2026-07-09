@@ -1,0 +1,289 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Category;
+use App\Models\Place;
+use App\Models\SharedCollection;
+use App\Models\SharedPlace;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use App\Models\PlaceImage;
+use App\Services\ImageProcessor;
+use Illuminate\Support\Str;
+
+class SharedCollectionController extends Controller
+{
+    public function store(Request $request)
+    {
+        $request->validate([
+            'category_id' => 'required|exists:categories,id',
+            'title' => 'required|string|max:100',
+            'name_display_mode' => 'required|in:original,custom',
+        ]);
+
+        $user = Auth::user();
+        $category = Category::where('id', $request->category_id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $places = Place::where('user_id', $user->id)
+            ->where('category_id', $category->id)
+            ->where('is_visible', true)
+            ->orderBy('sort_order')
+            ->with('images')
+            ->get();
+
+        if ($places->isEmpty()) {
+            return response()->json(['error' => '공유할 장소가 없습니다.'], 422);
+        }
+
+        $token = Str::random(32);
+        while (SharedCollection::where('token', $token)->exists()) {
+            $token = Str::random(32);
+        }
+
+        $collection = SharedCollection::create([
+            'user_id' => $user->id,
+            'token' => $token,
+            'title' => $request->title,
+            'source_category_id' => $category->id,
+            'name_display_mode' => $request->name_display_mode,
+        ]);
+
+        $isCustom = $request->name_display_mode === 'custom';
+        $storageDir = "shared/{$collection->id}";
+        Storage::disk('public')->makeDirectory($storageDir);
+
+        foreach ($places as $i => $place) {
+            $thumbnailUrl = null;
+            $sourcePath = $this->findThumbnailPath($place);
+            if ($sourcePath && Storage::disk('public')->exists($sourcePath)) {
+                $ext = pathinfo($sourcePath, PATHINFO_EXTENSION);
+                $destPath = "{$storageDir}/" . Str::random(20) . ".{$ext}";
+                Storage::disk('public')->copy($sourcePath, $destPath);
+                $thumbnailUrl = asset('storage/' . $destPath);
+            }
+
+            SharedPlace::create([
+                'shared_collection_id' => $collection->id,
+                'display_name' => $isCustom ? $place->name : ($place->original_name ?: $place->name),
+                'original_place_name' => $place->original_name ?: $place->name,
+                'address' => $place->road_address ?: $place->address,
+                'phone' => $place->phone,
+                'opening_hours' => $place->opening_hours,
+                'latitude' => $place->lat,
+                'longitude' => $place->lng,
+                'category_label' => $category->name,
+                'memo' => $isCustom ? $place->memo : null,
+                'thumbnail_url' => $thumbnailUrl,
+                'external_place_id' => $place->kakao_place_id ?: $place->naver_place_id,
+                'is_overseas' => (bool) $place->is_overseas,
+                'sort_order' => $i,
+            ]);
+        }
+
+        $shareUrl = url("/s/{$token}");
+
+        return response()->json([
+            'success' => true,
+            'token' => $token,
+            'url' => $shareUrl,
+            'place_count' => $places->count(),
+            'title' => $collection->title,
+            'thumbnail_url' => $collection->places()->first()?->thumbnail_url,
+        ]);
+    }
+
+    public function show(string $token)
+    {
+        $collection = SharedCollection::where('token', $token)->first();
+
+        if (!$collection || !$collection->is_active) {
+            return response()->view('shared.expired', [], 410);
+        }
+
+        $collection->increment('view_count');
+        $collection->load(['places', 'user:id,name']);
+
+        $userCategories = [];
+        if (Auth::check()) {
+            $userCategories = Category::where('user_id', Auth::id())
+                ->orderBy('sort_order')
+                ->get(['id', 'name', 'icon']);
+        }
+
+        return view('shared.show', compact('collection', 'userCategories'));
+    }
+
+    public function myLinks()
+    {
+        $collections = SharedCollection::where('user_id', Auth::id())
+            ->withCount('places')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('mypage.shared-links', compact('collections'));
+    }
+
+    public function deactivate(SharedCollection $collection)
+    {
+        if ($collection->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $collection->update(['is_active' => false]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function saveToMyPinpick(Request $request, string $token)
+    {
+        $collection = SharedCollection::where('token', $token)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $request->validate([
+            'place_ids' => 'required|array|min:1',
+            'place_ids.*' => 'integer|exists:shared_places,id',
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'new_category_name' => 'nullable|string|max:50',
+        ]);
+
+        $user = Auth::user();
+
+        if ($request->new_category_name) {
+            $maxSort = Category::where('user_id', $user->id)->max('sort_order') ?? -1;
+            $category = Category::create([
+                'user_id' => $user->id,
+                'name' => $request->new_category_name,
+                'icon' => '📌',
+                'sort_order' => $maxSort + 1,
+            ]);
+        } elseif ($request->category_id) {
+            $category = Category::where('id', $request->category_id)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+        } else {
+            return response()->json(['error' => '카테고리를 선택해주세요.'], 422);
+        }
+
+        $sharedPlaces = SharedPlace::where('shared_collection_id', $collection->id)
+            ->whereIn('id', $request->place_ids)
+            ->get();
+
+        $existingExtIds = Place::where('user_id', $user->id)
+            ->whereNotNull('kakao_place_id')
+            ->pluck('kakao_place_id')
+            ->merge(
+                Place::where('user_id', $user->id)
+                    ->whereNotNull('naver_place_id')
+                    ->pluck('naver_place_id')
+            )
+            ->toArray();
+
+        $maxSort = Place::where('user_id', $user->id)->max('sort_order') ?? -1;
+        $saved = 0;
+        $skipped = 0;
+
+        $koreaProvinces = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
+
+        foreach ($sharedPlaces as $sp) {
+            if ($sp->external_place_id && in_array($sp->external_place_id, $existingExtIds)) {
+                $skipped++;
+                continue;
+            }
+
+            $isOverseas = true;
+            if ($sp->address) {
+                foreach ($koreaProvinces as $prov) {
+                    if (str_starts_with($sp->address, $prov)) {
+                        $isOverseas = false;
+                        break;
+                    }
+                }
+            }
+
+            $newPlace = Place::create([
+                'user_id' => $user->id,
+                'category_id' => $category->id,
+                'name' => $sp->display_name,
+                'original_name' => $sp->original_place_name,
+                'address' => $sp->address,
+                'lat' => $sp->latitude,
+                'lng' => $sp->longitude,
+                'memo' => $sp->memo,
+                'status' => 'planned',
+                'is_overseas' => $isOverseas,
+                'is_public' => false,
+                'sort_order' => ++$maxSort,
+                'kakao_place_id' => $sp->external_place_id,
+            ]);
+
+            if ($sp->thumbnail_url) {
+                $this->copySharedImage($sp, $newPlace);
+            }
+
+            $saved++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'saved' => $saved,
+            'skipped' => $skipped,
+        ]);
+    }
+
+    private function findThumbnailPath(Place $place): ?string
+    {
+        $firstImage = $place->images->first();
+        if ($firstImage) {
+            $thumbPath = \App\Services\ImageProcessor::thumbPathFor($firstImage->path);
+            if (Storage::disk('public')->exists($thumbPath)) {
+                return $thumbPath;
+            }
+            return $firstImage->path;
+        }
+
+        if ($place->thumbnail) {
+            return $place->thumbnail;
+        }
+
+        return null;
+    }
+
+    private function copySharedImage(SharedPlace $sp, Place $newPlace): void
+    {
+        $url = $sp->thumbnail_url;
+        $parsed = parse_url($url, PHP_URL_PATH);
+        $storagePath = str_replace('/storage/', '', $parsed);
+
+        if (!Storage::disk('public')->exists($storagePath)) {
+            return;
+        }
+
+        $ext = pathinfo($storagePath, PATHINFO_EXTENSION) ?: 'webp';
+        $destDir = "places/{$newPlace->id}";
+        Storage::disk('public')->makeDirectory($destDir);
+        $destPath = "{$destDir}/" . Str::random(40) . ".{$ext}";
+
+        Storage::disk('public')->copy($storagePath, $destPath);
+
+        PlaceImage::create([
+            'place_id' => $newPlace->id,
+            'path' => $destPath,
+            'sort_order' => 0,
+        ]);
+
+        $thumbPath = ImageProcessor::thumbPathFor($destPath);
+        $sourceThumb = ImageProcessor::thumbPathFor($storagePath);
+        if (Storage::disk('public')->exists($sourceThumb)) {
+            Storage::disk('public')->copy($sourceThumb, $thumbPath);
+        } else {
+            app(ImageProcessor::class)->generateThumbFrom($destPath);
+        }
+
+        $newPlace->update(['thumbnail' => $thumbPath]);
+    }
+}

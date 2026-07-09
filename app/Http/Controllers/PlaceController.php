@@ -144,6 +144,7 @@ class PlaceController extends Controller
         $data = $request->validate([
             'places' => ['required', 'array', 'min:1', 'max:20'],
             'places.*.name' => ['required', 'string', 'max:255'],
+            'places.*.original_name' => ['nullable', 'string', 'max:255'],
             'places.*.category_name' => ['nullable', 'string', 'max:255'],
             'places.*.phone' => ['nullable', 'string', 'max:50'],
             'places.*.address' => ['nullable', 'string', 'max:255'],
@@ -154,6 +155,8 @@ class PlaceController extends Controller
             'places.*.status' => ['nullable', 'in:planned,visited'],
             'places.*.visited_at' => ['nullable'],
             'places.*.is_overseas' => ['nullable', 'boolean'],
+            'places.*.kakao_place_id' => ['nullable', 'string', 'max:100'],
+            'places.*.thumbnail_url' => ['nullable', 'string', 'max:500'],
         ]);
 
         CategoryController::ensureUserCategories($user);
@@ -170,10 +173,11 @@ class PlaceController extends Controller
             $lng = isset($p['lng']) && $p['lng'] !== '' ? (float) $p['lng'] : null;
             $visited = !empty($p['visited_at']) ? substr($p['visited_at'], 0, 10) : null;
 
-            Place::create([
+            $newPlace = Place::create([
                 'user_id' => $user->id,
                 'category_id' => $catId,
                 'name' => $p['name'],
+                'original_name' => $p['original_name'] ?? null,
                 'phone' => $p['phone'] ?? null,
                 'address' => $p['address'] ?? null,
                 'road_address' => $p['road_address'] ?? null,
@@ -183,14 +187,46 @@ class PlaceController extends Controller
                 'status' => $p['status'] ?? 'planned',
                 'visited_at' => $visited,
                 'is_overseas' => !empty($p['is_overseas']),
+                'kakao_place_id' => $p['kakao_place_id'] ?? null,
                 'sort_order' => ++$maxSort,
                 'is_visible' => true,
                 'is_public' => false,
             ]);
+
+            if (!empty($p['thumbnail_url'])) {
+                $this->importGuestThumbnail($p['thumbnail_url'], $newPlace);
+            }
+
             $imported++;
         }
 
         return response()->json(['ok' => true, 'imported' => $imported]);
+    }
+
+    private function importGuestThumbnail(string $url, Place $place): void
+    {
+        $parsed = parse_url($url, PHP_URL_PATH);
+        if (!$parsed) return;
+
+        $storagePath = str_replace('/storage/', '', $parsed);
+        if (!Storage::disk('public')->exists($storagePath)) return;
+
+        $ext = pathinfo($storagePath, PATHINFO_EXTENSION) ?: 'webp';
+        $destDir = "places/{$place->id}";
+        Storage::disk('public')->makeDirectory($destDir);
+        $destPath = "{$destDir}/" . \Illuminate\Support\Str::random(40) . ".{$ext}";
+
+        Storage::disk('public')->copy($storagePath, $destPath);
+
+        PlaceImage::create([
+            'place_id' => $place->id,
+            'path' => $destPath,
+            'sort_order' => 0,
+        ]);
+
+        app(ImageProcessor::class)->generateThumbFrom($destPath);
+        $thumbPath = ImageProcessor::thumbPathFor($destPath);
+        $place->update(['thumbnail' => $thumbPath]);
     }
 
     public function edit(Place $place, Request $request)

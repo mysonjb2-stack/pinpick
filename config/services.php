@@ -32,6 +32,7 @@ return [
         'client_id' => env('KAKAO_CLIENT_ID'),
         'client_secret' => env('KAKAO_CLIENT_SECRET'),
         'redirect' => env('KAKAO_REDIRECT'),
+        'js_key' => env('KAKAO_LOGIN_JS_KEY'),
     ],
 
     'google' => [

@@ -26,6 +26,7 @@
                 <tr>
                     <th>ID</th>
                     <th>장소명</th>
+                    <th>원본 장소명</th>
                     <th>카테고리</th>
                     <th>회원</th>
                     <th>주소</th>
@@ -40,6 +41,7 @@
                 <tr>
                     <td class="ad-text-sub">{{ $place->id }}</td>
                     <td><a href="{{ route('admin.places.show', $place) }}">{{ Str::limit($place->name, 20) }}</a></td>
+                    <td class="ad-text-sub">{{ $place->original_name && $place->original_name !== $place->name ? Str::limit($place->original_name, 20) : '-' }}</td>
                     <td class="ad-text-sub">{{ $place->category?->name ?? '-' }}</td>
                     <td>
                         @if($place->user)
@@ -63,7 +65,7 @@
                     <td><a href="{{ route('admin.places.show', $place) }}" class="ad-btn ad-btn--sm">상세</a></td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="ad-text-sub" style="text-align:center;padding:24px">장소가 없습니다.</td></tr>
+                <tr><td colspan="10" class="ad-text-sub" style="text-align:center;padding:24px">장소가 없습니다.</td></tr>
             @endforelse
             </tbody>
         </table>

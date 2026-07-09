@@ -7,6 +7,7 @@ use App\Http\Controllers\MapController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\PlaceController;
 use App\Http\Controllers\PublicPlaceController;
+use App\Http\Controllers\SharedCollectionController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\TrendingController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/mypage/profile', [MyPageController::class, 'updateProfile'])->name('mypage.profile.update');
     Route::delete('/mypage/account', [MyPageController::class, 'destroyAccount'])->name('mypage.account.destroy');
     Route::get('/mypage/categories', [MyPageController::class, 'categories'])->name('mypage.categories');
+    Route::get('/mypage/shared-links', [SharedCollectionController::class, 'myLinks'])->name('mypage.shared-links');
+    Route::post('/api/share', [SharedCollectionController::class, 'store'])->name('api.share.store')
+        ->middleware('throttle:10,1');
+    Route::patch('/api/share/{collection}/deactivate', [SharedCollectionController::class, 'deactivate'])->name('api.share.deactivate');
+    Route::post('/s/{token}/save', [SharedCollectionController::class, 'saveToMyPinpick'])->name('share.save');
 });
 Route::get('/notices', [MyPageController::class, 'notices'])->name('notices');
 Route::get('/faq', [MyPageController::class, 'faq'])->name('faq');
@@ -34,6 +40,7 @@ Route::get('/auth/{provider}', [SocialAuthController::class, 'redirect'])
 Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])
     ->where('provider', 'kakao|google|naver');
 Route::post('/logout', [SocialAuthController::class, 'logout'])->name('logout');
+Route::post('/auth/native/kakao', [SocialAuthController::class, 'nativeKakaoLogin']);
 
 // 장소 (create 폼은 비로그인도 접근 가능 - 게스트는 localStorage 저장)
 Route::get('/places/create', [PlaceController::class, 'create'])->name('places.create');
@@ -80,6 +87,12 @@ Route::get('/api/geocode/reverse', [PlaceController::class, 'reverseGeocode'])->
 Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi'])->name('api.geocode.forward');
 Route::get('/api/phone/fallback', [PlaceController::class, 'phoneFallback'])->name('api.phone.fallback');
 Route::get('/api/static-map', [PlaceController::class, 'staticMap'])->name('api.static-map');
+
+// 공유 페이지 (비로그인 접근 가능)
+Route::get('/s/{token}', [SharedCollectionController::class, 'show'])
+    ->where('token', '[A-Za-z0-9]{32}')
+    ->middleware('throttle:60,1')
+    ->name('share.show');
 
 // ── personal-only-v1: 사람들/공개 장소 라우트 비활성화 (v1-with-people 태그에서 복원 가능) ──
 // // 트렌딩 장소 (비로그인 접근 가능)

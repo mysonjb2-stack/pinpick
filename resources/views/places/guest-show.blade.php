@@ -26,8 +26,8 @@
 <div style="padding:16px" id="ppGuestShow" data-local-id="{{ $localId }}">
 
     <div class="pp-show-images" id="ppGuestThumb" hidden>
-        <div class="pp-show-images__item">
-            <img id="ppGuestThumbImg" src="" alt="장소 위치">
+        <div class="pp-show-images__item" id="ppGuestThumbWrap" style="cursor:zoom-in">
+            <img id="ppGuestThumbImg" src="" alt="장소 이미지">
         </div>
     </div>
 
@@ -54,6 +54,11 @@
             <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
             <a id="ppGuestPhone" href="#"></a>
         </div>
+        <div class="pp-info-row pp-info-row--sub" id="ppGuestHoursRow" hidden>
+            <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span id="ppGuestHoursToggle" style="color:var(--pp-primary);cursor:pointer">영업시간 보기</span>
+        </div>
+        <div id="ppGuestHoursDetail" hidden style="margin:4px 0 0 22px;font-size:12.5px;color:var(--pp-text-sub);line-height:1.8"></div>
         <div id="ppGuestMemoWrap" hidden style="margin-top:12px;padding:12px;background:var(--pp-bg-soft);border-radius:10px;font-size:13.5px">
             <span id="ppGuestMemo"></span>
         </div>
@@ -88,6 +93,16 @@
         <a href="/" class="pp-btn pp-btn--primary" style="display:inline-block;padding:10px 20px;background:var(--pp-primary);color:#fff;border-radius:999px;text-decoration:none;font-size:14px">홈으로</a>
     </div>
 
+</div>
+
+{{-- 이미지 라이트박스 --}}
+<div class="pp-lb" id="ppLb" hidden aria-hidden="true" role="dialog" aria-label="이미지 보기">
+    <button type="button" class="pp-lb__close" aria-label="닫기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="22" height="22"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="pp-lb__stage" id="ppLbStage">
+        <img class="pp-lb__img" id="ppLbImg" alt="">
+    </div>
 </div>
 
 <div class="pp-guest-modal" id="ppGuestLoginModal" hidden aria-hidden="true" role="dialog" aria-labelledby="ppGuestLoginModalTitle">
@@ -158,8 +173,6 @@
         return;
     }
 
-    function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
     document.title = (p.name || '장소') + ' · 핀픽';
 
     // 기본 정보
@@ -191,6 +204,24 @@
         document.getElementById('ppGuestPhoneRow').hidden = false;
     }
 
+    // 영업시간
+    const hours = Array.isArray(p.opening_hours) ? p.opening_hours : [];
+    if (hours.length) {
+        document.getElementById('ppGuestHoursRow').hidden = false;
+        const detail = document.getElementById('ppGuestHoursDetail');
+        detail.innerHTML = hours.map(function(h) { return '<div>' + String(h).replace(/[<>&"']/g, '') + '</div>'; }).join('');
+        const toggle = document.getElementById('ppGuestHoursToggle');
+        toggle.addEventListener('click', function() {
+            if (detail.hidden) {
+                detail.hidden = false;
+                toggle.textContent = '영업시간 접기';
+            } else {
+                detail.hidden = true;
+                toggle.textContent = '영업시간 보기';
+            }
+        });
+    }
+
     if (p.memo) {
         document.getElementById('ppGuestMemo').textContent = p.memo;
         document.getElementById('ppGuestMemoWrap').hidden = false;
@@ -203,17 +234,76 @@
 
     // 위치/지도
     const lat = +p.lat, lng = +p.lng;
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    if (p.thumbnail_url || (Number.isFinite(lat) && Number.isFinite(lng))) {
         const isOv = !!p.is_overseas;
-        const mapUrl = `/api/static-map?lat=${lat}&lng=${lng}&overseas=${isOv ? 1 : 0}&w=800&h=400`;
+        const mapUrl = (Number.isFinite(lat) && Number.isFinite(lng))
+            ? `/api/static-map?lat=${lat}&lng=${lng}&overseas=${isOv ? 1 : 0}&w=800&h=400`
+            : '';
 
-        // 상단 썸네일
-        document.getElementById('ppGuestThumbImg').src = mapUrl;
+        const thumbSrc = p.thumbnail_url || mapUrl;
+        document.getElementById('ppGuestThumbImg').src = thumbSrc;
         document.getElementById('ppGuestThumb').hidden = false;
+
+        // 이미지 라이트박스 (thumbnail_url이 있는 경우만)
+        if (p.thumbnail_url) {
+            const lb = document.getElementById('ppLb');
+            const lbImg = document.getElementById('ppLbImg');
+            const lbStage = document.getElementById('ppLbStage');
+            const closeBtn = lb.querySelector('.pp-lb__close');
+
+            document.getElementById('ppGuestThumbWrap').addEventListener('click', function() {
+                lbImg.src = p.thumbnail_url;
+                lb.hidden = false;
+                lb.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            });
+            closeBtn.addEventListener('click', closeLb);
+            lbStage.addEventListener('click', function(e) {
+                if (e.target === lbStage) closeLb();
+            });
+            document.addEventListener('keydown', function(e) {
+                if (!lb.hidden && e.key === 'Escape') closeLb();
+            });
+
+            function closeLb() {
+                lb.hidden = true;
+                lb.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+                lbImg.src = '';
+            }
+
+            // 핀치줌
+            var sc = 1, tx = 0, ty = 0;
+            var mode = 'idle', pinchDist0 = 0, pinchSc0 = 1;
+            function apply() { lbImg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + sc + ')'; }
+            function resetZoom() { sc = 1; tx = 0; ty = 0; lbImg.style.transform = ''; }
+
+            lbStage.addEventListener('touchstart', function(e) {
+                var t = e.touches;
+                if (t.length === 2) {
+                    mode = 'pinch';
+                    pinchDist0 = Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+                    pinchSc0 = sc;
+                }
+            }, {passive: true});
+            lbStage.addEventListener('touchmove', function(e) {
+                if (mode !== 'pinch' || e.touches.length < 2) return;
+                e.preventDefault();
+                var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                sc = Math.min(5, Math.max(1, pinchSc0 * (d / pinchDist0)));
+                apply();
+            }, {passive: false});
+            lbStage.addEventListener('touchend', function() {
+                mode = 'idle';
+                if (sc <= 1.05) resetZoom();
+            }, {passive: true});
+        } else {
+            document.getElementById('ppGuestThumbWrap').style.cursor = 'default';
+        }
 
         // 위치 섹션
         document.getElementById('ppGuestLoc').hidden = false;
-        document.getElementById('ppGuestMapImg').src = mapUrl;
+        if (mapUrl) document.getElementById('ppGuestMapImg').src = mapUrl;
 
         if (addr) {
             document.getElementById('ppGuestLocAddr').textContent = addr;

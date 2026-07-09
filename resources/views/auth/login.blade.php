@@ -15,10 +15,10 @@
         @if($lastLogin === 'kakao')
             <div class="pp-login__tip">최근 사용한 로그인 방법</div>
         @endif
-        <a href="/auth/kakao" class="pp-login__btn pp-login__btn--kakao">
+        <button type="button" onclick="handleKakaoLogin()" class="pp-login__btn pp-login__btn--kakao">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.7 6.78-.2.74-.75 2.81-.86 3.25-.14.55.2.54.42.4.17-.12 2.7-1.84 3.79-2.58.64.1 1.3.15 1.95.15 5.52 0 10-3.58 10-8S17.52 3 12 3z"/></svg>
             카카오로 시작하기
-        </a>
+        </button>
     </div>
     <div class="pp-login__slot">
         @if($lastLogin === 'naver')
@@ -43,4 +43,37 @@
         로그인 없이 최대 5개까지 임시 저장 가능해요
     </div>
 </div>
+
+<script>
+function isPinpickApp() {
+    return /MYPINPICK/i.test(navigator.userAgent);
+}
+
+function handleKakaoLogin() {
+    if (isPinpickApp() && window.webkit?.messageHandlers?.kakaologin) {
+        window.webkit.messageHandlers.kakaologin.postMessage('');
+        return;
+    }
+    location.href = '/auth/kakao';
+}
+
+window.onKakaoLoginSuccess = function(accessToken) {
+    fetch('/auth/native/kakao', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ access_token: accessToken })
+    })
+    .then(r => r.ok ? r.json() : Promise.reject(r))
+    .then(data => {
+        if (data.success) location.href = data.redirect || '/';
+    })
+    .catch(() => {
+        alert('로그인에 실패했어요. 다시 시도해주세요.');
+    });
+};
+</script>
 @endsection
