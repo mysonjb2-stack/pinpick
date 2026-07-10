@@ -86,7 +86,7 @@
     const THEME_LABELS = {
         food:'맛집', cafe:'카페', travel:'여행',
         beauty:'뷰티/케어', stay:'숙소', culture:'문화/여가',
-        medical:'병원/약국', shopping:'쇼핑', etc:'기타',
+        medical:'병원/약국', shopping:'쇼핑', etc:'',
     };
     const TITLES = {
         weekly: '이번주 핫한 저장',

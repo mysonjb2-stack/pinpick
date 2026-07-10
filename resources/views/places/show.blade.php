@@ -77,7 +77,7 @@
             <div class="pp-card__body">
                 <div class="pp-card__name">{{ $place->name }}</div>
                 <div class="pp-card__meta">
-                    <span>{{ $place->category?->name ?? '기타' }}</span>
+                    <span>{{ $place->category?->name ?? '' }}</span>
                     @if($place->themes->isNotEmpty())
                         <span class="pp-meta-dot" aria-hidden="true"></span>
                         @foreach($place->themes as $theme)

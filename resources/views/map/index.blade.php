@@ -108,7 +108,7 @@
             'lat' => (float) $p->lat,
             'lng' => (float) $p->lng,
             'category_id' => $p->category_id,
-            'category_name' => optional($p->category)->name ?? '기타',
+            'category_name' => optional($p->category)->name ?? '',
             'address' => $p->road_address ?: ($p->address ?: ''),
             'phone' => $p->phone ?: '',
             'status' => $p->status,
@@ -130,7 +130,7 @@
                 name: g.name || '',
                 lat, lng,
                 category_id: g.category_id,
-                category_name: g.category_name || '기타',
+                category_name: g.category_name || '',
                 address: g.road_address || g.address || '',
                 phone: g.phone || '',
                 status: g.status || 'planned',
@@ -676,7 +676,7 @@
         if (p.thumb_url) { msThumb.src = p.thumb_url; msThumb.hidden = false; }
         else { msThumb.removeAttribute('src'); msThumb.hidden = true; }
         msName.textContent = p.name;
-        msMeta.textContent = (p.category_name || '기타') + (p.address ? ' · ' + p.address : '');
+        msMeta.textContent = (p.category_name || '') + (p.address ? ' · ' + p.address : '');
         msBadge.textContent = p.status === 'visited' ? '방문완료' : '방문예정';
         msBadge.className = 'pp-badge pp-badge--' + p.status;
         if (p.phone) {

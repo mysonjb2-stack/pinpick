@@ -135,7 +135,7 @@
                         <div class="pp-rspot__body">
                             <div class="pp-rspot__name">{{ $p->name }}</div>
                             <div class="pp-rspot__meta">
-                                <span>{{ $p->category?->name ?? '기타' }}</span>
+                                <span>{{ $p->category?->name ?? '' }}</span>
                                 @if($p->themes->isNotEmpty())
                                     <span class="pp-meta-dot" aria-hidden="true"></span>
                                     @foreach($p->themes->take(2) as $theme)
@@ -348,14 +348,20 @@
         @auth
         <div class="pp-mine-sechead">
             <h3 class="pp-mine-sechead__title">전체 장소</h3>
-            <button type="button" class="pp-share-btn" id="ppShareBtn" hidden aria-label="공유">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            </button>
-            <div class="pp-sortfilter" id="ppSortFilter">
-                <button type="button" class="pp-sortfilter__btn" id="ppSortFilterBtn" aria-expanded="false">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M11 18h2"/></svg>
-                    <span id="ppSortFilterLabel">정렬/필터</span>
+            <div class="pp-mine-sechead__actions">
+                <button type="button" class="pp-mine-chip" id="ppShareBtn" hidden>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    공유
                 </button>
+                <button type="button" class="pp-mine-chip" id="ppSelEnter">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <span id="ppSelEnterLabel">선택</span>
+                </button>
+                <div class="pp-sortfilter" id="ppSortFilter">
+                    <button type="button" class="pp-mine-chip" id="ppSortFilterBtn" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M11 18h2"/></svg>
+                        <span id="ppSortFilterLabel">정렬/필터</span>
+                    </button>
                 <div class="pp-sortfilter__menu" id="ppSortFilterMenu" hidden>
                     <div class="pp-sortfilter__group">
                         <div class="pp-sortfilter__gtitle">정렬</div>
@@ -371,6 +377,7 @@
                         <button type="button" class="pp-sortfilter__opt" data-status="visited">방문완료</button>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
         <div class="yg-catorder-panel" id="catOrderPanel" hidden>
@@ -406,6 +413,7 @@
                             : null;
                     @endphp
                     <div class="pp-mine-grid__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
+                        <span class="pp-mine-grid__check"><svg width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 11 10 15 16 7"/></svg></span>
                         @if($mapThumb)
                             <img class="pp-mine-grid__thumb-img" src="{{ $mapThumb }}" alt="{{ $p->name }} 위치 지도" loading="lazy" onerror="this.remove()">
                         @endif
@@ -423,7 +431,7 @@
                     <div class="pp-mine-grid__body">
                         <div class="pp-mine-grid__name">{{ $p->name }}</div>
                         <div class="pp-mine-grid__meta">
-                            <span class="pp-mine-grid__cat">{{ $p->category?->name ?? '기타' }}</span>
+                            <span class="pp-mine-grid__cat">{{ $p->category?->name ?? '' }}</span>
                             @if($p->themes->isNotEmpty())
                                 <span class="pp-mine-grid__dot" aria-hidden="true">·</span>
                                 <span class="pp-card-theme-badge">{{ $p->themes->first()->name }}</span>
@@ -508,6 +516,29 @@
         </div>
     </div>
 </div>
+{{-- 다중 선택 모드 UI --}}
+<div class="pp-sel-bar" id="ppSelBar" style="display:none">
+    <div class="pp-sel-bar__left">
+        <span class="pp-sel-bar__count" id="ppSelCount">0개 선택됨</span>
+        <button type="button" class="pp-sel-bar__all" id="ppSelAll">전체선택</button>
+    </div>
+    <button type="button" class="pp-sel-bar__close" id="ppSelClose">✕</button>
+</div>
+<div class="pp-sel-actions" id="ppSelActions" style="display:none">
+    <button type="button" class="pp-sel-actions__btn pp-sel-actions__btn--share" id="ppSelShareBtn2" disabled>공유</button>
+    <button type="button" class="pp-sel-actions__btn pp-sel-actions__btn--move" id="ppSelMove" disabled>카테고리 이동</button>
+    <button type="button" class="pp-sel-actions__btn pp-sel-actions__btn--delete" id="ppSelDelete" disabled>삭제</button>
+</div>
+<div class="pp-sel-move-sheet" id="ppSelMoveSheet">
+    <div class="pp-sel-move-sheet__backdrop" data-role="close-move"></div>
+    <div class="pp-sel-move-sheet__panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <h3 style="font-size:16px;font-weight:700;color:var(--pp-text,#2b211e);margin:0">이동할 카테고리 선택</h3>
+            <button type="button" style="border:none;background:none;font-size:20px;color:var(--pp-text-sub,#6b5e52);cursor:pointer;padding:4px" data-role="close-move">✕</button>
+        </div>
+        <div class="pp-sel-move-sheet__list" id="ppSelMoveList"></div>
+    </div>
+</div>
 @endauth
 
 @endsection
@@ -515,57 +546,210 @@
 @push('scripts')
 @auth
 <script>
-// 비로그인 저장 장소 → 로그인 계정으로 이관 (확인 후)
+// 비로그인 저장 장소 → 로그인 계정으로 이관 (카테고리 배정 단계 포함)
 (function() {
     const KEY = 'pinpick_guest_places';
     let list;
     try { list = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return; }
     if (!Array.isArray(list) || !list.length) return;
 
+    const userCats = @json($categories->map(fn($c) => ['id' => $c->id, 'name' => $c->name, 'icon' => $c->icon])->values());
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    const groups = {};
+    list.forEach(p => {
+        const key = p.category_label || '__none__';
+        if (!groups[key]) groups[key] = { label: p.category_label || null, places: [] };
+        groups[key].places.push(p);
+    });
+    const groupKeys = Object.keys(groups);
+
+    function findMatchCat(name) {
+        if (!name) return null;
+        const lower = name.toLowerCase();
+        return userCats.find(c => c.name.toLowerCase() === lower) || null;
+    }
+
+    function escHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // Step 1: 확인 모달
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:flex-end;justify-content:center;padding:0';
     overlay.innerHTML = `
-        <div style="background:#fff;border-radius:16px;padding:28px 24px 20px;max-width:320px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.2)">
-            <div style="font-size:28px;margin-bottom:12px">📍</div>
-            <div style="font-size:15px;font-weight:700;color:#2b211e;margin-bottom:6px">비회원 장소 동기화</div>
-            <div style="font-size:13.5px;color:#6b5e52;line-height:1.5;margin-bottom:20px">비회원으로 등록된 장소 <b>${list.length}개</b>를<br>내 계정으로 가져올까요?</div>
-            <div style="display:flex;gap:8px">
-                <button id="ppGuestSkip" style="flex:1;padding:12px 0;border:1px solid #e0d6cc;border-radius:10px;background:#fff;color:#6b5e52;font-size:14px;font-weight:600;cursor:pointer">안할래요</button>
-                <button id="ppGuestSync" style="flex:1;padding:12px 0;border:none;border-radius:10px;background:#2b211e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">동기화</button>
+        <div id="ppSyncPanel" style="background:#fff;border-radius:18px 18px 0 0;padding:24px 22px calc(20px + env(safe-area-inset-bottom,0px));max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.15)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                <h3 style="font-size:16px;font-weight:700;color:#2b211e;margin:0">비회원 장소 동기화</h3>
+                <button id="ppSyncClose" style="border:none;background:none;font-size:20px;color:#6b5e52;cursor:pointer;padding:4px">✕</button>
+            </div>
+            <div id="ppSyncStep1">
+                <div style="font-size:13.5px;color:#6b5e52;line-height:1.5;margin-bottom:20px">비회원으로 등록된 장소 <b>${list.length}개</b>를 내 계정으로 가져올까요?</div>
+                <div style="display:flex;gap:8px">
+                    <button id="ppGuestSkip" style="flex:1;padding:12px 0;border:1px solid #e0d6cc;border-radius:10px;background:#fff;color:#6b5e52;font-size:14px;font-weight:600;cursor:pointer">안할래요</button>
+                    <button id="ppGuestNext" style="flex:1;padding:12px 0;border:none;border-radius:10px;background:#2b211e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">동기화</button>
+                </div>
+            </div>
+            <div id="ppSyncStep2" style="display:none;flex:1;overflow-y:auto">
+                <div style="font-size:13px;color:#6b5e52;margin-bottom:14px">카테고리를 선택해주세요</div>
+                <div id="ppSyncGroups"></div>
+                <div style="margin-top:16px">
+                    <button id="ppSyncImport" style="width:100%;padding:13px 0;border:none;border-radius:10px;background:#2b211e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">가져오기</button>
+                </div>
             </div>
         </div>`;
     document.body.appendChild(overlay);
 
+    document.getElementById('ppSyncClose').addEventListener('click', () => {
+        localStorage.removeItem(KEY);
+        overlay.remove();
+    });
     document.getElementById('ppGuestSkip').addEventListener('click', () => {
         localStorage.removeItem(KEY);
         overlay.remove();
     });
 
-    document.getElementById('ppGuestSync').addEventListener('click', () => {
-        const btn = document.getElementById('ppGuestSync');
-        btn.textContent = '동기화 중…';
+    // Step 2: 카테고리 배정 단계
+    document.getElementById('ppGuestNext').addEventListener('click', () => {
+        document.getElementById('ppSyncStep1').style.display = 'none';
+        document.getElementById('ppSyncStep2').style.display = '';
+        renderGroups();
+    });
+
+    function renderGroups() {
+        const container = document.getElementById('ppSyncGroups');
+        container.innerHTML = '';
+        groupKeys.forEach((key, gi) => {
+            const g = groups[key];
+            const isLabeled = !!g.label;
+            const match = isLabeled ? findMatchCat(g.label) : null;
+            const title = isLabeled ? '📁 ' + escHtml(g.label) : '📌 직접 저장한 장소';
+
+            let optionsHtml = '<option value="__new__">새 카테고리로 만들기</option>';
+            userCats.forEach(c => {
+                optionsHtml += '<option value="existing_' + c.id + '">' + escHtml((c.icon || '📌') + ' ' + c.name) + '</option>';
+            });
+
+            const defaultInputVal = isLabeled ? escHtml(g.label.slice(0, 30)) : '';
+
+            const div = document.createElement('div');
+            div.style.cssText = 'margin-bottom:14px;padding:14px;border:1px solid #e0d6cc;border-radius:12px';
+            div.innerHTML = `
+                <div style="font-size:14px;font-weight:600;color:#2b211e;margin-bottom:4px">${title} <span style="color:#6b5e52;font-weight:400">(${g.places.length}개)</span></div>
+                <select data-group="${gi}" style="width:100%;padding:9px 10px;border:1px solid #e0d6cc;border-radius:8px;font-size:13.5px;color:#2b211e;background:#fff;margin-top:8px">${optionsHtml}</select>
+                <div data-input-wrap="${gi}" style="margin-top:8px">
+                    <input data-cat-input="${gi}" type="text" maxlength="30" value="${defaultInputVal}" placeholder="카테고리 이름" style="width:100%;padding:9px 10px;border:1px solid #e0d6cc;border-radius:8px;font-size:13.5px;color:#2b211e;background:#fff;box-sizing:border-box;outline:none">
+                    <div data-cat-hint="${gi}" style="font-size:12px;margin-top:4px;display:none"></div>
+                </div>
+            `;
+            container.appendChild(div);
+
+            const sel = div.querySelector(`select[data-group="${gi}"]`);
+            const inputWrap = div.querySelector(`[data-input-wrap="${gi}"]`);
+            const input = div.querySelector(`[data-cat-input="${gi}"]`);
+            const hint = div.querySelector(`[data-cat-hint="${gi}"]`);
+
+            sel.value = '__new__';
+            inputWrap.style.display = '';
+
+            function checkHint() {
+                const val = input.value.trim();
+                const m = findMatchCat(val);
+                if (m) {
+                    hint.textContent = "기존 '" + m.name + "' 카테고리에 추가돼요";
+                    hint.style.cssText = 'font-size:12px;margin-top:4px;color:var(--pp-primary,#2b211e)';
+                } else if (!val && sel.value === '__new__') {
+                    hint.textContent = '';
+                    hint.style.display = 'none';
+                } else {
+                    hint.textContent = '';
+                    hint.style.display = 'none';
+                }
+            }
+
+            sel.addEventListener('change', () => {
+                if (sel.value === '__new__') {
+                    inputWrap.style.display = '';
+                    input.focus();
+                    checkHint();
+                } else {
+                    inputWrap.style.display = 'none';
+                    hint.style.display = 'none';
+                }
+            });
+            input.addEventListener('input', checkHint);
+            input.addEventListener('focus', () => { input.style.borderColor = 'var(--pp-primary,#2b211e)'; });
+            input.addEventListener('blur', () => { input.style.borderColor = '#e0d6cc'; });
+            checkHint();
+        });
+    }
+
+    // 가져오기
+    document.getElementById('ppSyncImport').addEventListener('click', async () => {
+        const btn = document.getElementById('ppSyncImport');
+
+        let hasError = false;
+        groupKeys.forEach((key, gi) => {
+            const sel = document.querySelector(`select[data-group="${gi}"]`);
+            const input = document.querySelector(`[data-cat-input="${gi}"]`);
+            const hint = document.querySelector(`[data-cat-hint="${gi}"]`);
+            if (sel.value === '__new__' && !input.value.trim()) {
+                hint.textContent = '카테고리 이름을 입력해주세요';
+                hint.style.cssText = 'font-size:12px;margin-top:4px;color:#e74c3c';
+                input.style.borderColor = '#e74c3c';
+                input.focus();
+                hasError = true;
+            }
+        });
+        if (hasError) return;
+
+        btn.textContent = '가져오는 중…';
         btn.disabled = true;
-        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-        fetch('/api/places/import-guest', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ places: list })
-        })
-        .then(r => r.ok ? r.json() : Promise.reject(r))
-        .then(j => {
+
+        const assignments = [];
+        groupKeys.forEach((key, gi) => {
+            const sel = document.querySelector(`select[data-group="${gi}"]`);
+            const input = document.querySelector(`[data-cat-input="${gi}"]`);
+            const g = groups[key];
+            g.places.forEach(p => {
+                const item = { ...p };
+                if (sel.value === '__new__') {
+                    const inputName = input.value.trim().slice(0, 30);
+                    const dup = findMatchCat(inputName);
+                    if (dup) {
+                        item._category_id = dup.id;
+                        item._new_category = null;
+                    } else {
+                        item._category_id = null;
+                        item._new_category = inputName;
+                    }
+                } else if (sel.value.startsWith('existing_')) {
+                    item._category_id = parseInt(sel.value.replace('existing_', ''));
+                    item._new_category = null;
+                }
+                assignments.push(item);
+            });
+        });
+
+        try {
+            const res = await fetch('/api/places/import-guest', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ places: assignments })
+            });
+            const j = await res.json();
             if (j && j.ok) {
                 localStorage.removeItem(KEY);
                 overlay.remove();
-                const n = j.imported || list.length;
                 const toast = document.createElement('div');
-                toast.textContent = `장소 ${n}개를 내 지도로 옮겼어요`;
-                toast.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#2b211e;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22);letter-spacing:-.01em';
+                toast.textContent = `장소 ${j.imported || list.length}개를 내 지도로 옮겼어요`;
+                toast.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#2b211e;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22)';
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 2400);
                 setTimeout(() => location.reload(), 600);
             }
-        })
-        .catch(() => { btn.textContent = '다시 시도'; btn.disabled = false; });
+        } catch (e) {
+            btn.textContent = '다시 시도';
+            btn.disabled = false;
+        }
     });
 })();
 </script>
@@ -590,19 +774,25 @@
         const activeTab = document.querySelector('#ppHeroTabs .pp-hero2__tab.is-active');
         if (!activeTab || activeTab.dataset.cat === 'all') return;
         currentCatId = activeTab.dataset.cat;
+        window.__sharePendingPlaceIds = null;
         titleInput.value = activeTab.textContent.trim();
         shareSheet.classList.add('is-open');
     });
 
     shareSheet.querySelectorAll('[data-close-share]').forEach(el => {
-        el.addEventListener('click', () => { shareSheet.classList.remove('is-open'); });
+        el.addEventListener('click', () => { shareSheet.classList.remove('is-open'); window.__sharePendingPlaceIds = null; });
     });
 
     async function createShare() {
         const mode = document.querySelector('input[name="shareMode"]:checked')?.value || 'original';
-        const catId = parseInt(currentCatId);
-        if (!catId) { showToast('카테고리를 선택해주세요'); return null; }
-        const body = { category_id: catId, title: titleInput.value.trim() || '공유', name_display_mode: mode };
+        const body = { title: titleInput.value.trim() || '공유', name_display_mode: mode };
+        if (window.__sharePendingPlaceIds) {
+            body.place_ids = window.__sharePendingPlaceIds;
+        } else {
+            const catId = parseInt(currentCatId);
+            if (!catId) { showToast('카테고리를 선택해주세요'); return null; }
+            body.category_id = catId;
+        }
 
         try {
             const res = await fetch('/api/share', {
@@ -644,6 +834,7 @@
             const data = await createShare();
             if (!data) return;
             shareSheet.classList.remove('is-open');
+            window.__sharePendingPlaceIds = null;
             await copyToClipboard(data.url);
             showToast('링크가 복사됐어요');
         } catch (e) {
@@ -656,6 +847,7 @@
             const data = await createShare();
             if (!data) return;
             shareSheet.classList.remove('is-open');
+            window.__sharePendingPlaceIds = null;
 
             if (typeof Kakao === 'undefined') {
                 const s = document.createElement('script');
@@ -967,7 +1159,7 @@
     if (!orderPanel) return;
 
     // 상단 버튼으로 열기
-    document.getElementById('catOrderEditBtnHero').addEventListener('click', openCatPanel);
+    document.getElementById('catOrderEditBtnHero')?.addEventListener('click', openCatPanel);
 
     // 취소 버튼 — 저장 없이 패널 닫기
     document.getElementById('catOrderCancel').addEventListener('click', () => {
@@ -1180,13 +1372,251 @@
     }
 })();
 
+// ── 다중 선택 모드 ──
+(function() {
+    const grid = document.getElementById('ppMineGrid');
+    const enterBtn = document.getElementById('ppSelEnter');
+    const selBar = document.getElementById('ppSelBar');
+    const selActions = document.getElementById('ppSelActions');
+    const selCount = document.getElementById('ppSelCount');
+    const selAllBtn = document.getElementById('ppSelAll');
+    const selClose = document.getElementById('ppSelClose');
+    const moveBtn = document.getElementById('ppSelMove');
+    const deleteBtn = document.getElementById('ppSelDelete');
+    const selShareBtn2 = document.getElementById('ppSelShareBtn2');
+    const selEnterLabel = document.getElementById('ppSelEnterLabel');
+    const moveSheet = document.getElementById('ppSelMoveSheet');
+    const moveList = document.getElementById('ppSelMoveList');
+    if (!grid || !enterBtn) return;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    let selecting = false;
+    const selected = new Set();
+    let longPressTimer = null;
+    let longPressTarget = null;
+    let scrolledDuringPress = false;
+
+    function getVisibleItems() {
+        return Array.from(grid.querySelectorAll('.pp-mine-grid__item')).filter(el => el.style.display !== 'none');
+    }
+
+    function enterSelMode(firstItem) {
+        selecting = true;
+        grid.classList.add('is-selecting');
+        selBar.style.display = '';
+        selActions.style.display = '';
+        document.querySelector('.pp-mine-sechead__actions')?.style.setProperty('display', 'none');
+        document.querySelector('.pp-nav')?.classList.add('pp-nav--hidden');
+        if (firstItem) toggleItem(firstItem);
+    }
+
+    function exitSelMode() {
+        selecting = false;
+        selected.clear();
+        grid.classList.remove('is-selecting');
+        grid.querySelectorAll('.pp-mine-grid__item.is-checked').forEach(el => el.classList.remove('is-checked'));
+        selBar.style.display = 'none';
+        selActions.style.display = 'none';
+        document.querySelector('.pp-mine-sechead__actions')?.style.removeProperty('display');
+        document.querySelector('.pp-nav')?.classList.remove('pp-nav--hidden');
+        closeMoveSheet();
+    }
+
+    function toggleItem(el) {
+        const id = el.dataset.id;
+        if (selected.has(id)) { selected.delete(id); el.classList.remove('is-checked'); }
+        else { selected.add(id); el.classList.add('is-checked'); }
+        updateCount();
+    }
+
+    function updateCount() {
+        const n = selected.size;
+        selCount.textContent = n + '개 선택됨';
+        moveBtn.disabled = n === 0;
+        deleteBtn.disabled = n === 0;
+        if (selShareBtn2) selShareBtn2.disabled = n === 0;
+        const vis = getVisibleItems();
+        selAllBtn.textContent = (n > 0 && n >= vis.length) ? '선택해제' : '전체선택';
+    }
+
+    enterBtn.addEventListener('click', () => enterSelMode(null));
+    selClose.addEventListener('click', exitSelMode);
+
+    selAllBtn.addEventListener('click', () => {
+        const vis = getVisibleItems();
+        if (selected.size >= vis.length) {
+            selected.clear();
+            grid.querySelectorAll('.pp-mine-grid__item.is-checked').forEach(el => el.classList.remove('is-checked'));
+        } else {
+            vis.forEach(el => { selected.add(el.dataset.id); el.classList.add('is-checked'); });
+        }
+        updateCount();
+    });
+
+    // 롱프레스 감지 (500ms)
+    grid.addEventListener('touchstart', (e) => {
+        const item = e.target.closest('.pp-mine-grid__item');
+        if (!item || selecting) return;
+        scrolledDuringPress = false;
+        longPressTarget = item;
+        longPressTimer = setTimeout(() => {
+            if (!scrolledDuringPress) {
+                e.preventDefault();
+                enterSelMode(item);
+            }
+            longPressTimer = null;
+            longPressTarget = null;
+        }, 500);
+    }, { passive: false });
+
+    grid.addEventListener('touchmove', () => {
+        scrolledDuringPress = true;
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; longPressTarget = null; }
+    });
+
+    grid.addEventListener('touchend', () => {
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; longPressTarget = null; }
+    });
+
+    // 선택 모드에서 카드 탭 → 링크 이동 대신 토글
+    grid.addEventListener('click', (e) => {
+        if (!selecting) return;
+        const item = e.target.closest('.pp-mine-grid__item');
+        if (!item) return;
+        if (e.target.closest('.pp-mine-grid__arrow')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        toggleItem(item);
+    }, true);
+
+    // 삭제
+    deleteBtn.addEventListener('click', async () => {
+        if (!selected.size) return;
+        if (!confirm(selected.size + '개 장소를 삭제할까요? 이 작업은 되돌릴 수 없어요.')) return;
+        deleteBtn.textContent = '삭제 중…';
+        deleteBtn.disabled = true;
+        try {
+            const res = await fetch('/api/places/bulk-delete', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selected).map(Number) })
+            });
+            const j = await res.json();
+            if (j.ok) {
+                selected.forEach(id => {
+                    const el = grid.querySelector(`.pp-mine-grid__item[data-id="${id}"]`);
+                    if (el) el.remove();
+                });
+                ppToast(j.deleted + '개 장소가 삭제됐어요');
+                exitSelMode();
+                updateSavedCount();
+            } else {
+                ppToast(j.error || '삭제 실패', true);
+            }
+        } catch (e) {
+            ppToast('네트워크 오류', true);
+        }
+        deleteBtn.textContent = '삭제';
+        deleteBtn.disabled = false;
+    });
+
+    // 선택 모드 공유
+    if (selShareBtn2) {
+        selShareBtn2.addEventListener('click', () => {
+            if (!selected.size) return;
+            const shareSheet = document.getElementById('ppShareSheet');
+            const titleInput = document.getElementById('ppShareTitle');
+            if (!shareSheet) return;
+            window.__sharePendingPlaceIds = Array.from(selected).map(Number);
+            if (titleInput) titleInput.value = selected.size + '개 장소';
+            shareSheet.classList.add('is-open');
+        });
+    }
+
+    // 카테고리 이동
+    moveBtn.addEventListener('click', () => {
+        if (!selected.size) return;
+        renderMoveList();
+        moveSheet.classList.add('is-open');
+    });
+
+    function closeMoveSheet() { moveSheet.classList.remove('is-open'); }
+    moveSheet.querySelectorAll('[data-role="close-move"]').forEach(el => {
+        el.addEventListener('click', closeMoveSheet);
+    });
+
+    function renderMoveList() {
+        const cats = [];
+        document.querySelectorAll('.yg-mycat-meta .yg-mycat').forEach(sec => {
+            cats.push({ id: sec.dataset.catId, name: sec.querySelector('.yg-mycat__catname')?.textContent || '' });
+        });
+        moveList.innerHTML = '';
+        cats.forEach(c => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pp-sel-move-sheet__opt';
+            btn.textContent = c.name;
+            btn.addEventListener('click', () => doMove(c.id, c.name));
+            moveList.appendChild(btn);
+        });
+    }
+
+    async function doMove(catId, catName) {
+        closeMoveSheet();
+        moveBtn.textContent = '이동 중…';
+        moveBtn.disabled = true;
+        try {
+            const res = await fetch('/api/places/bulk-move', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selected).map(Number), category_id: +catId })
+            });
+            const j = await res.json();
+            if (j.ok) {
+                selected.forEach(id => {
+                    const el = grid.querySelector(`.pp-mine-grid__item[data-id="${id}"]`);
+                    if (el) {
+                        el.dataset.cat = String(catId);
+                        const catSpan = el.querySelector('.pp-mine-grid__cat');
+                        if (catSpan) catSpan.textContent = catName;
+                    }
+                });
+                ppToast(j.moved + '개 장소가 이동됐어요');
+                exitSelMode();
+            } else {
+                ppToast(j.error || '이동 실패', true);
+            }
+        } catch (e) {
+            ppToast('네트워크 오류', true);
+        }
+        moveBtn.textContent = '카테고리 이동';
+        moveBtn.disabled = false;
+    }
+
+    function updateSavedCount() {
+        const stat = document.querySelector('.pp-hero2__stat');
+        if (stat) {
+            const n = grid.querySelectorAll('.pp-mine-grid__item').length;
+            stat.textContent = '저장 ' + n;
+        }
+    }
+
+    function ppToast(msg, isError) {
+        const el = document.createElement('div');
+        el.className = 'pp-flash' + (isError ? ' pp-flash--error' : '');
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(() => { el.style.transition = 'opacity .4s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 450); }, 2000);
+    }
+})();
+
 // 게스트 localStorage 장소 hydrate → 통합 그리드에 렌더
 @guest
 (function() {
     // 일회성 게스트 데이터 초기화 (phone/opening_hours 추가)
-    if (!localStorage.getItem('_pp_reset_0709b')) {
+    if (!localStorage.getItem('_pp_reset_0710a')) {
         localStorage.removeItem('pinpick_guest_places');
-        localStorage.setItem('_pp_reset_0709b', '1');
+        localStorage.setItem('_pp_reset_0710a', '1');
     }
     const grid = document.getElementById('ppMineGrid');
     if (!grid) return;
@@ -1234,7 +1664,7 @@
             </div>
             <div class="pp-mine-grid__body">
                 <div class="pp-mine-grid__name">${escapeHtml(p.name)}</div>
-                <div class="pp-mine-grid__meta">${escapeHtml(p.category_name || '')}${addr ? ' · ' + escapeHtml(addr) : ''}</div>
+                <div class="pp-mine-grid__meta">${escapeHtml(p.category_label || p.category_name || '')}${addr ? ' · ' + escapeHtml(addr) : ''}</div>
             </div>
         `;
         grid.appendChild(card);
@@ -1407,7 +1837,7 @@
     const THEME_LABELS = {
         food: '맛집', cafe: '카페', travel: '여행',
         beauty: '뷰티/케어', stay: '숙소', culture: '문화/여가',
-        medical: '병원/약국', shopping: '쇼핑', etc: '기타',
+        medical: '병원/약국', shopping: '쇼핑', etc: '',
     };
 
     async function loadTheme(themeSlug) {

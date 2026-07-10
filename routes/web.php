@@ -40,7 +40,8 @@ Route::get('/auth/{provider}', [SocialAuthController::class, 'redirect'])
 Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])
     ->where('provider', 'kakao|google|naver');
 Route::post('/logout', [SocialAuthController::class, 'logout'])->name('logout');
-Route::post('/auth/native/kakao', [SocialAuthController::class, 'nativeKakaoLogin']);
+Route::post('/auth/native/{provider}', [SocialAuthController::class, 'nativeLogin'])
+    ->where('provider', 'kakao|google|naver');
 
 // 장소 (create 폼은 비로그인도 접근 가능 - 게스트는 localStorage 저장)
 Route::get('/places/create', [PlaceController::class, 'create'])->name('places.create');
@@ -60,6 +61,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('/api/places/{place}/reorder', [PlaceController::class, 'reorder'])->name('api.places.reorder');
     Route::post('/api/places/reorder-all', [PlaceController::class, 'bulkReorder'])->name('api.places.reorder-all');
     Route::post('/api/places/import-guest', [PlaceController::class, 'importGuest'])->name('api.places.import-guest');
+    Route::post('/api/places/bulk-delete', [PlaceController::class, 'bulkDelete'])->name('api.places.bulk-delete');
+    Route::post('/api/places/bulk-move', [PlaceController::class, 'bulkMove'])->name('api.places.bulk-move');
 
     // 카테고리 전체보기
     Route::get('/categories/{category}', [CategoryController::class, 'show'])->name('categories.show');

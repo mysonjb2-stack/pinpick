@@ -18,22 +18,34 @@ class SharedCollectionController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'category_id' => 'required|exists:categories,id',
+            'category_id' => 'nullable|exists:categories,id',
+            'place_ids' => 'nullable|array|min:1|max:200',
+            'place_ids.*' => 'integer',
             'title' => 'required|string|max:100',
             'name_display_mode' => 'required|in:original,custom',
         ]);
 
         $user = Auth::user();
-        $category = Category::where('id', $request->category_id)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
 
-        $places = Place::where('user_id', $user->id)
-            ->where('category_id', $category->id)
-            ->where('is_visible', true)
-            ->orderBy('sort_order')
-            ->with('images')
-            ->get();
+        if ($request->place_ids) {
+            $places = Place::where('user_id', $user->id)
+                ->whereIn('id', $request->place_ids)
+                ->where('is_visible', true)
+                ->orderBy('sort_order')
+                ->with('images')
+                ->get();
+            $category = $places->first()?->category;
+        } else {
+            $category = Category::where('id', $request->category_id)
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+            $places = Place::where('user_id', $user->id)
+                ->where('category_id', $category->id)
+                ->where('is_visible', true)
+                ->orderBy('sort_order')
+                ->with('images')
+                ->get();
+        }
 
         if ($places->isEmpty()) {
             return response()->json(['error' => '공유할 장소가 없습니다.'], 422);
@@ -48,7 +60,7 @@ class SharedCollectionController extends Controller
             'user_id' => $user->id,
             'token' => $token,
             'title' => $request->title,
-            'source_category_id' => $category->id,
+            'source_category_id' => $category?->id,
             'name_display_mode' => $request->name_display_mode,
         ]);
 
@@ -75,7 +87,7 @@ class SharedCollectionController extends Controller
                 'opening_hours' => $place->opening_hours,
                 'latitude' => $place->lat,
                 'longitude' => $place->lng,
-                'category_label' => $category->name,
+                'category_label' => $place->category?->name ?? $category?->name ?? '',
                 'memo' => $isCustom ? $place->memo : null,
                 'thumbnail_url' => $thumbnailUrl,
                 'external_place_id' => $place->kakao_place_id ?: $place->naver_place_id,
@@ -148,7 +160,7 @@ class SharedCollectionController extends Controller
             'place_ids' => 'required|array|min:1',
             'place_ids.*' => 'integer|exists:shared_places,id',
             'category_id' => 'nullable|integer|exists:categories,id',
-            'new_category_name' => 'nullable|string|max:50',
+            'new_category_name' => 'nullable|string|max:30',
         ]);
 
         $user = Auth::user();
@@ -211,6 +223,8 @@ class SharedCollectionController extends Controller
                 'name' => $sp->display_name,
                 'original_name' => $sp->original_place_name,
                 'address' => $sp->address,
+                'phone' => $sp->phone,
+                'opening_hours' => $sp->opening_hours,
                 'lat' => $sp->latitude,
                 'lng' => $sp->longitude,
                 'memo' => $sp->memo,

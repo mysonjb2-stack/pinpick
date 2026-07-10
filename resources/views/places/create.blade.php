@@ -766,7 +766,7 @@ function extractRegion(d) {
     const p = addr.match(/^(\S+?)(특별시|광역시|특별자치시|특별자치도|도)\s/);
     if (p) return p[1];
     const first = addr.split(/[\s,]+/)[0];
-    return first || '기타';
+    return first || '';
 }
 
 function buildRegionGroups(docs) {
@@ -1866,13 +1866,14 @@ document.getElementById('placeForm').addEventListener('submit', function(e) {
     }
     const fd = new FormData(this);
     const cid = fd.get('category_id') || null;
-    const cinfo = cid && guestCatMap[cid] ? guestCatMap[cid] : { name: '기타', icon: '📌' };
+    const cinfo = cid && guestCatMap[cid] ? guestCatMap[cid] : { name: '', icon: '📌' };
     const item = {
         id: 'g' + Date.now(),
         name: fd.get('name'),
         category_id: cid ? +cid : null,
         category_name: cinfo.name,
         category_icon: cinfo.icon,
+        category_label: null,
         phone: fd.get('phone') || '',
         road_address: fd.get('road_address') || '',
         address: fd.get('address') || '',

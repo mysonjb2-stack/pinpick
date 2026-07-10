@@ -147,6 +147,7 @@ class PlaceController extends Controller
             'places.*.original_name' => ['nullable', 'string', 'max:255'],
             'places.*.category_name' => ['nullable', 'string', 'max:255'],
             'places.*.phone' => ['nullable', 'string', 'max:50'],
+            'places.*.opening_hours' => ['nullable'],
             'places.*.address' => ['nullable', 'string', 'max:255'],
             'places.*.road_address' => ['nullable', 'string', 'max:255'],
             'places.*.lat' => ['nullable', 'numeric'],
@@ -157,21 +158,55 @@ class PlaceController extends Controller
             'places.*.is_overseas' => ['nullable', 'boolean'],
             'places.*.kakao_place_id' => ['nullable', 'string', 'max:100'],
             'places.*.thumbnail_url' => ['nullable', 'string', 'max:500'],
+            'places.*._category_id' => ['nullable', 'integer'],
+            'places.*._new_category' => ['nullable', 'string', 'max:30'],
         ]);
 
         CategoryController::ensureUserCategories($user);
-        $userCats = Category::where('user_id', $user->id)->get()->keyBy(fn ($c) => mb_strtolower($c->name));
+        $userCats = Category::where('user_id', $user->id)->get();
+        $catByName = $userCats->keyBy(fn ($c) => mb_strtolower($c->name));
+        $catById = $userCats->keyBy('id');
+        $newCatCache = [];
 
         $maxSort = (int) Place::where('user_id', $user->id)->max('sort_order');
+        $maxCatSort = (int) Category::where('user_id', $user->id)->max('sort_order');
         $imported = 0;
 
         foreach ($data['places'] as $p) {
-            $catName = isset($p['category_name']) ? mb_strtolower($p['category_name']) : '';
-            $catId = $userCats[$catName]->id ?? null;
+            $catId = null;
+
+            if (!empty($p['_category_id']) && isset($catById[$p['_category_id']])) {
+                $catId = (int) $p['_category_id'];
+            } elseif (!empty($p['_new_category'])) {
+                $newName = $p['_new_category'];
+                $lower = mb_strtolower($newName);
+                if (isset($catByName[$lower])) {
+                    $catId = $catByName[$lower]->id;
+                } elseif (isset($newCatCache[$lower])) {
+                    $catId = $newCatCache[$lower];
+                } else {
+                    $cat = Category::create([
+                        'user_id' => $user->id,
+                        'name' => $newName,
+                        'icon' => '📌',
+                        'sort_order' => ++$maxCatSort,
+                    ]);
+                    $newCatCache[$lower] = $cat->id;
+                    $catId = $cat->id;
+                }
+            } else {
+                $catName = isset($p['category_name']) ? mb_strtolower($p['category_name']) : '';
+                $catId = $catByName[$catName]->id ?? null;
+            }
 
             $lat = isset($p['lat']) && $p['lat'] !== '' ? (float) $p['lat'] : null;
             $lng = isset($p['lng']) && $p['lng'] !== '' ? (float) $p['lng'] : null;
             $visited = !empty($p['visited_at']) ? substr($p['visited_at'], 0, 10) : null;
+
+            $openingHours = $p['opening_hours'] ?? null;
+            if (is_string($openingHours)) {
+                $openingHours = json_decode($openingHours, true);
+            }
 
             $newPlace = Place::create([
                 'user_id' => $user->id,
@@ -179,6 +214,7 @@ class PlaceController extends Controller
                 'name' => $p['name'],
                 'original_name' => $p['original_name'] ?? null,
                 'phone' => $p['phone'] ?? null,
+                'opening_hours' => $openingHours,
                 'address' => $p['address'] ?? null,
                 'road_address' => $p['road_address'] ?? null,
                 'lat' => $lat,
@@ -478,6 +514,47 @@ class PlaceController extends Controller
         }
         $place->delete();
         return redirect('/')->with('success', '삭제되었어요.');
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $user = $request->user();
+        $places = Place::where('user_id', $user->id)->whereIn('id', $data['ids'])->with('images')->get();
+
+        foreach ($places as $place) {
+            foreach ($place->images as $img) {
+                Storage::disk('public')->delete([$img->path, $img->thumb_path]);
+            }
+            if ($place->thumbnail) {
+                Storage::disk('public')->delete($place->thumbnail);
+            }
+            $place->delete();
+        }
+
+        return response()->json(['ok' => true, 'deleted' => $places->count()]);
+    }
+
+    public function bulkMove(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['integer'],
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+        ]);
+
+        $user = $request->user();
+        $category = Category::where('id', $data['category_id'])->where('user_id', $user->id)->firstOrFail();
+
+        $count = Place::where('user_id', $user->id)
+            ->whereIn('id', $data['ids'])
+            ->update(['category_id' => $category->id]);
+
+        return response()->json(['ok' => true, 'moved' => $count, 'category_name' => $category->name]);
     }
 
     // 테마별 내 장소 (로그인 사용자)

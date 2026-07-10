@@ -176,7 +176,7 @@
                         @unless($spThumb)<span>{{ $sp->category?->icon ?? '📍' }}</span>@endunless
                     </div>
                     <div class="pp-pub__sim-name">{{ $sp->name }}</div>
-                    <div class="pp-pub__sim-meta">{{ $sp->category?->name ?? '기타' }}@if($spRegion) · {{ $spRegion }}@endif</div>
+                    <div class="pp-pub__sim-meta">{{ $sp->category?->name ?? '' }}@if($spRegion) · {{ $spRegion }}@endif</div>
                 </a>
             @endforeach
         </div>

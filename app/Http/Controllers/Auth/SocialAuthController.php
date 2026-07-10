@@ -38,6 +38,61 @@ class SocialAuthController extends Controller
         $providerId = (string) $social->getId();
         $email = $social->getEmail();
 
+        $user = $this->findOrCreateUser($provider, $providerId, $email, [
+            'name' => $social->getName() ?: $social->getNickname() ?: '핀픽러',
+            'avatar' => $social->getAvatar(),
+        ]);
+
+        Auth::login($user, true);
+        Cookie::queue('pp_last_login', $provider, 60 * 24 * 365, '/', null, false, false);
+
+        return redirect('/');
+    }
+
+    public function nativeLogin(Request $request, string $provider)
+    {
+        $this->validateProvider($provider);
+
+        $token = $request->input('access_token');
+        if (!$token) {
+            return response()->json(['error' => 'access_token 필요'], 422);
+        }
+
+        $userInfo = match ($provider) {
+            'kakao' => $this->fetchKakaoUser($token),
+            'google' => $this->fetchGoogleUser($token),
+            'naver' => $this->fetchNaverUser($token),
+        };
+
+        if (!$userInfo) {
+            return response()->json(['error' => '인증 실패'], 401);
+        }
+
+        $user = $this->findOrCreateUser($provider, $userInfo['id'], $userInfo['email'], [
+            'name' => $userInfo['name'] ?? '핀픽러',
+            'avatar' => $userInfo['avatar'],
+        ]);
+
+        Auth::login($user, true);
+        Cookie::queue('pp_last_login', $provider, 60 * 24 * 365, '/', null, false, false);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'redirect' => '/']);
+        }
+
+        return redirect('/');
+    }
+
+    public function logout()
+    {
+        Auth::logout();
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+        return redirect('/');
+    }
+
+    private function findOrCreateUser(string $provider, string $providerId, ?string $email, array $profile): User
+    {
         $user = User::where('provider', $provider)
             ->where('provider_id', $providerId)
             ->first();
@@ -50,67 +105,58 @@ class SocialAuthController extends Controller
             $user = User::create([
                 'provider' => $provider,
                 'provider_id' => $providerId,
-                'name' => $social->getName() ?: $social->getNickname() ?: '핀픽러',
+                'name' => $profile['name'],
                 'email' => $email,
-                'profile_image' => $social->getAvatar(),
+                'profile_image' => $profile['avatar'],
             ]);
         }
 
-        Auth::login($user, true);
-
-        Cookie::queue('pp_last_login', $provider, 60 * 24 * 365, '/', null, false, false);
-
-        return redirect('/');
+        return $user;
     }
 
-    public function nativeKakaoLogin(Request $request)
+    private function fetchKakaoUser(string $token): ?array
     {
-        $token = $request->input('access_token');
-        if (!$token) {
-            return response()->json(['error' => 'access_token 필요'], 422);
-        }
-
         $response = Http::withToken($token)->get('https://kapi.kakao.com/v2/user/me');
-        if ($response->failed()) {
-            return response()->json(['error' => '카카오 인증 실패'], 401);
-        }
+        if ($response->failed()) return null;
 
-        $kakaoUser = $response->json();
-        $providerId = (string) $kakaoUser['id'];
-        $account = $kakaoUser['kakao_account'] ?? [];
+        $data = $response->json();
+        $account = $data['kakao_account'] ?? [];
         $profile = $account['profile'] ?? [];
-        $email = $account['email'] ?? null;
 
-        $user = User::where('provider', 'kakao')
-            ->where('provider_id', $providerId)
-            ->first();
-
-        if (!$user && $email) {
-            $user = User::where('email', $email)->first();
-        }
-
-        if (!$user) {
-            $user = User::create([
-                'provider' => 'kakao',
-                'provider_id' => $providerId,
-                'name' => $profile['nickname'] ?? '핀픽러',
-                'email' => $email,
-                'profile_image' => $profile['profile_image_url'] ?? null,
-            ]);
-        }
-
-        Auth::login($user, true);
-        Cookie::queue('pp_last_login', 'kakao', 60 * 24 * 365, '/', null, false, false);
-
-        return response()->json(['success' => true, 'redirect' => '/']);
+        return [
+            'id' => (string) $data['id'],
+            'name' => $profile['nickname'] ?? null,
+            'email' => $account['email'] ?? null,
+            'avatar' => $profile['profile_image_url'] ?? null,
+        ];
     }
 
-    public function logout()
+    private function fetchGoogleUser(string $token): ?array
     {
-        Auth::logout();
-        request()->session()->invalidate();
-        request()->session()->regenerateToken();
-        return redirect('/');
+        $response = Http::withToken($token)->get('https://www.googleapis.com/oauth2/v2/userinfo');
+        if ($response->failed()) return null;
+
+        $data = $response->json();
+        return [
+            'id' => (string) $data['id'],
+            'name' => $data['name'] ?? null,
+            'email' => $data['email'] ?? null,
+            'avatar' => $data['picture'] ?? null,
+        ];
+    }
+
+    private function fetchNaverUser(string $token): ?array
+    {
+        $response = Http::withToken($token)->get('https://openapi.naver.com/v1/nid/me');
+        if ($response->failed()) return null;
+
+        $data = $response->json()['response'] ?? [];
+        return [
+            'id' => (string) $data['id'],
+            'name' => $data['name'] ?? $data['nickname'] ?? null,
+            'email' => $data['email'] ?? null,
+            'avatar' => $data['profile_image'] ?? null,
+        ];
     }
 
     private function validateProvider(string $provider): void

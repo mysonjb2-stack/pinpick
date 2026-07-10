@@ -21,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.auth' => \App\Http\Middleware\AdminAuth::class,
         ]);
         $middleware->append(\App\Http\Middleware\TrackVisit::class);
+        $middleware->validateCsrfTokens(except: [
+            'auth/native/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

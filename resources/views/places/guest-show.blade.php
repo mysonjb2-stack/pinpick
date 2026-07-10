@@ -177,7 +177,7 @@
 
     // 기본 정보
     document.getElementById('ppGuestName').textContent = p.name || '';
-    document.getElementById('ppGuestCat').textContent = p.category_name || '기타';
+    document.getElementById('ppGuestCat').textContent = p.category_name || '';
     if (p.category_icon) document.getElementById('ppGuestIcon').textContent = p.category_icon;
 
     const badge = document.getElementById('ppGuestBadge');

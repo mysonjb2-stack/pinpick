@@ -24,19 +24,19 @@
         @if($lastLogin === 'naver')
             <div class="pp-login__tip">최근 사용한 로그인 방법</div>
         @endif
-        <a href="/auth/naver" class="pp-login__btn pp-login__btn--naver">
+        <button type="button" onclick="handleNaverLogin()" class="pp-login__btn pp-login__btn--naver">
             <span class="pp-login__naver-ico">N</span>
             네이버로 시작하기
-        </a>
+        </button>
     </div>
     <div class="pp-login__slot">
         @if($lastLogin === 'google')
             <div class="pp-login__tip">최근 사용한 로그인 방법</div>
         @endif
-        <a href="/auth/google" class="pp-login__btn pp-login__btn--google">
+        <button type="button" onclick="handleGoogleLogin()" class="pp-login__btn pp-login__btn--google">
             <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8c1.8-4.3 6-7.5 10.9-7.5 3 0 5.8 1.1 7.9 3L37.4 9.4C34 6.1 29.3 4 24 4 16.4 4 9.8 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 35.4 26.8 36.3 24 36.3c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.2 5.2c-.4.4 6.6-4.8 6.6-14.7 0-1.3-.1-2.4-.4-3.5z"/></svg>
             Google로 시작하기
-        </a>
+        </button>
     </div>
 
     <div style="margin-top:30px;font-size:12px;color:var(--pp-text-sub)">
@@ -49,16 +49,20 @@ function isPinpickApp() {
     return /MYPINPICK/i.test(navigator.userAgent);
 }
 
-function handleKakaoLogin() {
-    if (isPinpickApp() && window.webkit?.messageHandlers?.kakaologin) {
-        window.webkit.messageHandlers.kakaologin.postMessage('');
+function handleSocialLogin(provider, handlerName) {
+    if (isPinpickApp() && window.webkit?.messageHandlers?.[handlerName]) {
+        window.webkit.messageHandlers[handlerName].postMessage('');
         return;
     }
-    location.href = '/auth/kakao';
+    location.href = '/auth/' + provider;
 }
 
-window.onKakaoLoginSuccess = function(accessToken) {
-    fetch('/auth/native/kakao', {
+function handleKakaoLogin() { handleSocialLogin('kakao', 'kakaologin'); }
+function handleGoogleLogin() { handleSocialLogin('google', 'googlelogin'); }
+function handleNaverLogin() { handleSocialLogin('naver', 'naverlogin'); }
+
+function nativeLoginSuccess(provider, accessToken) {
+    fetch('/auth/native/' + provider, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -74,6 +78,10 @@ window.onKakaoLoginSuccess = function(accessToken) {
     .catch(() => {
         alert('로그인에 실패했어요. 다시 시도해주세요.');
     });
-};
+}
+
+window.onKakaoLoginSuccess = function(t) { nativeLoginSuccess('kakao', t); };
+window.onGoogleLoginSuccess = function(t) { nativeLoginSuccess('google', t); };
+window.onNaverLoginSuccess = function(t) { nativeLoginSuccess('naver', t); };
 </script>
 @endsection
