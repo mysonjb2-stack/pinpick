@@ -14,6 +14,8 @@ class SharedPlace extends Model
         'display_name',
         'original_place_name',
         'address',
+        'building_name',
+        'detail_location',
         'phone',
         'opening_hours',
         'latitude',

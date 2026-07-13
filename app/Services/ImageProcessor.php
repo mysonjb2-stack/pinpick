@@ -11,10 +11,10 @@ use Intervention\Image\ImageManager;
 
 class ImageProcessor
 {
-    private const MAIN_MAX = 1600;
-    private const THUMB_MAX = 600;
-    private const MAIN_QUALITY = 82;
-    private const THUMB_QUALITY = 78;
+    private const MAIN_MAX = 1200;
+    private const THUMB_MAX = 480;
+    private const MAIN_QUALITY = 78;
+    private const THUMB_QUALITY = 72;
 
     private ImageManager $manager;
 

@@ -83,6 +83,8 @@ class SharedCollectionController extends Controller
                 'display_name' => $isCustom ? $place->name : ($place->original_name ?: $place->name),
                 'original_place_name' => $place->original_name ?: $place->name,
                 'address' => $place->road_address ?: $place->address,
+                'building_name' => $place->building_name,
+                'detail_location' => $isCustom ? $place->detail_location : null,
                 'phone' => $place->phone,
                 'opening_hours' => $place->opening_hours,
                 'latitude' => $place->lat,

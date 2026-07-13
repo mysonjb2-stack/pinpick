@@ -14,6 +14,7 @@ class Place extends Model
 
     protected $fillable = [
         'user_id', 'category_id', 'name', 'original_name', 'phone', 'opening_hours', 'address', 'road_address',
+        'building_name', 'detail_location',
         'lat', 'lng', 'memo', 'status', 'visited_at',
         'naver_place_id', 'kakao_place_id', 'google_place_id', 'naver_matched_at',
         'is_overseas', 'thumbnail', 'sort_order', 'is_visible', 'is_public',

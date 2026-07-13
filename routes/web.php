@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/places/{place}', [PlaceController::class, 'destroy'])->name('places.destroy');
     Route::post('/api/places/{place}/quick-images', [PlaceController::class, 'quickAddImages'])->name('api.places.quick-images');
     Route::delete('/api/place-images/{placeImage}', [PlaceController::class, 'destroyImage'])->name('api.place-images.destroy');
+    Route::patch('/api/places/{place}/status', [PlaceController::class, 'toggleStatus'])->name('api.places.toggle-status');
     Route::patch('/api/places/{place}/reorder', [PlaceController::class, 'reorder'])->name('api.places.reorder');
     Route::post('/api/places/reorder-all', [PlaceController::class, 'bulkReorder'])->name('api.places.reorder-all');
     Route::post('/api/places/import-guest', [PlaceController::class, 'importGuest'])->name('api.places.import-guest');
@@ -89,6 +90,7 @@ Route::get('/api/place/detail', [PlaceController::class, 'placeDetail'])->name('
 Route::get('/api/geocode/reverse', [PlaceController::class, 'reverseGeocode'])->name('api.geocode.reverse');
 Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi'])->name('api.geocode.forward');
 Route::get('/api/phone/fallback', [PlaceController::class, 'phoneFallback'])->name('api.phone.fallback');
+Route::get('/api/building-name', [PlaceController::class, 'buildingName'])->name('api.building-name');
 Route::get('/api/static-map', [PlaceController::class, 'staticMap'])->name('api.static-map');
 
 // 공유 페이지 (비로그인 접근 가능)

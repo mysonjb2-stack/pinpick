@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use function Illuminate\Support\defer;
 
 class PlaceController extends Controller
 {
@@ -40,6 +41,8 @@ class PlaceController extends Controller
             'opening_hours' => ['nullable', 'string'],
             'address' => ['nullable', 'string', 'max:255'],
             'road_address' => ['nullable', 'string', 'max:255'],
+            'building_name' => ['nullable', 'string', 'max:100'],
+            'detail_location' => ['nullable', 'string', 'max:255'],
             'lat' => ['nullable', 'numeric'],
             'lng' => ['nullable', 'numeric'],
             'memo' => ['nullable', 'string', 'max:500'],
@@ -112,8 +115,13 @@ class PlaceController extends Controller
             ]);
         }
 
-        $this->generateMapThumbnail($place);
-        $this->tryMatchNaverPlaceId($place);
+        $placeId = $place->id;
+        defer(function () use ($placeId) {
+            $p = Place::find($placeId);
+            if (!$p) return;
+            $this->generateMapThumbnail($p);
+            $this->tryMatchNaverPlaceId($p);
+        });
 
         return redirect('/')->with('success', '장소가 저장되었어요.');
     }
@@ -291,6 +299,8 @@ class PlaceController extends Controller
             'opening_hours' => ['nullable', 'string'],
             'address' => ['nullable', 'string', 'max:255'],
             'road_address' => ['nullable', 'string', 'max:255'],
+            'building_name' => ['nullable', 'string', 'max:100'],
+            'detail_location' => ['nullable', 'string', 'max:255'],
             'lat' => ['nullable', 'numeric'],
             'lng' => ['nullable', 'numeric'],
             'memo' => ['nullable', 'string', 'max:500'],
@@ -349,13 +359,6 @@ class PlaceController extends Controller
         $place->update($data);
         $place->themes()->sync($themeIds);
 
-        if (
-            ($place->lat !== null && $place->lng !== null) &&
-            ($oldLat != $place->lat || $oldLng != $place->lng || empty($place->thumbnail))
-        ) {
-            $this->generateMapThumbnail($place);
-        }
-
         // 새 이미지 추가 (기존 이미지 수 + 신규 <= 5)
         $existingCount = $place->images()->count();
         $processor = app(ImageProcessor::class);
@@ -374,7 +377,15 @@ class PlaceController extends Controller
             ]);
         }
 
-        $this->tryMatchNaverPlaceId($place);
+        $placeId = $place->id;
+        $needMapRegen = ($place->lat !== null && $place->lng !== null) &&
+            ($oldLat != $place->lat || $oldLng != $place->lng || empty($place->thumbnail));
+        defer(function () use ($placeId, $needMapRegen) {
+            $p = Place::find($placeId);
+            if (!$p) return;
+            if ($needMapRegen) $this->generateMapThumbnail($p);
+            $this->tryMatchNaverPlaceId($p);
+        });
 
         return redirect()->route('places.show', $place)->with('success', '수정되었어요.');
     }
@@ -557,6 +568,27 @@ class PlaceController extends Controller
         return response()->json(['ok' => true, 'moved' => $count, 'category_name' => $category->name]);
     }
 
+    public function toggleStatus(Place $place, Request $request)
+    {
+        abort_unless($place->user_id === $request->user()?->id, 403);
+
+        $data = $request->validate([
+            'status' => ['required', 'in:planned,visited'],
+            'visited_at' => ['nullable', 'date'],
+        ]);
+
+        $place->update([
+            'status' => $data['status'],
+            'visited_at' => $data['status'] === 'visited' ? ($data['visited_at'] ?? now()->toDateString()) : null,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'status' => $place->status,
+            'visited_at' => $place->visited_at?->format('Y.m.d'),
+        ]);
+    }
+
     // 테마별 내 장소 (로그인 사용자)
     public function placesByTheme(Request $request)
     {
@@ -620,36 +652,126 @@ class PlaceController extends Controller
         $key = config('services.kakao_local.rest_api_key');
         if (!$key) return response()->json(['documents' => [], 'error' => 'no_key']);
 
-        $params = [
-            'query' => $q,
-            'size' => 15,
-        ];
-
         $lat = $request->input('lat');
         $lng = $request->input('lng');
-        if ($lat && $lng && is_numeric($lat) && is_numeric($lng)) {
-            $params['y'] = $lat;
-            $params['x'] = $lng;
-            $params['sort'] = 'distance';
+        $hasGeo = $lat && $lng && is_numeric($lat) && is_numeric($lng);
+
+        $headers = ['Authorization' => 'KakaoAK ' . $key];
+        $seen = [];
+        $allDocs = [];
+
+        // 1차: 거리순 (위치 있을 때) 또는 정확도순
+        $params1 = ['query' => $q, 'size' => 15];
+        if ($hasGeo) {
+            $params1['y'] = $lat;
+            $params1['x'] = $lng;
+            $params1['sort'] = 'distance';
+        }
+        $res1 = Http::withHeaders($headers)
+            ->get('https://dapi.kakao.com/v2/local/search/keyword.json', $params1);
+        foreach (($res1->json()['documents'] ?? []) as $d) {
+            if (!isset($seen[$d['id']])) {
+                $seen[$d['id']] = true;
+                $allDocs[] = $d;
+            }
         }
 
-        $res = \Illuminate\Support\Facades\Http::withHeaders([
-            'Authorization' => 'KakaoAK ' . $key,
-        ])->get('https://dapi.kakao.com/v2/local/search/keyword.json', $params);
+        // 2차: 정확도순 (랜드마크/역 등 거리순에서 누락되는 결과 보완)
+        if ($hasGeo) {
+            $params2 = ['query' => $q, 'size' => 15];
+            $res2 = Http::withHeaders($headers)
+                ->get('https://dapi.kakao.com/v2/local/search/keyword.json', $params2);
+            foreach (($res2->json()['documents'] ?? []) as $d) {
+                if (!isset($seen[$d['id']])) {
+                    $seen[$d['id']] = true;
+                    $allDocs[] = $d;
+                }
+            }
+        }
 
-        $data = $res->json();
-        $docs = $data['documents'] ?? [];
-
+        // 거리 기반 점수제 정렬 (정확일치 보너스 적용)
         $nq = str_replace(' ', '', $q);
-        $exact = array_values(array_filter($docs, function ($d) use ($nq) {
-            return str_contains(str_replace(' ', '', $d['place_name'] ?? ''), $nq);
-        }));
 
-        if (count($exact) > 0) {
-            $data['documents'] = $exact;
+        $EXACT_BONUS = 3000;      // 정확일치: 3km 보너스
+        $STARTS_WITH_BONUS = 1500; // 시작일치: 1.5km 보너스
+        $CONTAINS_BONUS = 500;     // 포함일치: 0.5km 보너스
+
+        $matched = [];
+        $unmatched = [];
+        foreach ($allDocs as $d) {
+            $np = str_replace(' ', '', $d['place_name'] ?? '');
+            $nameContainsQuery = ($np === $nq) || str_starts_with($np, $nq) || str_contains($np, $nq);
+            if ($nameContainsQuery) {
+                $matched[] = $d;
+            } else {
+                $unmatched[] = $d;
+            }
         }
 
-        return response()->json($data);
+        if ($hasGeo) {
+            $scoreSort = function (array $doc) use ($lat, $lng, $nq, $EXACT_BONUS, $STARTS_WITH_BONUS, $CONTAINS_BONUS): float {
+                $distM = self::haversineDist((float) $lat, (float) $lng, (float) $doc['y'], (float) $doc['x']) * 1000;
+                $np = str_replace(' ', '', $doc['place_name'] ?? '');
+                $bonus = 0;
+                if ($np === $nq) {
+                    $bonus = $EXACT_BONUS;
+                } elseif (str_starts_with($np, $nq)) {
+                    $bonus = $STARTS_WITH_BONUS;
+                } elseif (str_contains($np, $nq)) {
+                    $bonus = $CONTAINS_BONUS;
+                }
+                return $distM - $bonus;
+            };
+            usort($matched, fn($a, $b) => $scoreSort($a) <=> $scoreSort($b));
+            usort($unmatched, fn($a, $b) =>
+                self::haversineDist((float) $lat, (float) $lng, (float) $a['y'], (float) $a['x'])
+                <=> self::haversineDist((float) $lat, (float) $lng, (float) $b['y'], (float) $b['x'])
+            );
+        }
+
+        $docs = count($matched) > 0 ? $matched : $unmatched;
+
+        return response()->json([
+            'documents' => array_values($docs),
+            'meta' => $res1->json()['meta'] ?? [],
+        ]);
+    }
+
+    public function buildingName(Request $request)
+    {
+        $roadAddr = trim((string) $request->input('road_address', ''));
+        if ($roadAddr === '') return response()->json(['building_name' => '']);
+
+        $key = config('services.kakao_local.rest_api_key');
+        if (!$key) return response()->json(['building_name' => '']);
+
+        try {
+            $res = Http::withHeaders(['Authorization' => 'KakaoAK ' . $key])
+                ->timeout(3)
+                ->get('https://dapi.kakao.com/v2/local/search/address.json', [
+                    'query' => $roadAddr,
+                    'analyze_type' => 'exact',
+                ]);
+            $docs = $res->json()['documents'] ?? [];
+            foreach ($docs as $d) {
+                $bn = $d['road_address']['building_name'] ?? '';
+                if ($bn !== '') {
+                    return response()->json(['building_name' => $bn]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::info('building_name lookup failed', ['msg' => $e->getMessage()]);
+        }
+        return response()->json(['building_name' => '']);
+    }
+
+    private static function haversineDist(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $R = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     public function searchNearby(Request $request)
@@ -1142,23 +1264,24 @@ class PlaceController extends Controller
     {
         $name = trim((string) $request->input('name', ''));
         $address = trim((string) $request->input('address', ''));
-        if ($name === '') return response()->json(['phone' => '', 'opening_hours' => null, 'source' => null]);
+        if ($name === '') return response()->json(['phone' => '', 'opening_hours' => null, 'detail_address' => '', 'source' => null]);
 
         $info = $this->infoFromGooglePlaces($name, $address);
-        if ($info['phone'] || $info['opening_hours']) {
+        if ($info['phone'] || $info['opening_hours'] || $info['detail_address']) {
             return response()->json([
                 'phone' => $info['phone'],
                 'opening_hours' => $info['opening_hours'],
+                'detail_address' => $info['detail_address'],
                 'source' => 'google',
             ]);
         }
 
-        return response()->json(['phone' => '', 'opening_hours' => null, 'source' => null]);
+        return response()->json(['phone' => '', 'opening_hours' => null, 'detail_address' => '', 'source' => null]);
     }
 
     private function infoFromGooglePlaces(string $name, string $address): array
     {
-        $empty = ['phone' => '', 'opening_hours' => null];
+        $empty = ['phone' => '', 'opening_hours' => null, 'detail_address' => ''];
         $key = config('services.google_places.api_key');
         if (!$key) return $empty;
         $query = trim($address !== '' ? ($address . ' ' . $name) : $name);
@@ -1180,15 +1303,27 @@ class PlaceController extends Controller
                 $title = $this->normalizeName($p['displayName']['text'] ?? '');
                 $tel = trim($p['nationalPhoneNumber'] ?? ($p['internationalPhoneNumber'] ?? ''));
                 $hours = $p['regularOpeningHours']['weekdayDescriptions'] ?? null;
-                if (!$tel && !$hours) continue;
+                $detailAddr = $this->extractDetailAddress($p['formattedAddress'] ?? '', $address);
+                if (!$tel && !$hours && !$detailAddr) continue;
                 if ($title && $normName && (str_contains($title, $normName) || str_contains($normName, $title))) {
-                    return ['phone' => $tel, 'opening_hours' => $hours];
+                    return ['phone' => $tel, 'opening_hours' => $hours, 'detail_address' => $detailAddr];
                 }
             }
         } catch (\Throwable $e) {
             Log::warning('Google Places lookup error', ['msg' => $e->getMessage()]);
         }
         return $empty;
+    }
+
+    private function extractDetailAddress(string $googleAddr, string $kakaoRoad): string
+    {
+        if ($googleAddr === '' || $kakaoRoad === '') return '';
+        $kakaoTokens = preg_split('/\s+/', trim($kakaoRoad));
+        $lastToken = end($kakaoTokens);
+        $pos = mb_strrpos($googleAddr, $lastToken);
+        if ($pos === false) return '';
+        $after = mb_substr($googleAddr, $pos + mb_strlen($lastToken));
+        return trim($after) ?: '';
     }
 
     private function normalizeName(string $s): string

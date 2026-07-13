@@ -95,10 +95,28 @@
             </div>
         @endif
         @if($place->road_address || $place->address)
+            @php
+                $displayAddr = $place->road_address ?: $place->address;
+                $showBuilding = $place->building_name
+                    && $place->building_name !== $place->name
+                    && !str_contains($displayAddr, $place->building_name);
+            @endphp
             <div class="pp-info-row">
                 <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span>{{ $place->road_address ?: $place->address }}</span>
+                <span>{{ $displayAddr }}@if($showBuilding) {{ $place->building_name }}@endif</span>
             </div>
+            @if($place->detail_location)
+                <div class="pp-info-row pp-info-row--sub pp-info-row--detail-loc">
+                    <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                    <span>{{ $place->detail_location }}</span>
+                </div>
+            @endif
+            @if($place->address && $place->road_address)
+                <div class="pp-info-row pp-info-row--sub pp-info-row--jibun">
+                    <span class="pp-jibun-label">지번</span>
+                    <span>{{ $place->address }}</span>
+                </div>
+            @endif
         @endif
         @if($place->phone)
             <div class="pp-info-row pp-info-row--sub">
@@ -123,11 +141,18 @@
         @if($place->memo)
             <div style="margin-top:12px;padding:12px;background:var(--pp-bg-soft);border-radius:10px;font-size:13.5px">{{ $place->memo }}</div>
         @endif
-        @if($place->status === 'visited' && $place->visited_at)
-            <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)">방문일: {{ $place->visited_at->format('Y.m.d') }}</div>
-        @elseif($place->status === 'planned')
-            <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)">등록일: {{ $place->created_at->format('Y.m.d') }}</div>
-        @endif
+        <div class="pp-status-info" id="ppStatusInfo">
+            @if($place->status === 'visited' && $place->visited_at)
+                <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)" id="ppStatusDate">방문일: {{ $place->visited_at->format('Y.m.d') }}</div>
+            @elseif($place->status === 'planned')
+                <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)" id="ppStatusDate">등록일: {{ $place->created_at->format('Y.m.d') }}</div>
+            @endif
+            <button type="button" class="pp-status-toggle" id="ppStatusToggle" data-place-id="{{ $place->id }}" data-status="{{ $place->status }}">
+                <span class="pp-status-pop__dot pp-status-pop__dot--{{ $place->status }}"></span>
+                <span id="ppStatusLabel">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+        </div>
     </div>
 
     @php
@@ -668,6 +693,113 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
     upBtn.addEventListener('click', () => reorder('up'));
     downBtn.addEventListener('click', () => reorder('down'));
 })();
+
+// ── 상태 원탭 전환 ──
+(function(){
+    const toggle = document.getElementById('ppStatusToggle');
+    if (!toggle) return;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    const placeId = toggle.dataset.placeId;
+    const label = document.getElementById('ppStatusLabel');
+    const badge = document.querySelector('.pp-badge');
+    const dateEl = document.getElementById('ppStatusDate');
+    let activePop = null;
+
+    function closePop() { if (activePop) { activePop.remove(); activePop = null; } }
+
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activePop) { closePop(); return; }
+        const curStatus = toggle.dataset.status;
+        const pop = document.createElement('div');
+        pop.className = 'pp-status-pop';
+        pop.innerHTML = `
+            <button type="button" class="pp-status-pop__item ${curStatus==='planned'?'is-current':''}" data-val="planned">
+                <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정
+            </button>
+            <button type="button" class="pp-status-pop__item ${curStatus==='visited'?'is-current':''}" data-val="visited">
+                <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>방문완료
+            </button>
+        `;
+        const rect = toggle.getBoundingClientRect();
+        pop.style.position = 'fixed';
+        pop.style.top = (rect.bottom + 6) + 'px';
+        pop.style.left = Math.max(8, rect.left) + 'px';
+        document.body.appendChild(pop);
+        requestAnimationFrame(() => pop.classList.add('is-show'));
+        activePop = pop;
+
+        pop.addEventListener('click', async (ev) => {
+            const item = ev.target.closest('.pp-status-pop__item');
+            if (!item) return;
+            const newStatus = item.dataset.val;
+            const oldStatus = curStatus;
+            closePop();
+            if (newStatus === oldStatus) return;
+
+            toggle.dataset.status = newStatus;
+            label.textContent = newStatus === 'visited' ? '방문완료' : '방문예정';
+            const dot = toggle.querySelector('.pp-status-pop__dot');
+            dot.className = 'pp-status-pop__dot pp-status-pop__dot--' + newStatus;
+
+            if (badge) {
+                badge.className = 'pp-badge pp-badge--' + newStatus;
+                badge.textContent = newStatus === 'visited' ? '방문완료' : '방문예정';
+            }
+
+            const today = new Date().toISOString().slice(0,10);
+            if (dateEl) {
+                dateEl.textContent = newStatus === 'visited' ? '방문일: ' + today.replace(/-/g, '.') : '';
+            }
+
+            try {
+                const r = await fetch(`/api/places/${placeId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ status: newStatus, visited_at: newStatus === 'visited' ? today : null })
+                });
+                const j = await r.json();
+                if (!j.ok) throw new Error();
+                showStatusToast(newStatus === 'visited' ? '방문완료로 변경했어요' : '방문예정으로 변경했어요', placeId, oldStatus);
+            } catch {
+                toggle.dataset.status = oldStatus;
+                label.textContent = oldStatus === 'visited' ? '방문완료' : '방문예정';
+                dot.className = 'pp-status-pop__dot pp-status-pop__dot--' + oldStatus;
+                if (badge) {
+                    badge.className = 'pp-badge pp-badge--' + oldStatus;
+                    badge.textContent = oldStatus === 'visited' ? '방문완료' : '방문예정';
+                }
+            }
+        });
+    });
+
+    function showStatusToast(msg, pid, prevStatus) {
+        let t = document.getElementById('ppToast');
+        if (!t) { t = document.createElement('div'); t.id = 'ppToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
+        const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        t.innerHTML = esc(msg) + '<button type="button" class="pp-toast__undo">되돌리기</button>';
+        t.classList.add('is-show');
+        let undone = false;
+        const timer = setTimeout(() => t.classList.remove('is-show'), 5000);
+        t.querySelector('.pp-toast__undo').addEventListener('click', async () => {
+            if (undone) return; undone = true;
+            clearTimeout(timer);
+            t.classList.remove('is-show');
+            try {
+                await fetch(`/api/places/${pid}/status`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ status: prevStatus, visited_at: prevStatus === 'visited' ? new Date().toISOString().slice(0,10) : null })
+                });
+            } catch {}
+            location.reload();
+        }, { once: true });
+    }
+
+    document.addEventListener('click', closePop);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
+})();
+
 </script>
 @endpush
 @endsection

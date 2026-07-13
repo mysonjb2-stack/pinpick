@@ -65,6 +65,7 @@ class SocialAuthController extends Controller
         };
 
         if (!$userInfo) {
+            logger('nativeLogin 인증 실패', ['provider' => $provider, 'token_length' => strlen($token)]);
             return response()->json(['error' => '인증 실패'], 401);
         }
 
@@ -106,7 +107,7 @@ class SocialAuthController extends Controller
                 'provider' => $provider,
                 'provider_id' => $providerId,
                 'name' => $profile['name'],
-                'email' => $email,
+                'email' => $email ?: $provider . '_' . $providerId . '@noemail.pinpick',
                 'profile_image' => $profile['avatar'],
             ]);
         }
@@ -133,8 +134,32 @@ class SocialAuthController extends Controller
 
     private function fetchGoogleUser(string $token): ?array
     {
+        // 1) access_token으로 userinfo 시도
         $response = Http::withToken($token)->get('https://www.googleapis.com/oauth2/v2/userinfo');
-        if ($response->failed()) return null;
+
+        if ($response->failed()) {
+            logger('Google userinfo 실패', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'token_prefix' => substr($token, 0, 20) . '...',
+            ]);
+
+            // 2) id_token(JWT)인 경우 tokeninfo로 디코딩 시도
+            $tokenInfo = Http::get('https://oauth2.googleapis.com/tokeninfo', ['id_token' => $token]);
+            if ($tokenInfo->successful()) {
+                $data = $tokenInfo->json();
+                logger('Google id_token 디코딩 성공', ['sub' => $data['sub'] ?? null, 'email' => $data['email'] ?? null]);
+                return [
+                    'id' => (string) ($data['sub'] ?? ''),
+                    'name' => $data['name'] ?? ($data['given_name'] ?? null),
+                    'email' => $data['email'] ?? null,
+                    'avatar' => $data['picture'] ?? null,
+                ];
+            }
+
+            logger('Google id_token 디코딩도 실패', ['status' => $tokenInfo->status(), 'body' => $tokenInfo->body()]);
+            return null;
+        }
 
         $data = $response->json();
         return [

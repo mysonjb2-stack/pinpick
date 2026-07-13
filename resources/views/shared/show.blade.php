@@ -68,7 +68,11 @@
                 </div>
                 <h3 class="pp-share__card-name">{{ $place->display_name }}</h3>
                 @if($place->address)
-                    <p class="pp-share__card-addr">{{ $place->address }}</p>
+                    @php $showBn = $place->building_name && $place->building_name !== $place->display_name && !str_contains($place->address, $place->building_name); @endphp
+                    <p class="pp-share__card-addr">{{ $place->address }}@if($showBn) ({{ $place->building_name }})@endif</p>
+                @endif
+                @if($place->detail_location)
+                    <p class="pp-share__card-addr pp-share__card-detail">{{ $place->detail_location }}</p>
                 @endif
                 @if($place->memo)
                     <p class="pp-share__card-memo">{{ $place->memo }}</p>

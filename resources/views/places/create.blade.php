@@ -97,7 +97,8 @@
         <div class="pp-field">
             <label class="pp-label">주소</label>
             <div class="pp-addr-wrap">
-                <input class="pp-input pp-addr-input" name="road_address" id="f_road" placeholder="주소 또는 건물명 검색" value="{{ $editMode ? $place->road_address : '' }}" readonly>
+                <input type="hidden" name="road_address" id="f_road_val" value="{{ $editMode ? $place->road_address : '' }}">
+                <input class="pp-input pp-addr-input" id="f_road" placeholder="주소 또는 건물명 검색" value="{{ $editMode ? trim(($place->road_address ?? '') . ($place->building_name ? ' ' . $place->building_name : '')) : '' }}" readonly>
                 <button type="button" class="pp-addr-search-btn" id="addrSearchBtn" aria-label="주소 검색">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                 </button>
@@ -110,6 +111,12 @@
             <input type="hidden" name="is_overseas" id="f_overseas" value="{{ $editMode && $place->is_overseas ? '1' : '0' }}">
             <input type="hidden" name="opening_hours" id="f_hours" value="{{ $editMode && $place->opening_hours ? json_encode($place->opening_hours) : '' }}">
             <input type="hidden" name="original_name" id="f_original_name" value="{{ $editMode ? $place->original_name : '' }}">
+            <input type="hidden" name="building_name" id="f_building" value="{{ $editMode ? ($place->building_name ?? '') : '' }}">
+        </div>
+
+        <div class="pp-field">
+            <label class="pp-label">상세 위치 <span class="pp-label-sub">(선택)</span></label>
+            <input class="pp-input" name="detail_location" id="f_detail_loc" placeholder="예: S동 1층, 지하 푸드코트 안" maxlength="255" value="{{ $editMode ? ($place->detail_location ?? '') : '' }}">
         </div>
 
         <div class="pp-field">
@@ -633,17 +640,46 @@ async function doSearch(q) {
     }
 }
 
+// 주소에서 시/도 + 시/군/구 뱃지 텍스트 추출
+function extractDetailedRegion(d) {
+    const addr = d.road_address_name || d.address_name || '';
+    const parts = addr.split(/\s+/);
+    if (parts.length < 2) return parts[0] || '';
+    const p1 = parts[0];
+    const p2 = parts[1].replace(/시$/, '');
+    return p1 + ' ' + p2;
+}
+
+// 지하철역 노선명 추출 (카카오 category_name: "교통,지하철 > 수인분당선")
+function getStationLine(d) {
+    const cat = d.category_name || '';
+    if (!cat.includes('지하철')) return '';
+    const segs = cat.split(/\s*>\s*/);
+    const last = (segs[segs.length - 1] || '').trim();
+    if (last && last !== '지하철') return last;
+    return '';
+}
+
 // 국내 자동완성 렌더링 (카카오 키워드 결과)
 function renderAcDomestic(docs) {
-    slAcList.innerHTML = docs.map((d, i) => `
-        <div class="sl__ac-item" data-i="${i}">
+    slAcList.innerHTML = docs.map((d, i) => {
+        const region = extractDetailedRegion(d);
+        const regionBadge = region ? `<span class="sl__sheet-region">${escapeHtml(region)}</span>` : '';
+        const line = getStationLine(d);
+        const lineTag = line ? `<span class="sl__ac-line">${escapeHtml(line)}</span>` : '';
+        let dist = '';
+        if (userLat !== null && d.y && d.x) {
+            dist = `<span class="sl__ac-dist">${fmtDist(haversine(userLat, userLng, +d.y, +d.x))}</span>`;
+        }
+        return `<div class="sl__ac-item" data-i="${i}">
             <div class="sl__ac-icon">${getCategoryIcon(d.category_group_name)}</div>
             <div class="sl__ac-body">
-                <div class="sl__ac-name">${escapeHtml(d.place_name)}</div>
-                <div class="sl__ac-desc">${escapeHtml(d.road_address_name || d.address_name || '')}</div>
+                <div class="sl__ac-name">${escapeHtml(d.place_name)}${lineTag}</div>
+                <div class="sl__ac-desc">${regionBadge}${escapeHtml(d.road_address_name || d.address_name || '')}</div>
             </div>
-        </div>
-    `).join('');
+            ${dist}
+        </div>`;
+    }).join('');
     slAcList.querySelectorAll('.sl__ac-item').forEach(el => {
         el.addEventListener('click', () => pickPlace(docs[+el.dataset.i]));
     });
@@ -657,7 +693,9 @@ function pickPlace(d) {
     document.getElementById('f_original_name').value = d.place_name || '';
     document.getElementById('f_phone').value = d.phone || '';
     document.getElementById('f_hours').value = d.opening_hours ? JSON.stringify(d.opening_hours) : '';
-    document.getElementById('f_road').value = d.road_address_name || d.address_name || '';
+    const _cleanAddr = d.road_address_name || d.address_name || '';
+    document.getElementById('f_road_val').value = _cleanAddr;
+    document.getElementById('f_road').value = _cleanAddr;
     document.getElementById('f_addr').value = d.address_name || '';
     document.getElementById('f_lat').value = d.y || '';
     document.getElementById('f_lng').value = d.x || '';
@@ -675,15 +713,33 @@ function pickPlace(d) {
         const phoneEl = document.getElementById('f_phone');
         const hoursEl = document.getElementById('f_hours');
         if (!phoneEl.value) phoneEl.placeholder = '전화번호 조회 중…';
-        const params = new URLSearchParams({ name: d.place_name, address: d.road_address_name || d.address_name || '' });
+        const kakaoRoad = d.road_address_name || d.address_name || '';
+        const params = new URLSearchParams({ name: d.place_name, address: kakaoRoad });
         fetch('/api/phone/fallback?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(r => r.json())
             .then(j => {
                 if (j && j.phone && !phoneEl.value) phoneEl.value = j.phone;
                 if (j && j.opening_hours && !hoursEl.value) hoursEl.value = JSON.stringify(j.opening_hours);
+                const detLocEl = document.getElementById('f_detail_loc');
+                if (j && j.detail_address && !detLocEl.value) detLocEl.value = j.detail_address;
             })
             .catch(() => {})
             .finally(() => { phoneEl.placeholder = ''; });
+        // 건물명 조회 (카카오 주소 검색 API)
+        if (kakaoRoad) {
+            fetch('/api/building-name?' + new URLSearchParams({ road_address: kakaoRoad }), { headers: { 'Accept': 'application/json' } })
+                .then(r => r.json())
+                .then(j => {
+                    if (j && j.building_name) {
+                        document.getElementById('f_building').value = j.building_name;
+                        const rdEl = document.getElementById('f_road');
+                        if (rdEl.value && !rdEl.value.includes(j.building_name)) {
+                            rdEl.value += ' ' + j.building_name;
+                        }
+                    }
+                })
+                .catch(() => {});
+        }
     }
     const sp = document.getElementById('searchTrigger').querySelector('span');
     if (sp) sp.textContent = d.place_name || '';
@@ -803,10 +859,15 @@ function showResultMapView(docs) {
     document.getElementById('slResultMapGoogle').style.display = isOverseas ? 'block' : 'none';
 
     const THRESHOLD = 10;
-    const isClustered = docs.length >= THRESHOLD && userLat !== null;
+    const shouldCluster = docs.length >= THRESHOLD && userLat !== null;
+    let doCluster = false;
 
-    if (isClustered) {
+    if (shouldCluster) {
         regionGroups = buildRegionGroups(docs);
+        doCluster = regionGroups.length > 1;
+    }
+
+    if (doCluster) {
         showClusteredUI(docs, isOverseas);
     } else {
         regionGroups = [];
@@ -861,14 +922,10 @@ function applyRegionFilter(isOverseas) {
 
     let filteredDocs;
     if (activeRegion === 'nearby') {
-        filteredDocs = [...lastAllDocs].sort((a, b) =>
-            haversine(userLat, userLng, +a.y, +a.x) - haversine(userLat, userLng, +b.y, +b.x)
-        ).slice(0, 5);
+        filteredDocs = lastAllDocs;
     } else {
         const group = regionGroups.find(g => g.name === activeRegion);
-        filteredDocs = group ? [...group.items].sort((a, b) =>
-            haversine(userLat, userLng, +a.y, +a.x) - haversine(userLat, userLng, +b.y, +b.x)
-        ) : lastAllDocs;
+        filteredDocs = group ? group.items : lastAllDocs;
     }
     lastDocs = filteredDocs;
     renderSheet(filteredDocs);
@@ -1041,11 +1098,13 @@ function renderSheet(docs) {
         if (userLat !== null && d.y && d.x) {
             dist = `<span class="sl__sheet-dist">${fmtDist(haversine(userLat, userLng, +d.y, +d.x))}</span>`;
         }
-        const region = regionGroups.length ? `<span class="sl__sheet-region">${escapeHtml(extractRegion(d))}</span>` : '';
+        const region = `<span class="sl__sheet-region">${escapeHtml(extractDetailedRegion(d))}</span>`;
+        const line = getStationLine(d);
+        const lineTag = line ? `<span class="sl__ac-line">${escapeHtml(line)}</span>` : '';
         return `<div class="sl__sheet-item" data-idx="${i}">
             <div class="sl__sheet-icon">${icon}</div>
             <div class="sl__sheet-body">
-                <div class="sl__sheet-name">${escapeHtml(d.place_name)}</div>
+                <div class="sl__sheet-name">${escapeHtml(d.place_name)}${lineTag}</div>
                 <div class="sl__sheet-addr">${region}${escapeHtml(d.road_address_name || d.address_name || '')}</div>
             </div>
             ${dist}
@@ -1214,8 +1273,14 @@ function openAddressSearch() {
             const road = data.roadAddress || '';
             const jibun = data.jibunAddress || data.autoJibunAddress || '';
             const addr = road || jibun;
-            fRoad.value = road || jibun;
+            const cleanAddr = road || jibun;
+            document.getElementById('f_road_val').value = cleanAddr;
+            fRoad.value = cleanAddr;
             fAddr.value = jibun;
+            if (data.buildingName) {
+                document.getElementById('f_building').value = data.buildingName;
+                fRoad.value += ' ' + data.buildingName;
+            }
             fKpid.value = '';
             fLat.value = '';
             fLng.value = '';
@@ -1462,7 +1527,9 @@ document.getElementById('slMappinSave').addEventListener('click', () => {
     if (lat !== undefined) {
         document.getElementById('f_lat').value = lat;
         document.getElementById('f_lng').value = lng;
-        document.getElementById('f_road').value = document.getElementById('slMappinAddr').textContent || '';
+        const _pinAddr = document.getElementById('slMappinAddr').textContent || '';
+        document.getElementById('f_road_val').value = _pinAddr;
+        document.getElementById('f_road').value = _pinAddr;
         document.getElementById('f_addr').value = '';
         document.getElementById('f_name').value = '';
         document.getElementById('f_kpid').value = '';
@@ -1837,17 +1904,120 @@ imgFileInput.setAttribute('name', 'images[]');
 updateImgCount();
 
 // =========================================
-// 6) 방문 상태 토글
+// 6) 방문 상태 토글 + 오늘 날짜 자동 지정
 // =========================================
+const visitedDateInput = document.querySelector('#visitedDateField input[name="visited_at"]');
 document.querySelectorAll('.pp-seg button').forEach(b => {
     b.addEventListener('click', () => {
         document.querySelectorAll('.pp-seg button').forEach(x => x.classList.remove('is-active'));
         b.classList.add('is-active');
         const s = b.dataset.status;
         document.getElementById('f_status').value = s;
-        document.getElementById('visitedDateField').style.display = s === 'visited' ? 'block' : 'none';
+        const dateField = document.getElementById('visitedDateField');
+        dateField.style.display = s === 'visited' ? 'block' : 'none';
+        if (s === 'visited' && !visitedDateInput.value) {
+            visitedDateInput.value = new Date().toISOString().slice(0, 10);
+        }
     });
 });
+
+// =========================================
+// 6-1) EXIF 날짜 추출 → 방문완료 자동 제안
+// =========================================
+function readExifDate(file) {
+    return new Promise(resolve => {
+        if (!file.type.match(/^image\/(jpeg|jpg|tiff)$/i)) { resolve(null); return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const view = new DataView(e.target.result);
+            if (view.getUint16(0) !== 0xFFD8) { resolve(null); return; }
+            let offset = 2;
+            while (offset < view.byteLength - 2) {
+                const marker = view.getUint16(offset);
+                if (marker === 0xFFE1) {
+                    const exifLen = view.getUint16(offset + 2);
+                    const exifStr = String.fromCharCode(...new Uint8Array(e.target.result, offset + 4, 4));
+                    if (exifStr !== 'Exif') { resolve(null); return; }
+                    const tiffStart = offset + 10;
+                    const le = view.getUint16(tiffStart) === 0x4949;
+                    const g = (o, sz) => sz === 2 ? view.getUint16(o, le) : view.getUint32(o, le);
+                    let ifdOff = tiffStart + g(tiffStart + 4, 4);
+                    for (let pass = 0; pass < 2; pass++) {
+                        const cnt = g(ifdOff, 2);
+                        for (let i = 0; i < cnt; i++) {
+                            const entry = ifdOff + 2 + i * 12;
+                            const tag = g(entry, 2);
+                            if (tag === 0x9003 || tag === 0x0132) {
+                                const valOff = tiffStart + g(entry + 8, 4);
+                                let s = '';
+                                for (let j = 0; j < 19; j++) s += String.fromCharCode(view.getUint8(valOff + j));
+                                const m = s.match(/^(\d{4}):(\d{2}):(\d{2})/);
+                                if (m) { resolve(`${m[1]}-${m[2]}-${m[3]}`); return; }
+                            }
+                            if (tag === 0x8769) {
+                                ifdOff = tiffStart + g(entry + 8, 4);
+                                break;
+                            }
+                        }
+                    }
+                    resolve(null); return;
+                }
+                if ((marker & 0xFF00) !== 0xFF00) break;
+                offset += 2 + view.getUint16(offset + 2);
+            }
+            resolve(null);
+        };
+        reader.readAsArrayBuffer(file.slice(0, 131072));
+    });
+}
+
+let exifBannerShown = false;
+const origImgChangeHandler = imgFileInput.onchange;
+imgFileInput.addEventListener('change', async () => {
+    if (exifBannerShown) return;
+    const files = Array.from(imgFileInput.files);
+    for (const f of files) {
+        const d = await readExifDate(f);
+        if (!d) continue;
+        const curStatus = document.getElementById('f_status').value;
+        if (curStatus === 'visited') break;
+        exifBannerShown = true;
+        const banner = document.createElement('div');
+        banner.className = 'pp-exif-suggest';
+        banner.innerHTML = `<span>📸 사진 촬영일 <b>${d.replace(/-/g, '.')}</b> — 방문완료로 변경할까요?</span>`
+            + `<button type="button" class="pp-exif-suggest__yes">네</button>`
+            + `<button type="button" class="pp-exif-suggest__no" aria-label="닫기">&times;</button>`;
+        document.getElementById('visitedDateField').parentElement.insertBefore(banner, document.getElementById('visitedDateField'));
+        banner.querySelector('.pp-exif-suggest__yes').addEventListener('click', () => {
+            document.querySelectorAll('.pp-seg button').forEach(x => x.classList.remove('is-active'));
+            document.querySelector('.pp-seg button[data-status="visited"]').classList.add('is-active');
+            document.getElementById('f_status').value = 'visited';
+            visitedDateInput.value = d;
+            document.getElementById('visitedDateField').style.display = 'block';
+            banner.remove();
+        });
+        banner.querySelector('.pp-exif-suggest__no').addEventListener('click', () => banner.remove());
+        break;
+    }
+});
+
+// =========================================
+// 6-2) 제출 버튼 로딩 상태 + 다중 제출 방지
+// =========================================
+(function(){
+    const form = document.getElementById('placeForm');
+    const btn = document.getElementById('placeSubmitBtn');
+    if (!form || !btn) return;
+    let submitted = false;
+    form.addEventListener('submit', (e) => {
+        if (submitted) { e.preventDefault(); return; }
+        submitted = true;
+        btn.disabled = true;
+        btn.dataset.origText = btn.textContent;
+        btn.textContent = '저장 중…';
+        btn.classList.add('is-loading');
+    });
+})();
 
 // =========================================
 // 7) 비로그인 게스트 localStorage 저장

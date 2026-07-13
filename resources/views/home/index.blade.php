@@ -127,9 +127,9 @@
                         @php $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
                         <div class="pp-rspot__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
                             @unless($thumbUrl)<span class="pp-rspot__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
-                            <span class="pp-rspot__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                            <span class="pp-rspot__badge pp-status-badge" data-place-id="{{ $p->id }}" data-status="{{ $p->status }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                             @if($p->status === 'visited' && $p->visited_at)
-                                <span class="pp-rspot__date">{{ $p->visited_at->format('Y.m.d') }}</span>
+                                <span class="pp-rspot__date pp-status-date" data-place-id="{{ $p->id }}">{{ $p->visited_at->format('Y.m.d') }}</span>
                             @endif
                         </div>
                         <div class="pp-rspot__body">
@@ -418,10 +418,10 @@
                             <img class="pp-mine-grid__thumb-img" src="{{ $mapThumb }}" alt="{{ $p->name }} 위치 지도" loading="lazy" onerror="this.remove()">
                         @endif
                         @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
-                        <span class="pp-mine-grid__badge">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                        <span class="pp-mine-grid__badge pp-status-badge" data-place-id="{{ $p->id }}" data-status="{{ $p->status }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                         <span class="pp-mine-grid__region {{ $p->is_overseas ? 'is-overseas' : '' }}">{{ $p->is_overseas ? '해외' : '국내' }}</span>
                         @if($p->status === 'visited' && $p->visited_at)
-                            <span class="pp-mine-grid__date">{{ $p->visited_at->format('Y.m.d') }}</span>
+                            <span class="pp-mine-grid__date pp-status-date" data-place-id="{{ $p->id }}">{{ $p->visited_at->format('Y.m.d') }}</span>
                         @endif
                         <div class="pp-mine-grid__reorder" aria-hidden="true">
                             <button type="button" class="pp-mine-grid__arrow" data-dir="up" aria-label="위로">↑</button>
@@ -490,7 +490,12 @@
     <div class="pp-share-sheet__backdrop" data-close-share></div>
     <div class="pp-share-sheet__panel">
         <div class="pp-share-sheet__handle"></div>
-        <h3 class="pp-share-sheet__title">장소 공유</h3>
+        <div class="pp-share-sheet__head">
+            <h3 class="pp-share-sheet__title">장소 공유</h3>
+            <button type="button" class="pp-share-sheet__close" data-close-share aria-label="닫기">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
         <div class="pp-share-sheet__field">
             <label class="pp-share-sheet__label">공유 제목</label>
             <input type="text" class="pp-share-sheet__input" id="ppShareTitle" maxlength="100">
@@ -517,14 +522,14 @@
     </div>
 </div>
 {{-- 다중 선택 모드 UI --}}
-<div class="pp-sel-bar" id="ppSelBar" style="display:none">
-    <div class="pp-sel-bar__left">
-        <span class="pp-sel-bar__count" id="ppSelCount">0개 선택됨</span>
-        <button type="button" class="pp-sel-bar__all" id="ppSelAll">전체선택</button>
-    </div>
-    <button type="button" class="pp-sel-bar__close" id="ppSelClose">✕</button>
+<div class="pp-sel-bar" id="ppSelBar">
+    <button type="button" class="pp-sel-bar__close" id="ppSelClose" aria-label="선택 취소">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <span class="pp-sel-bar__count" id="ppSelCount">장소를 선택하세요</span>
+    <button type="button" class="pp-sel-bar__all" id="ppSelAll">전체선택</button>
 </div>
-<div class="pp-sel-actions" id="ppSelActions" style="display:none">
+<div class="pp-sel-actions" id="ppSelActions">
     <button type="button" class="pp-sel-actions__btn pp-sel-actions__btn--share" id="ppSelShareBtn2" disabled>공유</button>
     <button type="button" class="pp-sel-actions__btn pp-sel-actions__btn--move" id="ppSelMove" disabled>카테고리 이동</button>
     <button type="button" class="pp-sel-actions__btn pp-sel-actions__btn--delete" id="ppSelDelete" disabled>삭제</button>
@@ -1403,10 +1408,13 @@
     function enterSelMode(firstItem) {
         selecting = true;
         grid.classList.add('is-selecting');
-        selBar.style.display = '';
-        selActions.style.display = '';
         document.querySelector('.pp-mine-sechead__actions')?.style.setProperty('display', 'none');
         document.querySelector('.pp-nav')?.classList.add('pp-nav--hidden');
+        document.querySelector('.yg-header')?.classList.add('pp-sel-hidden');
+        document.querySelector('.pp-hero2')?.classList.add('pp-sel-compact');
+        document.querySelector('.pp-mine-sechead__title')?.classList.add('pp-sel-hidden');
+        selBar.classList.add('is-active');
+        selActions.classList.add('is-active');
         if (firstItem) toggleItem(firstItem);
     }
 
@@ -1415,10 +1423,13 @@
         selected.clear();
         grid.classList.remove('is-selecting');
         grid.querySelectorAll('.pp-mine-grid__item.is-checked').forEach(el => el.classList.remove('is-checked'));
-        selBar.style.display = 'none';
-        selActions.style.display = 'none';
+        selBar.classList.remove('is-active');
+        selActions.classList.remove('is-active');
         document.querySelector('.pp-mine-sechead__actions')?.style.removeProperty('display');
         document.querySelector('.pp-nav')?.classList.remove('pp-nav--hidden');
+        document.querySelector('.yg-header')?.classList.remove('pp-sel-hidden');
+        document.querySelector('.pp-hero2')?.classList.remove('pp-sel-compact');
+        document.querySelector('.pp-mine-sechead__title')?.classList.remove('pp-sel-hidden');
         closeMoveSheet();
     }
 
@@ -1431,7 +1442,7 @@
 
     function updateCount() {
         const n = selected.size;
-        selCount.textContent = n + '개 선택됨';
+        selCount.textContent = n === 0 ? '장소를 선택하세요' : n + '개 선택됨';
         moveBtn.disabled = n === 0;
         deleteBtn.disabled = n === 0;
         if (selShareBtn2) selShareBtn2.disabled = n === 0;
@@ -1993,5 +2004,126 @@
     });
 })();
 @endif
+
+// ── 원탭 상태 토글 (뱃지 탭 → 팝오버) ──
+@auth
+(function(){
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    let activePop = null;
+
+    function closePop() {
+        if (activePop) { activePop.remove(); activePop = null; }
+    }
+
+    document.addEventListener('click', (e) => {
+        const badge = e.target.closest('.pp-status-badge');
+        if (!badge) { closePop(); return; }
+        e.preventDefault();
+        e.stopPropagation();
+        const placeId = badge.dataset.placeId;
+        const curStatus = badge.dataset.status;
+        if (!placeId) return;
+        closePop();
+
+        const pop = document.createElement('div');
+        pop.className = 'pp-status-pop';
+        pop.innerHTML = `
+            <button type="button" class="pp-status-pop__item ${curStatus==='planned'?'is-current':''}" data-val="planned">
+                <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정
+            </button>
+            <button type="button" class="pp-status-pop__item ${curStatus==='visited'?'is-current':''}" data-val="visited">
+                <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>방문완료
+            </button>
+        `;
+
+        const rect = badge.getBoundingClientRect();
+        pop.style.position = 'fixed';
+        pop.style.top = (rect.bottom + 6) + 'px';
+        pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 150)) + 'px';
+        document.body.appendChild(pop);
+        requestAnimationFrame(() => pop.classList.add('is-show'));
+        activePop = pop;
+
+        pop.addEventListener('click', async (ev) => {
+            const item = ev.target.closest('.pp-status-pop__item');
+            if (!item) return;
+            const newStatus = item.dataset.val;
+            closePop();
+            if (newStatus === curStatus) return;
+
+            const oldStatus = curStatus;
+            const oldText = badge.textContent;
+            badge.dataset.status = newStatus;
+            badge.textContent = newStatus === 'visited' ? '방문완료' : '방문예정';
+
+            const dateEls = document.querySelectorAll(`.pp-status-date[data-place-id="${placeId}"]`);
+            const today = new Date().toISOString().slice(0,10).replace(/-/g,'.');
+            if (newStatus === 'visited') {
+                dateEls.forEach(d => { d.textContent = today; d.style.display = ''; });
+                if (!dateEls.length) {
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = (badge.classList.contains('pp-rspot__badge') ? 'pp-rspot__date' : 'pp-mine-grid__date') + ' pp-status-date';
+                    dateSpan.dataset.placeId = placeId;
+                    dateSpan.textContent = today;
+                    badge.parentElement.appendChild(dateSpan);
+                }
+            } else {
+                dateEls.forEach(d => d.style.display = 'none');
+            }
+
+            try {
+                const r = await fetch(`/api/places/${placeId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ status: newStatus, visited_at: newStatus === 'visited' ? new Date().toISOString().slice(0,10) : null })
+                });
+                const j = await r.json();
+                if (!j.ok) throw new Error();
+                ppStatusToast(newStatus === 'visited' ? '방문완료로 변경했어요' : '방문예정으로 변경했어요', placeId, oldStatus);
+            } catch {
+                badge.dataset.status = oldStatus;
+                badge.textContent = oldText;
+                dateEls.forEach(d => d.style.display = oldStatus === 'visited' ? '' : 'none');
+                ppStatusToast('변경 실패', null, null);
+            }
+        });
+    });
+
+    function ppStatusToast(msg, placeId, prevStatus) {
+        const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        let t = document.getElementById('ppToast');
+        if (!t) { t = document.createElement('div'); t.id = 'ppToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
+        const undoHtml = placeId ? '<button type="button" class="pp-toast__undo">되돌리기</button>' : '';
+        t.innerHTML = esc(msg) + undoHtml;
+        t.classList.add('is-show');
+        const timer = setTimeout(() => { t.classList.remove('is-show'); }, placeId ? 5000 : 2500);
+        if (!placeId) return;
+        const undoBtn = t.querySelector('.pp-toast__undo');
+        let undone = false;
+        undoBtn.addEventListener('click', async () => {
+            if (undone) return;
+            undone = true;
+            clearTimeout(timer);
+            t.classList.remove('is-show');
+            try {
+                await fetch(`/api/places/${placeId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ status: prevStatus, visited_at: prevStatus === 'visited' ? new Date().toISOString().slice(0,10) : null })
+                });
+            } catch {}
+            document.querySelectorAll(`.pp-status-badge[data-place-id="${placeId}"]`).forEach(b => {
+                b.dataset.status = prevStatus;
+                b.textContent = prevStatus === 'visited' ? '방문완료' : '방문예정';
+            });
+            const dateEls = document.querySelectorAll(`.pp-status-date[data-place-id="${placeId}"]`);
+            dateEls.forEach(d => d.style.display = prevStatus === 'visited' ? '' : 'none');
+            ppStatusToast('되돌렸어요', null, null);
+        }, { once: true });
+    }
+
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
+})();
+@endauth
 </script>
 @endpush
