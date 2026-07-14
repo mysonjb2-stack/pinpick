@@ -514,6 +514,22 @@ class PlaceController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function reorderImages(Place $place, Request $request)
+    {
+        abort_unless($place->user_id === $request->user()?->id, 403);
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        foreach ($data['ids'] as $i => $id) {
+            PlaceImage::where('id', $id)->where('place_id', $place->id)->update(['sort_order' => $i]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function destroy(Place $place, Request $request)
     {
         abort_unless($place->user_id === $request->user()?->id, 403);

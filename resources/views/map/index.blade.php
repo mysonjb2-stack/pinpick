@@ -20,11 +20,32 @@
     <div id="pp-map-naver" class="pp-map"{{ $defaultScope === 'domestic' ? '' : ' hidden' }}></div>
     <div id="pp-map-google" class="pp-map"{{ $defaultScope === 'overseas' ? '' : ' hidden' }}></div>
     <div class="pp-map-credit" id="ppMapCredit">지도: NAVER</div>
+    <div class="pp-map-toast" id="ppMapToast" hidden>
+        <span class="pp-map-toast__text">내 주변에 저장한 장소가 없어 전체 지도를 보여드려요</span>
+        <button type="button" class="pp-map-toast__action" id="ppToastAction" hidden>내 위치로 보기</button>
+        <button type="button" class="pp-map-toast__dismiss" id="ppToastDismiss" aria-label="닫기">&times;</button>
+    </div>
 </div>
 <div class="pp-map-locate-anchor">
     <button type="button" class="pp-map-locate" id="ppMapLocate" aria-label="현재 위치">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
     </button>
+</div>
+
+<div class="pp-map-zero" id="ppMapZero" hidden>
+    <div class="pp-map-zero__card">
+        <button type="button" class="pp-map-zero__close" id="ppZeroClose" aria-label="닫기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="16" height="16"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <svg class="pp-map-zero__icon" viewBox="0 0 48 48" fill="none" width="56" height="56">
+            <circle cx="24" cy="24" r="22" fill="#F5F0EB"/>
+            <path d="M24 8c-5.52 0-10 4.48-10 10 0 7.5 10 22 10 22s10-14.5 10-22c0-5.52-4.48-10-10-10z" fill="#C96A5D" opacity=".85"/>
+            <circle cx="24" cy="18" r="4" fill="#fff"/>
+        </svg>
+        <div class="pp-map-zero__title" id="ppZeroTitle"></div>
+        <div class="pp-map-zero__sub" id="ppZeroSub"></div>
+        <a href="#" class="pp-map-zero__btn" id="ppZeroBtn">+ 첫 장소 추가하기</a>
+    </div>
 </div>
 
 <div class="pp-map-empty" id="ppMapEmpty" hidden aria-hidden="true">
@@ -232,20 +253,41 @@
     let currentScope = (_savedScope === 'domestic' || _savedScope === 'overseas') ? _savedScope : @json($defaultScope);
     let currentCat = sessionStorage.getItem('pp_map_cat') || 'all';
 
+    // ===== 거리 계산 =====
+    const NEARBY_RADIUS_KM = 5;
+    function haversineKm(lat1, lng1, lat2, lng2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    function hasNearbyIn(lat, lng, list) {
+        return list.some(p => haversineKm(lat, lng, p.lat, p.lng) <= NEARBY_RADIUS_KM);
+    }
+    let _userPos = _cachedGeo ? { lat: _cachedGeo.lat, lng: _cachedGeo.lng } : null;
+
     // ===== Naver (국내) =====
     let nMap = null, nMarkers = [], nActive = null;
     function initNaver() {
         if (nMap) return;
         if (typeof naver === 'undefined' || !naver.maps) return;
         const domestic = places.filter(p => !p.is_overseas);
-        const c = _cachedGeo
-            ? new naver.maps.LatLng(_cachedGeo.lat, _cachedGeo.lng)
-            : ((!_forceMe && domestic.length)
-                ? new naver.maps.LatLng(domestic[0].lat, domestic[0].lng)
-                : new naver.maps.LatLng(37.5665, 126.9780));
         const savedN = JSON.parse(sessionStorage.getItem('pp_map_naver_view') || 'null');
-        const nCenter = savedN ? new naver.maps.LatLng(savedN.lat, savedN.lng) : c;
-        const nZoom = savedN ? savedN.zoom : (_cachedGeo ? 15 : 13);
+        let nCenter, nZoom;
+        if (savedN) {
+            nCenter = new naver.maps.LatLng(savedN.lat, savedN.lng);
+            nZoom = savedN.zoom;
+        } else if (_userPos && domestic.length && hasNearbyIn(_userPos.lat, _userPos.lng, domestic)) {
+            nCenter = new naver.maps.LatLng(_userPos.lat, _userPos.lng);
+            nZoom = 15;
+        } else if (domestic.length) {
+            nCenter = new naver.maps.LatLng(domestic[0].lat, domestic[0].lng);
+            nZoom = 13;
+        } else {
+            nCenter = new naver.maps.LatLng(37.5665, 126.9780);
+            nZoom = 13;
+        }
         nMap = new naver.maps.Map('pp-map-naver', {
             center: nCenter, zoom: nZoom,
             mapTypeControl: false, zoomControl: false,
@@ -296,10 +338,21 @@
         if (gMap) return;
         if (typeof google === 'undefined' || !google.maps) return;
         const overseas = places.filter(p => p.is_overseas);
-        const c = overseas.length ? { lat: overseas[0].lat, lng: overseas[0].lng } : { lat: 35.6762, lng: 139.6503 };
         const savedG = JSON.parse(sessionStorage.getItem('pp_map_google_view') || 'null');
-        const gCenter = savedG ? { lat: savedG.lat, lng: savedG.lng } : c;
-        const gZoom = savedG ? savedG.zoom : 13;
+        let gCenter, gZoom;
+        if (savedG) {
+            gCenter = { lat: savedG.lat, lng: savedG.lng };
+            gZoom = savedG.zoom;
+        } else if (_userPos && overseas.length && hasNearbyIn(_userPos.lat, _userPos.lng, overseas)) {
+            gCenter = { lat: _userPos.lat, lng: _userPos.lng };
+            gZoom = 15;
+        } else if (overseas.length) {
+            gCenter = { lat: overseas[0].lat, lng: overseas[0].lng };
+            gZoom = 13;
+        } else {
+            gCenter = { lat: 35.6762, lng: 139.6503 };
+            gZoom = 13;
+        }
         gMap = new google.maps.Map(document.getElementById('pp-map-google'), {
             center: gCenter, zoom: gZoom,
             mapTypeControl: false, streetViewControl: false, fullscreenControl: false, zoomControl: false,
@@ -378,11 +431,9 @@
 
     const creditEl = document.getElementById('ppMapCredit');
 
-    // 저장된 뷰포트 없을 때만 현재 위치로 초기 중앙화 (첫 방문 또는 세션 만료)
-    let _initialGeolocated = false;
     let userLocMarkerN = null, userLocMarkerG = null;
     function showMyLocation(lat, lng) {
-        if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
+        if (nMap && typeof naver !== 'undefined') {
             if (userLocMarkerN) userLocMarkerN.setMap(null);
             userLocMarkerN = new naver.maps.Marker({
                 position: new naver.maps.LatLng(lat, lng), map: nMap,
@@ -399,29 +450,141 @@
             });
         }
     }
-    function tryInitialGeolocate() {
-        if (_initialGeolocated) return;
-        _initialGeolocated = true;
-        if (_cachedGeo) {
-            showMyLocation(_cachedGeo.lat, _cachedGeo.lng);
+
+    // ===== 토스트 =====
+    const toastEl = document.getElementById('ppMapToast');
+    const toastAction = document.getElementById('ppToastAction');
+    const toastDismiss = document.getElementById('ppToastDismiss');
+    let _toastTimer = null;
+
+    function showMapToast(hasGeo, lat, lng) {
+        if (hasGeo) {
+            toastAction.hidden = false;
+            toastAction.onclick = () => {
+                dismissToast();
+                if (currentScope === 'domestic' && nMap) {
+                    nMap.setCenter(new naver.maps.LatLng(lat, lng));
+                    nMap.setZoom(15);
+                } else if (currentScope === 'overseas' && gMap) {
+                    gMap.setCenter({ lat, lng });
+                    gMap.setZoom(15);
+                }
+            };
+        } else {
+            toastAction.hidden = true;
+        }
+        toastEl.hidden = false;
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(dismissToast, 5000);
+    }
+    function dismissToast() {
+        toastEl.hidden = true;
+        clearTimeout(_toastTimer);
+    }
+    toastDismiss.addEventListener('click', dismissToast);
+
+    // ===== 초기 카메라 결정 =====
+    const _cameraDecided = {};
+
+    function scopePlaces() {
+        return places.filter(p => (!!p.is_overseas) === (currentScope === 'overseas'));
+    }
+    function fitScopePlaces(sp) {
+        if (!sp || !sp.length) return;
+        if (currentScope === 'domestic' && nMap) {
+            if (sp.length === 1) {
+                nMap.setCenter(new naver.maps.LatLng(sp[0].lat, sp[0].lng));
+                nMap.setZoom(13);
+            } else {
+                const bounds = new naver.maps.LatLngBounds();
+                sp.forEach(p => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
+                nMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            }
+        } else if (currentScope === 'overseas' && gMap) {
+            if (sp.length === 1) {
+                gMap.setCenter({ lat: sp[0].lat, lng: sp[0].lng });
+                gMap.setZoom(13);
+            } else {
+                const bounds = new google.maps.LatLngBounds();
+                sp.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+                gMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+            }
+        }
+    }
+    function centerMap(lat, lng, zoom) {
+        if (currentScope === 'domestic' && nMap) {
+            nMap.setCenter(new naver.maps.LatLng(lat, lng));
+            nMap.setZoom(zoom);
+        } else if (currentScope === 'overseas' && gMap) {
+            gMap.setCenter({ lat, lng });
+            gMap.setZoom(zoom);
+        }
+    }
+
+    function decideInitialCamera() {
+        if (_hasSavedView) {
+            if (_userPos) showMyLocation(_userPos.lat, _userPos.lng);
             return;
         }
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition((pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            writeGeoCache(lat, lng);
-            if (!_hasSavedView) {
-                if (currentScope === 'domestic' && nMap && typeof naver !== 'undefined') {
-                    nMap.setCenter(new naver.maps.LatLng(lat, lng));
-                    nMap.setZoom(13);
-                } else if (currentScope === 'overseas' && gMap && typeof google !== 'undefined') {
-                    gMap.setCenter({ lat, lng });
-                    gMap.setZoom(13);
-                }
+        if (_cameraDecided[currentScope]) return;
+        _cameraDecided[currentScope] = true;
+
+        const sp = scopePlaces();
+        dismissToast();
+
+        // 장소 0건 → 내 위치로만 이동 (엠티스테이트 카드는 checkEmptyState가 처리)
+        if (!sp.length) {
+            if (_userPos) {
+                centerMap(_userPos.lat, _userPos.lng, 13);
+                showMyLocation(_userPos.lat, _userPos.lng);
+            } else if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        _userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                        writeGeoCache(_userPos.lat, _userPos.lng);
+                        centerMap(_userPos.lat, _userPos.lng, 13);
+                        showMyLocation(_userPos.lat, _userPos.lng);
+                    },
+                    () => {},
+                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+                );
             }
-            showMyLocation(lat, lng);
-        }, () => {}, { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 });
+            return;
+        }
+
+        if (_userPos) {
+            showMyLocation(_userPos.lat, _userPos.lng);
+            if (hasNearbyIn(_userPos.lat, _userPos.lng, sp)) {
+                centerMap(_userPos.lat, _userPos.lng, 15);
+            } else {
+                fitScopePlaces(sp);
+                showMapToast(true, _userPos.lat, _userPos.lng);
+            }
+            return;
+        }
+
+        fitScopePlaces(sp);
+
+        if (!navigator.geolocation) {
+            showMapToast(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                _userPos = { lat, lng };
+                writeGeoCache(lat, lng);
+                showMyLocation(lat, lng);
+                if (hasNearbyIn(lat, lng, sp)) {
+                    centerMap(lat, lng, 15);
+                } else {
+                    showMapToast(true, lat, lng);
+                }
+            },
+            () => { showMapToast(false); },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+        );
     }
 
     function applyScope(scope, opts = {}) {
@@ -431,6 +594,8 @@
         googleEl.hidden = scope !== 'overseas';
         creditEl.textContent = scope === 'domestic' ? '지도: NAVER' : '지도: Google';
         closeSheet();
+        filterCatTabs();
+        checkEmptyState();
         if (scope === 'domestic') {
             initNaver();
             renderNaver(currentCat);
@@ -444,7 +609,7 @@
                 if (opts.fit) fitToFilteredPlaces();
             });
         }
-        if (!opts.fit) tryInitialGeolocate();
+        if (!opts.fit) decideInitialCamera();
     }
 
     // ===== 지역 칩 =====
@@ -523,7 +688,6 @@
         scopeEl.querySelectorAll('.yg-segtab__btn').forEach(b => b.classList.remove('is-active'));
         btn.classList.add('is-active');
         applyScope(btn.dataset.scope);
-        filterCatTabs();
     });
 
     function fitToFilteredPlaces() {
@@ -656,6 +820,30 @@
         emptyEl.setAttribute('aria-hidden', 'false');
     }
 
+    // ===== 빈 상태 (스코프 전체 0건) =====
+    const zeroEl = document.getElementById('ppMapZero');
+    const zeroTitleEl = document.getElementById('ppZeroTitle');
+    const zeroSubEl = document.getElementById('ppZeroSub');
+    const zeroBtnEl = document.getElementById('ppZeroBtn');
+
+    document.getElementById('ppZeroClose').addEventListener('click', () => { zeroEl.hidden = true; });
+
+    function checkEmptyState() {
+        const overseas = currentScope === 'overseas';
+        const total = places.filter(p => (!!p.is_overseas) === overseas);
+        if (total.length > 0) { zeroEl.hidden = true; return; }
+        if (overseas) {
+            zeroTitleEl.textContent = '해외 장소는 아직 없네요';
+            zeroSubEl.textContent = '여행 계획이 있다면 미리 저장해보세요';
+            zeroBtnEl.href = '/places/create?scope=overseas';
+        } else {
+            zeroTitleEl.textContent = '아직 저장한 장소가 없어요';
+            zeroSubEl.textContent = '가고 싶은 곳을 핀으로 저장해보세요';
+            zeroBtnEl.href = '/places/create';
+        }
+        zeroEl.hidden = false;
+    }
+
     // ===== Bottom sheet =====
     const sheet = document.getElementById('ppMapSheet');
     const msName = document.getElementById('ppMsName');
@@ -736,7 +924,9 @@
         navigator.geolocation.getCurrentPosition((pos) => {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
+            _userPos = { lat, lng };
             writeGeoCache(lat, lng);
+            dismissToast();
             const inKorea = isInKorea(lat, lng);
             const needScope = inKorea ? 'domestic' : 'overseas';
             if (currentScope !== needScope) {

@@ -41,6 +41,7 @@
             <label class="pp-show-images__add-btn" aria-label="이미지 추가">
                 <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="24" height="24"><path d="M12 5v14M5 12h14"/></svg>
+                <span class="pp-show-images__add-label">사진 등록</span>
             </label>
         </form>
         @endif
@@ -55,6 +56,7 @@
             <label class="pp-show-images__add-btn" aria-label="이미지 추가">
                 <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="24" height="24"><path d="M12 5v14M5 12h14"/></svg>
+                <span class="pp-show-images__add-label">사진 등록</span>
             </label>
         </form>
     </div>
@@ -86,7 +88,18 @@
                     @endif
                 </div>
             </div>
-            <span class="pp-badge pp-badge--{{ $place->status }}">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+            <div class="pp-card__status-wrap">
+                <button type="button" class="pp-status-toggle" id="ppStatusToggle" data-place-id="{{ $place->id }}" data-status="{{ $place->status }}">
+                    <span class="pp-status-pop__dot pp-status-pop__dot--{{ $place->status }}"></span>
+                    <span id="ppStatusLabel">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                @if($place->status === 'visited' && $place->visited_at)
+                    <div class="pp-card__status-date" id="ppStatusDate">방문일: {{ $place->visited_at->format('Y.m.d') }}</div>
+                @elseif($place->status === 'planned')
+                    <div class="pp-card__status-date" id="ppStatusDate">등록일: {{ $place->created_at->format('Y.m.d') }}</div>
+                @endif
+            </div>
         </div>
         @if($place->original_name && $place->original_name !== $place->name)
             <div class="pp-info-row pp-info-row--original">
@@ -141,18 +154,6 @@
         @if($place->memo)
             <div style="margin-top:12px;padding:12px;background:var(--pp-bg-soft);border-radius:10px;font-size:13.5px">{{ $place->memo }}</div>
         @endif
-        <div class="pp-status-info" id="ppStatusInfo">
-            @if($place->status === 'visited' && $place->visited_at)
-                <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)" id="ppStatusDate">방문일: {{ $place->visited_at->format('Y.m.d') }}</div>
-            @elseif($place->status === 'planned')
-                <div style="margin-top:8px;font-size:12px;color:var(--pp-text-sub)" id="ppStatusDate">등록일: {{ $place->created_at->format('Y.m.d') }}</div>
-            @endif
-            <button type="button" class="pp-status-toggle" id="ppStatusToggle" data-place-id="{{ $place->id }}" data-status="{{ $place->status }}">
-                <span class="pp-status-pop__dot pp-status-pop__dot--{{ $place->status }}"></span>
-                <span id="ppStatusLabel">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-        </div>
     </div>
 
     @php
@@ -386,7 +387,7 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
     let webUrl, appUrl;
 
     if (provider === 'kakao') {
-        appUrl = `kakaomap://route?ep=${lat},${lng}&by=CAR`;
+        appUrl = `kakaomap://route?ep=${lat},${lng}&by=CAR&dname=${encName}`;
         webUrl = `https://map.kakao.com/link/to/${encName},${lat},${lng}`;
     } else if (provider === 'google') {
         appUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
@@ -701,8 +702,7 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     const placeId = toggle.dataset.placeId;
     const label = document.getElementById('ppStatusLabel');
-    const badge = document.querySelector('.pp-badge');
-    const dateEl = document.getElementById('ppStatusDate');
+    let dateEl = document.getElementById('ppStatusDate');
     let activePop = null;
 
     function closePop() { if (activePop) { activePop.remove(); activePop = null; } }
@@ -742,14 +742,18 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
             const dot = toggle.querySelector('.pp-status-pop__dot');
             dot.className = 'pp-status-pop__dot pp-status-pop__dot--' + newStatus;
 
-            if (badge) {
-                badge.className = 'pp-badge pp-badge--' + newStatus;
-                badge.textContent = newStatus === 'visited' ? '방문완료' : '방문예정';
-            }
-
             const today = new Date().toISOString().slice(0,10);
-            if (dateEl) {
-                dateEl.textContent = newStatus === 'visited' ? '방문일: ' + today.replace(/-/g, '.') : '';
+            const wrap = toggle.closest('.pp-card__status-wrap');
+            if (newStatus === 'visited') {
+                if (!dateEl && wrap) {
+                    dateEl = document.createElement('div');
+                    dateEl.id = 'ppStatusDate';
+                    dateEl.className = 'pp-card__status-date';
+                    wrap.appendChild(dateEl);
+                }
+                if (dateEl) dateEl.textContent = '방문일: ' + today.replace(/-/g, '.');
+            } else {
+                if (dateEl) { dateEl.textContent = ''; }
             }
 
             try {
@@ -765,10 +769,6 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
                 toggle.dataset.status = oldStatus;
                 label.textContent = oldStatus === 'visited' ? '방문완료' : '방문예정';
                 dot.className = 'pp-status-pop__dot pp-status-pop__dot--' + oldStatus;
-                if (badge) {
-                    badge.className = 'pp-badge pp-badge--' + oldStatus;
-                    badge.textContent = oldStatus === 'visited' ? '방문완료' : '방문예정';
-                }
             }
         });
     });

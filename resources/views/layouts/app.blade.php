@@ -28,6 +28,7 @@
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
     @stack('head')
+    <script>if(new URLSearchParams(location.search).get('reset_guest')==='1'){localStorage.removeItem('pinpick_guest_places');alert('게스트 저장 데이터 초기화 완료');history.replaceState(null,'',location.pathname);}</script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-HQK3JQ1XEJ"></script>
     <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-HQK3JQ1XEJ');</script>
 </head>

@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>핀픽 앱 WebView 외부 링크 처리 가이드</title>
+<style>
+  @font-face {
+    font-family: 'Mono';
+    src: local('SF Mono'), local('Menlo'), local('Consolas');
+  }
+
+  :root {
+    --bg: #f8f7f5;
+    --surface: #ffffff;
+    --text: #1c1917;
+    --text-2: #57534e;
+    --text-3: #a8a29e;
+    --border: #e7e5e4;
+    --accent: #b45309;
+    --accent-bg: #fef3c7;
+    --accent-text: #92400e;
+    --code-bg: #f5f3f0;
+    --code-border: #e0ddd8;
+    --tag-app: #059669;
+    --tag-app-bg: #ecfdf5;
+    --tag-web: #2563eb;
+    --tag-web-bg: #eff6ff;
+    --tag-warn: #d97706;
+    --tag-warn-bg: #fffbeb;
+    --shadow: 0 1px 3px rgba(28,25,23,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1917;
+      --surface: #262523;
+      --text: #e7e5e4;
+      --text-2: #a8a29e;
+      --text-3: #78716c;
+      --border: #3d3a37;
+      --accent: #f59e0b;
+      --accent-bg: #422006;
+      --accent-text: #fbbf24;
+      --code-bg: #2a2826;
+      --code-border: #3d3a37;
+      --tag-app: #34d399;
+      --tag-app-bg: #064e3b;
+      --tag-web: #60a5fa;
+      --tag-web-bg: #1e3a5f;
+      --tag-warn: #fbbf24;
+      --tag-warn-bg: #422006;
+      --shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1917;
+    --surface: #262523;
+    --text: #e7e5e4;
+    --text-2: #a8a29e;
+    --text-3: #78716c;
+    --border: #3d3a37;
+    --accent: #f59e0b;
+    --accent-bg: #422006;
+    --accent-text: #fbbf24;
+    --code-bg: #2a2826;
+    --code-border: #3d3a37;
+    --tag-app: #34d399;
+    --tag-app-bg: #064e3b;
+    --tag-web: #60a5fa;
+    --tag-web-bg: #1e3a5f;
+    --tag-warn: #fbbf24;
+    --tag-warn-bg: #422006;
+    --shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+  :root[data-theme="light"] {
+    --bg: #f8f7f5;
+    --surface: #ffffff;
+    --text: #1c1917;
+    --text-2: #57534e;
+    --text-3: #a8a29e;
+    --border: #e7e5e4;
+    --accent: #b45309;
+    --accent-bg: #fef3c7;
+    --accent-text: #92400e;
+    --code-bg: #f5f3f0;
+    --code-border: #e0ddd8;
+    --tag-app: #059669;
+    --tag-app-bg: #ecfdf5;
+    --tag-web: #2563eb;
+    --tag-web-bg: #eff6ff;
+    --tag-warn: #d97706;
+    --tag-warn-bg: #fffbeb;
+    --shadow: 0 1px 3px rgba(28,25,23,.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 40px 20px 60px;
+  }
+
+  .header {
+    margin-bottom: 36px;
+  }
+  .header__eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -.01em;
+    color: var(--text);
+    text-wrap: balance;
+  }
+  .header__sub {
+    font-size: 14px;
+    color: var(--text-2);
+    margin-top: 6px;
+  }
+
+  .section {
+    margin-bottom: 32px;
+  }
+  .section__title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid var(--border);
+  }
+
+  .flow-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .flow-card__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 10px;
+  }
+  .flow-card__label {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text);
+    flex: 1;
+  }
+  .flow-card__tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .tag--app { color: var(--tag-app); background: var(--tag-app-bg); }
+  .tag--web { color: var(--tag-web); background: var(--tag-web-bg); }
+
+  .flow-steps {
+    padding: 0 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .step {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 13.5px;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+  .step__num {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+
+  .url-row {
+    padding: 8px 16px 12px;
+  }
+  .url-box {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'Mono', monospace;
+    font-size: 12.5px;
+    color: var(--accent-text);
+    word-break: break-all;
+    line-height: 1.55;
+    overflow-x: auto;
+  }
+  .url-box .dim { color: var(--text-3); }
+
+  .note {
+    background: var(--tag-warn-bg);
+    border-left: 3px solid var(--tag-warn);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .note strong { color: var(--text); font-weight: 600; }
+
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .summary-table th,
+  .summary-table td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .summary-table th {
+    font-weight: 600;
+    color: var(--text-3);
+    font-size: 11.5px;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .summary-table td { color: var(--text-2); }
+  .summary-table code {
+    font-family: 'Mono', monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--accent-text);
+  }
+  .summary-table tr:last-child td,
+  .summary-table tr:last-child th { border-bottom: none; }
+
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 28px 0;
+  }
+
+  .footer-note {
+    font-size: 12px;
+    color: var(--text-3);
+    text-align: center;
+    margin-top: 32px;
+  }
+</style>
+
+<div class="wrap">
+  <div class="header">
+    <div class="header__eyebrow">핀픽 iOS/Android 앱 개발</div>
+    <h1>WebView 외부 링크 처리 가이드</h1>
+    <div class="header__sub">앱이 없을 때 웹 URL로 보내는 fallback 경로 정리</div>
+  </div>
+
+  <div class="note">
+    <strong>핵심:</strong> 웹에서 앱 스킴(<code>nmap://</code>, <code>kakaomap://</code>)을 먼저 시도하고, 앱이 없으면 웹 URL로 보내는 로직이 이미 구현되어 있습니다. WebView에서 이 스킴들이 정상적으로 외부 앱 또는 외부 브라우저로 전달되도록 처리해주세요.
+  </div>
+
+  <!-- 네이버 길찾기 -->
+  <div class="section">
+    <div class="section__title">1. 네이버지도 길찾기</div>
+
+    <div class="flow-card">
+      <div class="flow-card__head">
+        <span class="flow-card__label">앱 스킴 (앱 설치 시)</span>
+        <span class="flow-card__tag tag--app">앱 실행</span>
+      </div>
+      <div class="url-row">
+        <div class="url-box">nmap://route/car?dlat=<span class="dim">{위도}</span>&dlng=<span class="dim">{경도}</span>&dname=<span class="dim">{장소명}</span>&appname=net.mypinpick</div>
+      </div>
+    </div>
+
+    <div class="flow-card">
+      <div class="flow-card__head">
+        <span class="flow-card__label">웹 fallback (앱 미설치 시)</span>
+        <span class="flow-card__tag tag--web">브라우저 이동</span>
+      </div>
+      <div class="url-row">
+        <div class="url-box">https://map.naver.com/p/directions/-/<span class="dim">{경도}</span>,<span class="dim">{위도}</span>,<span class="dim">{장소명}</span>,,PLACE_POI/-/car</div>
+      </div>
+      <div class="flow-steps">
+        <div class="step"><span class="step__num">1</span><span>앱 스킴으로 1.2초간 앱 실행 시도</span></div>
+        <div class="step"><span class="step__num">2</span><span>앱이 안 열리면 위 웹 URL을 새 탭으로 오픈</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 카카오맵 길찾기 -->
+  <div class="section">
+    <div class="section__title">2. 카카오맵 길찾기</div>
+
+    <div class="flow-card">
+      <div class="flow-card__head">
+        <span class="flow-card__label">앱 스킴 (앱 설치 시)</span>
+        <span class="flow-card__tag tag--app">앱 실행</span>
+      </div>
+      <div class="url-row">
+        <div class="url-box">kakaomap://route?ep=<span class="dim">{위도}</span>,<span class="dim">{경도}</span>&by=CAR</div>
+      </div>
+    </div>
+
+    <div class="flow-card">
+      <div class="flow-card__head">
+        <span class="flow-card__label">웹 fallback (앱 미설치 시)</span>
+        <span class="flow-card__tag tag--web">브라우저 이동</span>
+      </div>
+      <div class="url-row">
+        <div class="url-box">https://map.kakao.com/link/to/<span class="dim">{장소명}</span>,<span class="dim">{위도}</span>,<span class="dim">{경도}</span></div>
+      </div>
+      <div class="flow-steps">
+        <div class="step"><span class="step__num">1</span><span>앱 스킴으로 1.2초간 앱 실행 시도</span></div>
+        <div class="step"><span class="step__num">2</span><span>앱이 안 열리면 위 웹 URL을 새 탭으로 오픈</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 네이버 예약 -->
+  <div class="section">
+    <div class="section__title">3. 네이버 예약</div>
+
+    <div class="flow-card">
+      <div class="flow-card__head">
+        <span class="flow-card__label">웹 URL (앱 스킴 없음)</span>
+        <span class="flow-card__tag tag--web">브라우저 이동</span>
+      </div>
+      <div class="url-row">
+        <div class="url-box">https://m.place.naver.com/place/<span class="dim">{naver_place_id}</span>/booking?entry=plt</div>
+      </div>
+      <div class="flow-steps">
+        <div class="step"><span class="step__num">!</span><span>앱 스킴 없이 처음부터 웹 URL로 이동합니다. <code>target="_blank"</code>로 외부 브라우저에서 열리도록 처리 필요.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 요약 테이블 -->
+  <div class="section">
+    <div class="section__title">요약</div>
+    <div class="table-wrap">
+      <table class="summary-table">
+        <tr>
+          <th>기능</th>
+          <th>앱 스킴</th>
+          <th>웹 fallback</th>
+        </tr>
+        <tr>
+          <td><strong>네이버 길찾기</strong></td>
+          <td><code>nmap://</code></td>
+          <td><code>map.naver.com</code></td>
+        </tr>
+        <tr>
+          <td><strong>카카오 길찾기</strong></td>
+          <td><code>kakaomap://</code></td>
+          <td><code>map.kakao.com</code></td>
+        </tr>
+        <tr>
+          <td><strong>네이버 예약</strong></td>
+          <td>없음</td>
+          <td><code>m.place.naver.com</code></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- WebView 처리 요청사항 -->
+  <div class="section">
+    <div class="section__title">WebView에서 처리해야 할 사항</div>
+
+    <div class="note">
+      <strong>iOS (WKWebView)</strong><br>
+      <code>decidePolicyFor navigationAction</code>에서 URL 스킴을 확인하고, <code>nmap://</code>, <code>kakaomap://</code> 등 외부 앱 스킴은 <code>UIApplication.shared.open(url)</code>로 전달. <code>canOpenURL</code>이 false면 웹 fallback이 자동으로 동작합니다.
+    </div>
+
+    <div class="note">
+      <strong>Android (WebView)</strong><br>
+      <code>shouldOverrideUrlLoading</code>에서 <code>intent://</code> 및 커스텀 스킴을 <code>Intent</code>로 변환하여 <code>startActivity</code>. <code>ActivityNotFoundException</code> 시 <code>S.browser_fallback_url</code>로 이동.
+    </div>
+
+    <div class="note">
+      <strong>공통: <code>target="_blank"</code> 처리</strong><br>
+      네이버 예약 등 <code>&lt;a target="_blank"&gt;</code> 링크는 WebView 내에서 무시될 수 있습니다. 외부 브라우저(Safari/Chrome)로 열리도록 처리해주세요.
+    </div>
+  </div>
+
+  <div class="footer-note">핀픽 앱 개발 참고자료 · 2026.07.14</div>
+</div>
+</html>

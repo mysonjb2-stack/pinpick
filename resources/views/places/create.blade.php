@@ -129,10 +129,11 @@
             <input type="file" id="imgFileInput" accept="image/jpeg,image/png,image/webp,image/heic" multiple hidden>
             <div class="pp-images" id="imgPreview">
                 @if($editMode)
-                    @foreach($place->images as $img)
+                    @foreach($place->images as $idx => $img)
                     <div class="pp-images__item" data-existing-id="{{ $img->id }}">
                         <img src="{{ $img->thumb_url }}" alt="">
                         <button type="button" class="pp-images__del pp-images__del--existing" data-img-id="{{ $img->id }}" aria-label="삭제">&times;</button>
+                        @if($idx === 0)<span class="pp-images__primary">대표</span>@endif
                     </div>
                     @endforeach
                 @endif
@@ -1678,6 +1679,20 @@ if (!editMode && !catHidden.value) {
         catHidden.value = qCat;
     }
 }
+
+// ?scope=overseas → 해외 탭 기본 선택
+if (!editMode) {
+    const qScope = new URLSearchParams(location.search).get('scope');
+    if (qScope === 'overseas' && currentRegion !== 'overseas') {
+        currentRegion = 'overseas';
+        document.querySelectorAll('.sl__region-btn').forEach(b => {
+            b.classList.toggle('is-active', b.dataset.region === 'overseas');
+        });
+        document.getElementById('f_overseas').value = '1';
+        const nuf = document.getElementById('naverUrlField');
+        if (nuf) nuf.style.display = 'none';
+    }
+}
 renderChips();
 if (catHidden.value) selectCategory(catHidden.value);
 
@@ -1820,8 +1835,9 @@ const imgFileInput = document.getElementById('imgFileInput');
 const imgPreview = document.getElementById('imgPreview');
 const imgAddBtn = document.getElementById('imgAddBtn');
 const imgCountEl = document.getElementById('imgCount');
-let imgFiles = []; // 신규 파일
+let imgFiles = [];
 let existingImgCount = imgPreview.querySelectorAll('.pp-images__item[data-existing-id]').length;
+const placeId = document.querySelector('input[name="_method"]') ? location.pathname.match(/places\/(\d+)/)?.[1] : null;
 
 function totalImgCount() { return existingImgCount + imgFiles.length; }
 
@@ -1830,11 +1846,23 @@ function updateImgCount() {
     imgAddBtn.style.display = totalImgCount() >= IMG_MAX ? 'none' : '';
 }
 
+function updatePrimaryLabels() {
+    imgPreview.querySelectorAll('.pp-images__primary').forEach(el => el.remove());
+    const first = imgPreview.querySelector('.pp-images__item');
+    if (first) {
+        const lbl = document.createElement('span');
+        lbl.className = 'pp-images__primary';
+        lbl.textContent = '대표';
+        first.appendChild(lbl);
+    }
+}
+
 function renderNewImgPreviews() {
     imgPreview.querySelectorAll('.pp-images__item:not([data-existing-id])').forEach(el => el.remove());
     imgFiles.forEach((file, i) => {
         const div = document.createElement('div');
         div.className = 'pp-images__item';
+        div.dataset.newIdx = i;
         div.innerHTML = `
             <img src="${URL.createObjectURL(file)}" alt="">
             <button type="button" class="pp-images__del pp-images__del--new" data-idx="${i}" aria-label="삭제">&times;</button>
@@ -1842,6 +1870,7 @@ function renderNewImgPreviews() {
         imgPreview.insertBefore(div, imgAddBtn);
     });
     updateImgCount();
+    updatePrimaryLabels();
     syncFileInput();
 }
 
@@ -1871,37 +1900,116 @@ imgFileInput.addEventListener('change', () => {
     renderNewImgPreviews();
 });
 
+// --- 탭 액션 시트 ---
+let activeAction = null;
+function closeAction() { if (activeAction) { activeAction.remove(); activeAction = null; } }
+document.addEventListener('click', closeAction);
+
 imgPreview.addEventListener('click', async (e) => {
     const delBtn = e.target.closest('.pp-images__del');
-    if (!delBtn) return;
+    const item = e.target.closest('.pp-images__item');
 
-    // 기존 이미지 삭제 (서버에 API 호출)
-    if (delBtn.classList.contains('pp-images__del--existing')) {
-        const imgId = delBtn.dataset.imgId;
-        if (!confirm('이 사진을 삭제할까요?')) return;
-        try {
-            const r = await fetch(`/api/place-images/${imgId}`, {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }
-            });
-            const j = await r.json();
-            if (j.ok) {
-                delBtn.closest('.pp-images__item').remove();
-                existingImgCount--;
-                updateImgCount();
-            }
-        } catch (err) { alert('삭제 실패'); }
+    if (delBtn) {
+        closeAction();
+        if (delBtn.classList.contains('pp-images__del--existing')) {
+            const imgId = delBtn.dataset.imgId;
+            if (!confirm('이 사진을 삭제할까요?')) return;
+            try {
+                const r = await fetch(`/api/place-images/${imgId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }
+                });
+                const j = await r.json();
+                if (j.ok) {
+                    delBtn.closest('.pp-images__item').remove();
+                    existingImgCount--;
+                    updateImgCount();
+                    updatePrimaryLabels();
+                    saveImageOrder();
+                }
+            } catch (err) { alert('삭제 실패'); }
+            return;
+        }
+        const idx = +delBtn.dataset.idx;
+        imgFiles.splice(idx, 1);
+        renderNewImgPreviews();
         return;
     }
 
-    // 신규 이미지 삭제
-    const idx = +delBtn.dataset.idx;
-    imgFiles.splice(idx, 1);
-    renderNewImgPreviews();
+    if (item && !e.target.closest('.pp-images__del')) {
+        e.stopPropagation();
+        closeAction();
+        const allItems = Array.from(imgPreview.querySelectorAll('.pp-images__item'));
+        const idx = allItems.indexOf(item);
+        const isFirst = idx === 0;
+        const isLast = idx === allItems.length - 1;
+
+        const pop = document.createElement('div');
+        pop.className = 'pp-img-action';
+        let html = '';
+        if (!isFirst) {
+            html += '<button type="button" class="pp-img-action__item" data-act="primary">대표 사진으로 지정</button>';
+            html += '<button type="button" class="pp-img-action__item" data-act="prev">앞으로 이동</button>';
+        }
+        if (!isLast) {
+            html += '<button type="button" class="pp-img-action__item" data-act="next">뒤로 이동</button>';
+        }
+        html += '<button type="button" class="pp-img-action__item pp-img-action__item--danger" data-act="delete">삭제</button>';
+        pop.innerHTML = html;
+
+        const rect = item.getBoundingClientRect();
+        pop.style.top = (rect.bottom + 6) + 'px';
+        pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 170)) + 'px';
+        document.body.appendChild(pop);
+        activeAction = pop;
+
+        pop.addEventListener('click', async (ev) => {
+            const btn = ev.target.closest('.pp-img-action__item');
+            if (!btn) return;
+            closeAction();
+
+            if (btn.dataset.act === 'primary') {
+                imgPreview.insertBefore(item, allItems[0]);
+                updatePrimaryLabels();
+                saveImageOrder();
+            } else if (btn.dataset.act === 'prev') {
+                allItems[idx - 1].before(item);
+                updatePrimaryLabels();
+                saveImageOrder();
+            } else if (btn.dataset.act === 'next') {
+                allItems[idx + 1].after(item);
+                updatePrimaryLabels();
+                saveImageOrder();
+            } else if (btn.dataset.act === 'delete') {
+                const existingDel = item.querySelector('.pp-images__del--existing');
+                const newDel = item.querySelector('.pp-images__del--new');
+                if (existingDel) {
+                    existingDel.click();
+                } else if (newDel) {
+                    newDel.click();
+                }
+            }
+        });
+    }
 });
+
+async function saveImageOrder() {
+    if (!placeId) return;
+    const ids = Array.from(imgPreview.querySelectorAll('.pp-images__item[data-existing-id]'))
+        .map(el => parseInt(el.dataset.existingId));
+    if (!ids.length) return;
+    try {
+        await fetch(`/api/places/${placeId}/reorder-images`, {
+            method: 'PATCH',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+    } catch (e) {}
+}
 
 imgFileInput.setAttribute('name', 'images[]');
 updateImgCount();
+updatePrimaryLabels();
 
 // =========================================
 // 6) 방문 상태 토글 + 오늘 날짜 자동 지정

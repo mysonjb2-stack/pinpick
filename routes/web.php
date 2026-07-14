@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/places/{place}', [PlaceController::class, 'destroy'])->name('places.destroy');
     Route::post('/api/places/{place}/quick-images', [PlaceController::class, 'quickAddImages'])->name('api.places.quick-images');
     Route::delete('/api/place-images/{placeImage}', [PlaceController::class, 'destroyImage'])->name('api.place-images.destroy');
+    Route::patch('/api/places/{place}/reorder-images', [PlaceController::class, 'reorderImages'])->name('api.places.reorder-images');
     Route::patch('/api/places/{place}/status', [PlaceController::class, 'toggleStatus'])->name('api.places.toggle-status');
     Route::patch('/api/places/{place}/reorder', [PlaceController::class, 'reorder'])->name('api.places.reorder');
     Route::post('/api/places/reorder-all', [PlaceController::class, 'bulkReorder'])->name('api.places.reorder-all');

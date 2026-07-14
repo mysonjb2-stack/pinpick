@@ -1539,9 +1539,31 @@
             const titleInput = document.getElementById('ppShareTitle');
             if (!shareSheet) return;
             window.__sharePendingPlaceIds = Array.from(selected).map(Number);
-            if (titleInput) titleInput.value = selected.size + '개 장소';
+            if (titleInput) titleInput.value = guessShareTitle();
             shareSheet.classList.add('is-open');
         });
+    }
+
+    function guessShareTitle() {
+        const ids = Array.from(selected);
+        const cards = ids.map(id => document.querySelector(`.pp-mine-grid__item[data-id="${id}"]`)).filter(Boolean);
+        if (!cards.length) return '';
+
+        const activeTab = document.querySelector('#ppHeroTabs .pp-hero2__tab.is-active');
+        if (activeTab && activeTab.dataset.cat !== 'all') {
+            return activeTab.textContent.trim();
+        }
+
+        const catIds = cards.map(c => c.dataset.cat);
+        const allSame = catIds.every(c => c === catIds[0]);
+        if (allSame) {
+            const catMeta = document.querySelector(`.yg-mycat[data-cat-id="${catIds[0]}"] .yg-mycat__catname`);
+            if (catMeta) return catMeta.textContent.trim();
+        }
+
+        const firstName = cards[0].dataset.name || '';
+        if (cards.length === 1) return firstName;
+        return firstName + ' 외 ' + (cards.length - 1) + '곳';
     }
 
     // 카테고리 이동
@@ -1639,6 +1661,8 @@
     if (list.length >= 1 && list.length <= 5) {
         if (heroTitle) heroTitle.hidden = true;
         if (loginCta) loginCta.hidden = false;
+        var hero2 = document.querySelector('.pp-hero2');
+        if (hero2) hero2.style.maxHeight = 'none';
     }
     if (!list.length) {
         grid.innerHTML = '<a href="{{ route('places.create') }}" class="pp-mine-grid__empty">'

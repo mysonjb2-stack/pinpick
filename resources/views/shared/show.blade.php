@@ -355,8 +355,11 @@
     });
 
     // --- action=save 자동 시작 ---
-    if (_qpAction === 'save' && isAuth) {
-        setTimeout(function() { openCategorySheet(); }, 300);
+    if (_qpAction === 'save') {
+        setTimeout(function() {
+            if (isAuth) { openCategorySheet(); }
+            else { handleGuestSave(); }
+        }, 300);
     }
 
     // --- Close sheets ---
@@ -556,18 +559,23 @@
                 location.href = '/';
                 return;
             }
-            var schemeUrl = buildSchemeUrl(true);
-            if (/Android/i.test(navigator.userAgent)) {
-                var intentPath = schemeUrl.replace('pinpick://', '');
-                location.href = 'intent://' + intentPath +
-                    '#Intent;scheme=pinpick;S.browser_fallback_url=' +
-                    encodeURIComponent(location.origin + '/') + ';end';
+            if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                var orders = getSelectedSortOrders();
+                var deepPath = 's/' + token + '?action=save';
+                if (orders) deepPath += '&selected=' + orders;
+                if (/Android/i.test(navigator.userAgent)) {
+                    location.href = 'intent://' + deepPath +
+                        '#Intent;scheme=pinpick;S.browser_fallback_url=' +
+                        encodeURIComponent(location.origin + '/') + ';end';
+                } else {
+                    location.href = 'pinpick://' + deepPath;
+                    setTimeout(function() {
+                        if (document.hidden) return;
+                        location.href = '/';
+                    }, 1500);
+                }
             } else {
-                location.href = schemeUrl;
-                setTimeout(function() {
-                    if (document.hidden) return;
-                    location.href = '/';
-                }, 1500);
+                location.href = '/';
             }
         };
         document.querySelectorAll('.pp-share__card-add').forEach(function(b) { b.style.display = 'none'; });
@@ -594,7 +602,7 @@
             location.href = appScheme;
             setTimeout(function() {
                 if (document.hidden) return;
-                if (FALLBACK_URL) location.href = FALLBACK_URL;
+                location.href = webFallback;
             }, 1500);
             return;
         }
