@@ -35,7 +35,7 @@
     <div class="pp-show-images" id="ppShowImages">
         @foreach($place->images as $i => $img)
         <div class="pp-show-images__item" data-lb-idx="{{ $i }}" data-lb-src="{{ $img->url }}">
-            <img src="{{ $img->url }}" alt="{{ $place->name }}" loading="lazy">
+            <img src="{{ $img->url }}" alt="{{ $place->name }}" {!! $i === 0 ? 'fetchpriority="high" decoding="async"' : 'loading="lazy" decoding="async"' !!}>
         </div>
         @endforeach
         @if($place->images->count() < 5)

@@ -614,7 +614,8 @@ class PlaceController extends Controller
         $slug = trim((string) $request->input('theme', ''));
         $query = Place::where('user_id', $request->user()->id)
             ->where('is_visible', true)
-            ->with(['category', 'themes']);
+            ->select(['id', 'name', 'category_id', 'road_address', 'address', 'lat', 'lng', 'user_id'])
+            ->with(['category:id,name', 'themes:id,name']);
 
         if ($slug !== '') {
             $query->whereHas('themes', fn($q) => $q->where('slug', $slug));
@@ -1090,29 +1091,43 @@ class PlaceController extends Controller
         $h = (int) ($request->input('h') ?? 300);
 
         $hash = sha1("{$lat}|{$lng}|" . ($overseas ? 'g' : 'n') . "|{$w}x{$h}");
-        $relPath = "static-maps/{$hash}.jpg";
-        $absPath = storage_path('app/public/' . $relPath);
+        $webpPath = storage_path("app/public/static-maps/{$hash}.webp");
+        $jpgPath = storage_path("app/public/static-maps/{$hash}.jpg");
 
-        if (!is_file($absPath)) {
-            if (!is_dir(dirname($absPath))) {
-                @mkdir(dirname($absPath), 0775, true);
+        if (is_file($webpPath)) {
+            return response()->file($webpPath, [
+                'Content-Type' => 'image/webp',
+                'Cache-Control' => 'public, max-age=2592000',
+            ]);
+        }
+
+        if (!is_file($jpgPath)) {
+            if (!is_dir(dirname($jpgPath))) {
+                @mkdir(dirname($jpgPath), 0775, true);
             }
             try {
                 $body = $overseas
                     ? $this->fetchGoogleStaticMap($lat, $lng, $w, $h)
                     : $this->fetchNaverStaticMap($lat, $lng, $w, $h);
                 if ($body) {
-                    file_put_contents($absPath, $body);
+                    $processor = app(ImageProcessor::class);
+                    if ($processor->saveAsWebp($body, "static-maps/{$hash}.webp", max($w, $h), 72)) {
+                        return response()->file($webpPath, [
+                            'Content-Type' => 'image/webp',
+                            'Cache-Control' => 'public, max-age=2592000',
+                        ]);
+                    }
+                    file_put_contents($jpgPath, $body);
                 }
             } catch (\Throwable $e) {
                 Log::warning('[static-map] fetch fail: ' . $e->getMessage());
             }
         }
 
-        if (is_file($absPath)) {
-            return response()->file($absPath, [
+        if (is_file($jpgPath)) {
+            return response()->file($jpgPath, [
                 'Content-Type' => 'image/jpeg',
-                'Cache-Control' => 'public, max-age=2592000', // 30일
+                'Cache-Control' => 'public, max-age=2592000',
             ]);
         }
         return response('', 404);
@@ -1410,8 +1425,17 @@ class PlaceController extends Controller
 
             if (!$binary) return;
 
-            $path = 'places/thumb_' . $place->id . '.jpg';
-            Storage::disk('public')->put($path, $binary);
+            $processor = app(ImageProcessor::class);
+            $path = 'static-maps/' . sha1($place->id . $lat . $lng) . '.webp';
+            if ($processor->saveAsWebp($binary, $path, 600, 72)) {
+                $oldPath = 'places/thumb_' . $place->id . '.jpg';
+                if (Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+            } else {
+                $path = 'places/thumb_' . $place->id . '.jpg';
+                Storage::disk('public')->put($path, $binary);
+            }
 
             $place->thumbnail = $path;
             $place->saveQuietly();

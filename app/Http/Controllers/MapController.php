@@ -19,7 +19,8 @@ class MapController extends Controller
             $places = Place::where('user_id', $request->user()->id)
                 ->where('is_visible', true)
                 ->whereNotNull('lat')->whereNotNull('lng')
-                ->with(['category', 'images' => fn ($q) => $q->orderBy('sort_order')->limit(1)])
+                ->select(['id', 'name', 'category_id', 'lat', 'lng', 'is_overseas', 'status', 'thumbnail', 'user_id'])
+                ->with(['category:id,name,icon,color', 'images' => fn ($q) => $q->select(['id', 'place_id', 'path', 'sort_order'])->orderBy('sort_order')])
                 ->get();
         }
 

@@ -38,6 +38,11 @@ if [ "$DO_MIGRATE" = "1" ]; then
     php artisan migrate --force
 fi
 
+log "CSS 미니파이"
+if command -v npx &>/dev/null; then
+    npx --yes csso-cli public/css/app.css --output public/css/app.min.css 2>/dev/null && ok "app.min.css 생성" || echo "  CSS 미니파이 건너뜀"
+fi
+
 log "캐시 비우기"
 php artisan view:clear     >/dev/null
 php artisan config:clear   >/dev/null

@@ -93,9 +93,11 @@
 
 @push('head')
 @if($naverClientId)
+<link rel="preconnect" href="https://oapi.map.naver.com" crossorigin>
 <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={{ $naverClientId }}"></script>
 @endif
 @if($googleMapsKey)
+<link rel="preconnect" href="https://maps.googleapis.com" crossorigin>
 <script src="https://maps.googleapis.com/maps/api/js?key={{ $googleMapsKey }}&loading=async" async defer></script>
 @endif
 @endpush

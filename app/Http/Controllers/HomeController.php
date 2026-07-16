@@ -32,17 +32,20 @@ class HomeController extends Controller
         if ($request->user()) {
             $uid = $request->user()->id;
 
-            $allPlaces = Place::where('user_id', $uid)
-                ->where('is_visible', true)
-                ->with(['category', 'images', 'themes'])
+            $baseQuery = Place::where('user_id', $uid)->where('is_visible', true);
+            $savedCount = (clone $baseQuery)->count();
+            $weekNewCount = (clone $baseQuery)->where('created_at', '>=', now()->subDays(7))->count();
+
+            $allPlaces = (clone $baseQuery)
+                ->select(['id', 'name', 'original_name', 'category_id', 'lat', 'lng', 'is_overseas',
+                    'status', 'thumbnail', 'memo', 'sort_order', 'created_at',
+                    'road_address', 'address', 'building_name', 'detail_location', 'user_id'])
+                ->with(['category:id,name,icon,color', 'images:id,place_id,path,sort_order', 'themes:id,name'])
                 ->latest()
                 ->get();
 
-            $savedCount = $allPlaces->count();
             $recentPlaces = $allPlaces->take(20);
             $categoryLatest = $allPlaces->groupBy('category_id')->map(fn($g) => $g->first());
-            $weekAgo = now()->subDays(7);
-            $weekNewCount = $allPlaces->filter(fn($p) => $p->created_at >= $weekAgo)->count();
 
             $filtered = $allPlaces;
             if ($selectedCategory) {

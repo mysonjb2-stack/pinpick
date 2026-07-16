@@ -64,6 +64,52 @@ class ImageProcessor
         return true;
     }
 
+    /**
+     * 기존 이미지 파일을 WebP로 변환 (원본 삭제).
+     * @return string|null 새 WebP 경로 (실패 시 null)
+     */
+    public function convertToWebp(string $storagePath, int $maxWidth = self::MAIN_MAX, int $quality = self::MAIN_QUALITY): ?string
+    {
+        $disk = Storage::disk('public');
+        if (!$disk->exists($storagePath)) return null;
+
+        $ext = strtolower(pathinfo($storagePath, PATHINFO_EXTENSION));
+        if ($ext === 'webp') return $storagePath;
+
+        try {
+            $image = $this->manager->decodePath($disk->path($storagePath));
+            $image->orient();
+            $image->scaleDown($maxWidth, $maxWidth);
+
+            $newPath = preg_replace('/\.[^.]+$/', '.webp', $storagePath);
+            $disk->put($newPath, (string) $image->encode(new WebpEncoder($quality)));
+
+            if ($newPath !== $storagePath) {
+                $disk->delete($storagePath);
+            }
+            return $newPath;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 바이너리 데이터를 WebP로 변환하여 저장.
+     */
+    public function saveAsWebp(string $binary, string $storagePath, int $maxWidth = self::MAIN_MAX, int $quality = self::MAIN_QUALITY): bool
+    {
+        try {
+            $image = $this->manager->decodeString($binary);
+            $image->scaleDown($maxWidth, $maxWidth);
+
+            $webpPath = preg_replace('/\.[^.]+$/', '.webp', $storagePath);
+            Storage::disk('public')->put($webpPath, (string) $image->encode(new WebpEncoder($quality)));
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public static function thumbPathFor(string $mainPath): string
     {
         $dir = dirname($mainPath);

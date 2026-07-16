@@ -415,7 +415,7 @@
                     <div class="pp-mine-grid__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
                         <span class="pp-mine-grid__check"><svg width="14" height="14" viewBox="0 0 22 22" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 11 10 15 16 7"/></svg></span>
                         @if($mapThumb)
-                            <img class="pp-mine-grid__thumb-img" src="{{ $mapThumb }}" alt="{{ $p->name }} 위치 지도" loading="lazy" onerror="this.remove()">
+                            <img class="pp-mine-grid__thumb-img" src="{{ $mapThumb }}" alt="{{ $p->name }} 위치 지도" loading="lazy" decoding="async" onerror="this.remove()">
                         @endif
                         @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
                         <span class="pp-mine-grid__badge pp-status-badge" data-place-id="{{ $p->id }}" data-status="{{ $p->status }}" data-visited-at="{{ $p->visited_at?->format('Y-m-d') ?? '' }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>

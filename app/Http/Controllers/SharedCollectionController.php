@@ -72,9 +72,14 @@ class SharedCollectionController extends Controller
             $thumbnailUrl = null;
             $sourcePath = $this->findThumbnailPath($place);
             if ($sourcePath && Storage::disk('public')->exists($sourcePath)) {
-                $ext = pathinfo($sourcePath, PATHINFO_EXTENSION);
+                $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
                 $destPath = "{$storageDir}/" . Str::random(20) . ".{$ext}";
                 Storage::disk('public')->copy($sourcePath, $destPath);
+                if ($ext !== 'webp') {
+                    $processor = app(ImageProcessor::class);
+                    $webpPath = $processor->convertToWebp($destPath, 800, 75);
+                    if ($webpPath) $destPath = $webpPath;
+                }
                 $thumbnailUrl = asset('storage/' . $destPath);
             }
 
@@ -118,7 +123,11 @@ class SharedCollectionController extends Controller
             return response()->view('shared.expired', [], 410);
         }
 
-        $collection->increment('view_count');
+        $viewKey = "shared_view:{$collection->id}:" . (request()->ip() ?? 'unknown');
+        if (!\Illuminate\Support\Facades\Cache::has($viewKey)) {
+            $collection->increment('view_count');
+            \Illuminate\Support\Facades\Cache::put($viewKey, true, 300);
+        }
         $collection->load(['places', 'user:id,name']);
 
         $userCategories = [];

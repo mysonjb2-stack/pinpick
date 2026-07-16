@@ -21,16 +21,16 @@
     <meta property="og:image" content="@yield('og_image', asset('images/og-image.png'))">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="dns-prefetch" href="//www.googletagmanager.com">
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
     <link rel="icon" href="{{ asset('favicon.ico') }}?v={{ filemtime(public_path('favicon.ico')) }}" sizes="any">
-    <link rel="icon" type="image/png" sizes="192x192" href="{{ asset('icon-192.png') }}?v={{ filemtime(public_path('icon-192.png')) }}">
-    <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('icon-512.png') }}?v={{ filemtime(public_path('icon-512.png')) }}">
     <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}?v={{ filemtime(public_path('apple-touch-icon.png')) }}">
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
+    @php $cssFile = file_exists(public_path('css/app.min.css')) ? 'css/app.min.css' : 'css/app.css'; @endphp
+    <link rel="stylesheet" href="{{ asset($cssFile) }}?v={{ filemtime(public_path($cssFile)) }}">
     @stack('head')
     <script>if(new URLSearchParams(location.search).get('reset_guest')==='1'){localStorage.removeItem('pinpick_guest_places');alert('게스트 저장 데이터 초기화 완료');history.replaceState(null,'',location.pathname);}</script>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HQK3JQ1XEJ"></script>
-    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-HQK3JQ1XEJ');</script>
+    <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-HQK3JQ1XEJ',{send_page_view:true});</script>
 </head>
 <body>
 <div class="pp-app @yield('app_class')">
@@ -80,7 +80,6 @@
         }
     });
 
-    // 터치 시작 시 링크 프리페치 — 탭→이동 사이 ~100ms 동안 미리 로드
     var prefetched = {};
     document.addEventListener('touchstart', function(e) {
         var a = e.target.closest('a[href]');
@@ -94,6 +93,15 @@
         link.href = url;
         document.head.appendChild(link);
     }, { passive: true });
+
+    // GA 지연 로딩
+    if (!window.__gaLoaded) {
+        window.__gaLoaded = true;
+        var gs = document.createElement('script');
+        gs.src = 'https://www.googletagmanager.com/gtag/js?id=G-HQK3JQ1XEJ';
+        gs.async = true;
+        document.head.appendChild(gs);
+    }
 })();
 </script>
 </body>
