@@ -17,7 +17,7 @@ class CategoryController extends Controller
 
         $items = Category::where('user_id', $request->user()->id)
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'icon', 'sort_order']);
+            ->get(['id', 'name', 'icon', 'color', 'sort_order']);
 
         return response()->json(['items' => $items]);
     }
@@ -29,6 +29,7 @@ class CategoryController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|max:30',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
         $userId = $request->user()->id;
@@ -39,6 +40,7 @@ class CategoryController extends Controller
             'user_id'    => $userId,
             'name'       => $data['name'],
             'icon'       => '📌',
+            'color'      => $data['color'] ?? null,
             'sort_order' => 0,
             'is_default' => false,
         ]);
@@ -46,6 +48,7 @@ class CategoryController extends Controller
         return response()->json(['ok' => true, 'item' => [
             'id' => $cat->id,
             'name' => $cat->name,
+            'color' => $cat->color,
             'is_default' => false,
         ]]);
     }
@@ -58,10 +61,14 @@ class CategoryController extends Controller
         abort_unless($category->user_id === $request->user()->id, 403);
 
         $data = $request->validate([
-            'name' => 'required|string|max:30',
+            'name' => 'sometimes|required|string|max:30',
+            'color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
-        $category->update(['name' => $data['name']]);
+        $update = [];
+        if (isset($data['name'])) $update['name'] = $data['name'];
+        if (array_key_exists('color', $data)) $update['color'] = $data['color'];
+        $category->update($update);
 
         return response()->json(['ok' => true, 'item' => $category]);
     }

@@ -20,6 +20,9 @@ class SocialAuthController extends Controller
         if ($provider === 'kakao') {
             $driver->scopes(['profile_nickname', 'profile_image', 'account_email']);
         }
+        if ($provider === 'apple') {
+            $driver->scopes(['name', 'email']);
+        }
 
         return $driver->redirect();
     }
@@ -69,6 +72,7 @@ class SocialAuthController extends Controller
             'kakao' => $this->fetchKakaoUser($token),
             'google' => $this->fetchGoogleUser($token),
             'naver' => $this->fetchNaverUser($token),
+            'apple' => $this->fetchAppleUser($token, $request->input('name')),
         };
 
         if (!$userInfo) {
@@ -206,6 +210,36 @@ class SocialAuthController extends Controller
         ];
     }
 
+    private function fetchAppleUser(string $token, ?string $name = null): ?array
+    {
+        // JWT id_token 형식
+        if (substr_count($token, '.') === 2) {
+            $payload = $this->decodeJwt($token);
+            if ($payload && !empty($payload['sub'])) {
+                if (($payload['iss'] ?? '') === 'https://appleid.apple.com') {
+                    return [
+                        'id' => (string) $payload['sub'],
+                        'name' => $name ?: ($payload['name'] ?? null),
+                        'email' => $payload['email'] ?? null,
+                        'avatar' => null,
+                    ];
+                }
+            }
+        }
+
+        // 앱에서 보내는 plain userIdentifier (Apple sub ID)
+        if (strlen($token) > 10 && !str_contains($token, ' ')) {
+            return [
+                'id' => $token,
+                'name' => $name,
+                'email' => null,
+                'avatar' => null,
+            ];
+        }
+
+        return null;
+    }
+
     private function isAppWebview(): bool
     {
         return str_contains(request()->header('User-Agent', ''), 'MYPINPICK');
@@ -243,6 +277,6 @@ class SocialAuthController extends Controller
 
     private function validateProvider(string $provider): void
     {
-        abort_unless(in_array($provider, ['kakao', 'google', 'naver'], true), 404);
+        abort_unless(in_array($provider, ['kakao', 'google', 'naver', 'apple'], true), 404);
     }
 }

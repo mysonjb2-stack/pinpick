@@ -289,20 +289,19 @@
         let webUrl, appUrl;
         if (PLACE.is_overseas) {
             if (isRoute) {
-                appUrl = `comgooglemaps://?daddr=${PLACE.lat},${PLACE.lng}&directionsmode=driving`;
-                webUrl = `https://www.google.com/maps/dir/?api=1&destination=${PLACE.lat},${PLACE.lng}`;
+                webUrl = `https://www.google.com/maps/dir/?api=1&destination=${PLACE.lat},${PLACE.lng}&travelmode=driving`;
             } else {
-                appUrl = `comgooglemaps://?q=${PLACE.lat},${PLACE.lng}(${encName})`;
                 webUrl = `https://www.google.com/maps/search/?api=1&query=${PLACE.lat},${PLACE.lng}`;
             }
+            window.open(webUrl, '_blank');
+            return;
+        }
+        if (isRoute) {
+            appUrl = `nmap://route/car?dlat=${PLACE.lat}&dlng=${PLACE.lng}&dname=${encName}&appname=net.mypinpick`;
+            webUrl = `https://map.naver.com/p/directions/-/${PLACE.lng},${PLACE.lat},${encName},,PLACE_POI/-/car`;
         } else {
-            if (isRoute) {
-                appUrl = `nmap://route/car?dlat=${PLACE.lat}&dlng=${PLACE.lng}&dname=${encName}&appname=net.mypinpick`;
-                webUrl = `https://map.naver.com/p/directions/-/${PLACE.lng},${PLACE.lat},${encName},,PLACE_POI/-/car`;
-            } else {
-                appUrl = `nmap://place?lat=${PLACE.lat}&lng=${PLACE.lng}&name=${encName}&appname=net.mypinpick`;
-                webUrl = `https://map.naver.com/p/search/${encName}/place/?c=15,0,0,0,dh`;
-            }
+            appUrl = `nmap://place?lat=${PLACE.lat}&lng=${PLACE.lng}&name=${encName}&appname=net.mypinpick`;
+            webUrl = `https://map.naver.com/p/search/${encName}/place/?c=15,0,0,0,dh`;
         }
         if (mobile) {
             const t = Date.now();

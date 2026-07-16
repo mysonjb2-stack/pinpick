@@ -12,6 +12,7 @@
         "laravel/framework": "^13.0",
         "laravel/socialite": "^5.26",
         "laravel/tinker": "^3.0",
+        "socialiteproviders/apple": "^5.10",
         "socialiteproviders/kakao": "^4.3",
         "socialiteproviders/naver": "^4.1"
     },

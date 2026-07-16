@@ -10,6 +10,9 @@
     </button>
     <div class="pp-header__title">장소 상세</div>
     <div class="pp-header__spacer"></div>
+    <button type="button" class="pp-header__icon" id="ppDetailShareBtn" aria-label="공유">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
     <div class="pp-header__more" id="ppMoreWrap">
         <button type="button" class="pp-header__icon" id="ppMoreBtn" aria-label="더보기" aria-haspopup="menu" aria-expanded="false">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -79,7 +82,7 @@
             <div class="pp-card__body">
                 <div class="pp-card__name">{{ $place->name }}</div>
                 <div class="pp-card__meta">
-                    <span>{{ $place->category?->name ?? '' }}</span>
+                    <span>@if($place->category?->color)<span class="pp-cat-dot" style="background:{{ $place->category->color }}"></span>@endif{{ $place->category?->name ?? '' }}</span>
                     @if($place->themes->isNotEmpty())
                         <span class="pp-meta-dot" aria-hidden="true"></span>
                         @foreach($place->themes as $theme)
@@ -89,7 +92,7 @@
                 </div>
             </div>
             <div class="pp-card__status-wrap">
-                <button type="button" class="pp-status-toggle" id="ppStatusToggle" data-place-id="{{ $place->id }}" data-status="{{ $place->status }}">
+                <button type="button" class="pp-status-toggle" id="ppStatusToggle" data-place-id="{{ $place->id }}" data-status="{{ $place->status }}" data-visited-at="{{ $place->visited_at?->format('Y-m-d') ?? '' }}">
                     <span class="pp-status-pop__dot pp-status-pop__dot--{{ $place->status }}"></span>
                     <span id="ppStatusLabel">{{ $place->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -196,7 +199,7 @@
             @else
                 <button type="button" onclick="ppOpenRoute('naver', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-dirs__btn">
                     <span class="pp-dirs__ico pp-dirs__ico--naver">N</span>
-                    <span class="pp-dirs__lab">네이버지도 길찾기</span>
+                    <span class="pp-dirs__lab">네이버 길찾기</span>
                 </button>
                 <button type="button" onclick="ppOpenRoute('kakao', {{ $place->lat }}, {{ $place->lng }}, @js($place->name))" class="pp-dirs__btn">
                     <span class="pp-dirs__ico pp-dirs__ico--kakao">K</span>
@@ -386,12 +389,13 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
     const encName = encodeURIComponent(name);
     let webUrl, appUrl;
 
-    if (provider === 'kakao') {
+    if (provider === 'google') {
+        webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+        window.open(webUrl, '_blank');
+        return;
+    } else if (provider === 'kakao') {
         appUrl = `kakaomap://route?ep=${lat},${lng}&by=CAR&dname=${encName}`;
         webUrl = `https://map.kakao.com/link/to/${encName},${lat},${lng}`;
-    } else if (provider === 'google') {
-        appUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
-        webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${encName}`;
     } else {
         appUrl = `nmap://route/car?dlat=${lat}&dlng=${lng}&dname=${encName}&appname=net.mypinpick`;
         webUrl = `https://map.naver.com/p/directions/-/${lng},${lat},${encName},,PLACE_POI/-/car`;
@@ -706,98 +710,323 @@ document.querySelectorAll('.pp-loc__copy').forEach(btn => {
     let activePop = null;
 
     function closePop() { if (activePop) { activePop.remove(); activePop = null; } }
+    function fmtDate(d) { return d.replace(/-/g, '.'); }
+    function fmtDateKo(d) { const p = d.split('-'); return parseInt(p[1]) + '월 ' + parseInt(p[2]) + '일'; }
+
+    function buildPopHtml(curStatus, visitedAt) {
+        if (curStatus === 'planned') {
+            return `
+                <button type="button" class="pp-status-pop__item is-current" data-action="noop">
+                    <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정
+                    <span class="pp-status-pop__cur">(현재)</span>
+                </button>
+                <button type="button" class="pp-status-pop__item" data-action="visit-today">
+                    <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>방문완료로 변경
+                </button>
+                <button type="button" class="pp-status-pop__item" data-action="visit-pick">
+                    <span class="pp-status-pop__ico">📅</span>다른 날짜로 완료 기록
+                </button>`;
+        }
+        return `
+            <button type="button" class="pp-status-pop__item is-current" data-action="noop">
+                <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>
+                <span>방문완료 <span class="pp-status-pop__cur">(현재)</span>${visitedAt ? '<span class="pp-status-pop__sub">' + fmtDate(visitedAt) + '</span>' : ''}</span>
+            </button>
+            <button type="button" class="pp-status-pop__item" data-action="visit-pick">
+                <span class="pp-status-pop__ico">📅</span>방문 날짜 변경
+            </button>
+            <button type="button" class="pp-status-pop__item" data-action="revert">
+                <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정으로 되돌리기
+            </button>`;
+    }
+
+    function openDatePicker(cb) {
+        const inp = document.createElement('input');
+        inp.type = 'date';
+        inp.max = new Date().toISOString().slice(0, 10);
+        inp.style.cssText = 'position:fixed;left:-9999px;top:50%;opacity:0';
+        document.body.appendChild(inp);
+        inp.addEventListener('change', () => { cb(inp.value); inp.remove(); });
+        inp.addEventListener('blur', () => setTimeout(() => inp.remove(), 300));
+        inp.showPicker ? inp.showPicker() : inp.click();
+    }
+
+    function updateUI(status, visitedAt) {
+        toggle.dataset.status = status;
+        toggle.dataset.visitedAt = visitedAt || '';
+        label.textContent = status === 'visited' ? '방문완료' : '방문예정';
+        const dot = toggle.querySelector('.pp-status-pop__dot');
+        dot.className = 'pp-status-pop__dot pp-status-pop__dot--' + status;
+        const wrap = toggle.closest('.pp-card__status-wrap');
+        if (status === 'visited' && visitedAt) {
+            if (!dateEl && wrap) {
+                dateEl = document.createElement('div');
+                dateEl.id = 'ppStatusDate';
+                dateEl.className = 'pp-card__status-date';
+                wrap.appendChild(dateEl);
+            }
+            if (dateEl) dateEl.textContent = '방문일: ' + fmtDate(visitedAt);
+        } else if (status === 'planned') {
+            if (dateEl) dateEl.textContent = '';
+        }
+    }
 
     toggle.addEventListener('click', (e) => {
         e.stopPropagation();
         if (activePop) { closePop(); return; }
         const curStatus = toggle.dataset.status;
+        const visitedAt = toggle.dataset.visitedAt || '';
         const pop = document.createElement('div');
         pop.className = 'pp-status-pop';
-        pop.innerHTML = `
-            <button type="button" class="pp-status-pop__item ${curStatus==='planned'?'is-current':''}" data-val="planned">
-                <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정
-            </button>
-            <button type="button" class="pp-status-pop__item ${curStatus==='visited'?'is-current':''}" data-val="visited">
-                <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>방문완료
-            </button>
-        `;
+        pop.innerHTML = buildPopHtml(curStatus, visitedAt);
         const rect = toggle.getBoundingClientRect();
         pop.style.position = 'fixed';
         pop.style.top = (rect.bottom + 6) + 'px';
-        pop.style.left = Math.max(8, rect.left) + 'px';
+        pop.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+        pop.style.left = 'auto';
         document.body.appendChild(pop);
         requestAnimationFrame(() => pop.classList.add('is-show'));
         activePop = pop;
 
-        pop.addEventListener('click', async (ev) => {
+        pop.addEventListener('click', (ev) => {
             const item = ev.target.closest('.pp-status-pop__item');
             if (!item) return;
-            const newStatus = item.dataset.val;
-            const oldStatus = curStatus;
+            const action = item.dataset.action;
             closePop();
-            if (newStatus === oldStatus) return;
-
-            toggle.dataset.status = newStatus;
-            label.textContent = newStatus === 'visited' ? '방문완료' : '방문예정';
-            const dot = toggle.querySelector('.pp-status-pop__dot');
-            dot.className = 'pp-status-pop__dot pp-status-pop__dot--' + newStatus;
-
-            const today = new Date().toISOString().slice(0,10);
-            const wrap = toggle.closest('.pp-card__status-wrap');
-            if (newStatus === 'visited') {
-                if (!dateEl && wrap) {
-                    dateEl = document.createElement('div');
-                    dateEl.id = 'ppStatusDate';
-                    dateEl.className = 'pp-card__status-date';
-                    wrap.appendChild(dateEl);
-                }
-                if (dateEl) dateEl.textContent = '방문일: ' + today.replace(/-/g, '.');
-            } else {
-                if (dateEl) { dateEl.textContent = ''; }
-            }
-
-            try {
-                const r = await fetch(`/api/places/${placeId}/status`, {
-                    method: 'PATCH',
-                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ status: newStatus, visited_at: newStatus === 'visited' ? today : null })
-                });
-                const j = await r.json();
-                if (!j.ok) throw new Error();
-                showStatusToast(newStatus === 'visited' ? '방문완료로 변경했어요' : '방문예정으로 변경했어요', placeId, oldStatus);
-            } catch {
-                toggle.dataset.status = oldStatus;
-                label.textContent = oldStatus === 'visited' ? '방문완료' : '방문예정';
-                dot.className = 'pp-status-pop__dot pp-status-pop__dot--' + oldStatus;
+            if (action === 'noop') return;
+            const oldStatus = curStatus;
+            const oldVisitedAt = visitedAt;
+            if (action === 'visit-today') {
+                const today = new Date().toISOString().slice(0, 10);
+                applyStatus(today, oldStatus, oldVisitedAt);
+            } else if (action === 'visit-pick') {
+                openDatePicker((d) => { if (d) applyStatus(d, oldStatus, oldVisitedAt); });
+            } else if (action === 'revert') {
+                applyStatus(null, oldStatus, oldVisitedAt);
             }
         });
     });
 
-    function showStatusToast(msg, pid, prevStatus) {
+    async function applyStatus(visitedAt, oldStatus, oldVisitedAt) {
+        const newStatus = visitedAt ? 'visited' : 'planned';
+        updateUI(newStatus, visitedAt);
+        try {
+            const r = await fetch(`/api/places/${placeId}/status`, {
+                method: 'PATCH',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ status: newStatus, visited_at: visitedAt || null })
+            });
+            const j = await r.json();
+            if (!j.ok) throw new Error();
+            if (newStatus === 'visited') {
+                showStatusToast(fmtDateKo(visitedAt) + ' 방문완료로 기록했어요', oldStatus, oldVisitedAt, visitedAt);
+            } else {
+                showStatusToast('방문예정으로 되돌렸어요', oldStatus, oldVisitedAt);
+            }
+        } catch {
+            updateUI(oldStatus, oldVisitedAt);
+        }
+    }
+
+    function showStatusToast(msg, prevStatus, prevVisitedAt, newVisitedAt) {
         let t = document.getElementById('ppToast');
         if (!t) { t = document.createElement('div'); t.id = 'ppToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
         const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        t.innerHTML = esc(msg) + '<button type="button" class="pp-toast__undo">되돌리기</button>';
+        let actions = '';
+        if (newVisitedAt) actions += '<button type="button" class="pp-toast__undo" data-role="change-date">날짜 변경</button>';
+        actions += '<button type="button" class="pp-toast__undo" data-role="undo">되돌리기</button>';
+        t.innerHTML = esc(msg) + actions;
         t.classList.add('is-show');
-        let undone = false;
+        let done = false;
         const timer = setTimeout(() => t.classList.remove('is-show'), 5000);
-        t.querySelector('.pp-toast__undo').addEventListener('click', async () => {
-            if (undone) return; undone = true;
+
+        const changeDateBtn = t.querySelector('[data-role="change-date"]');
+        if (changeDateBtn) {
+            changeDateBtn.addEventListener('click', () => {
+                if (done) return; done = true;
+                clearTimeout(timer);
+                t.classList.remove('is-show');
+                openDatePicker(async (d) => {
+                    if (!d) return;
+                    updateUI('visited', d);
+                    try {
+                        await fetch(`/api/places/${placeId}/status`, {
+                            method: 'PATCH',
+                            headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                            body: JSON.stringify({ status: 'visited', visited_at: d })
+                        });
+                    } catch {}
+                    showStatusToast(fmtDateKo(d) + '로 변경했어요', null, null);
+                });
+            }, { once: true });
+        }
+
+        t.querySelector('[data-role="undo"]').addEventListener('click', async () => {
+            if (done) return; done = true;
             clearTimeout(timer);
             t.classList.remove('is-show');
             try {
-                await fetch(`/api/places/${pid}/status`, {
+                await fetch(`/api/places/${placeId}/status`, {
                     method: 'PATCH',
                     headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ status: prevStatus, visited_at: prevStatus === 'visited' ? new Date().toISOString().slice(0,10) : null })
+                    body: JSON.stringify({ status: prevStatus, visited_at: prevVisitedAt || null })
                 });
             } catch {}
-            location.reload();
+            if (prevStatus) { updateUI(prevStatus, prevVisitedAt); }
+            showToastSimple('되돌렸어요');
         }, { once: true });
+    }
+
+    function showToastSimple(msg) {
+        let t = document.getElementById('ppToast');
+        if (!t) { t = document.createElement('div'); t.id = 'ppToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
+        t.textContent = msg;
+        t.classList.add('is-show');
+        setTimeout(() => t.classList.remove('is-show'), 2500);
     }
 
     document.addEventListener('click', closePop);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
+})();
+
+// ── 단일 장소 공유 ──
+(function(){
+    const btn = document.getElementById('ppDetailShareBtn');
+    if (!btn) return;
+    const placeId = {{ $place->id }};
+    const placeName = @js($place->name);
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    const sheet = document.createElement('div');
+    sheet.className = 'pp-share-sheet';
+    sheet.id = 'ppShareSheet';
+    sheet.innerHTML = `
+        <div class="pp-share-sheet__backdrop" data-close-share></div>
+        <div class="pp-share-sheet__panel">
+            <div class="pp-share-sheet__handle"></div>
+            <div class="pp-share-sheet__head">
+                <h3 class="pp-share-sheet__title">장소 공유</h3>
+                <button type="button" class="pp-share-sheet__close" data-close-share aria-label="닫기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="pp-share-sheet__field">
+                <label class="pp-share-sheet__label">공유 제목</label>
+                <input type="text" class="pp-share-sheet__input" id="ppShareTitle" maxlength="100">
+            </div>
+            <div class="pp-share-sheet__field">
+                <label class="pp-share-sheet__label">장소명 표시 방식</label>
+                <label class="pp-share-sheet__radio">
+                    <input type="radio" name="shareMode" value="original" checked>
+                    <span>기본 장소명으로 보내기</span>
+                </label>
+                <label class="pp-share-sheet__radio">
+                    <input type="radio" name="shareMode" value="custom">
+                    <span>내가 지은 이름과 메모 포함</span>
+                </label>
+                <p class="pp-share-sheet__hint" id="ppShareModeHint" hidden>직접 입력한 장소명과 메모가 상대방에게 그대로 보여요</p>
+            </div>
+            <div class="pp-share-sheet__buttons">
+                <button type="button" class="pp-btn pp-btn--kakao-share" id="ppShareKakao">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.7 6.78-.2.74-.75 2.81-.86 3.25-.14.55.2.54.42.4.17-.12 2.7-1.84 3.79-2.58.64.1 1.3.15 1.95.15 5.52 0 10-3.58 10-8S17.52 3 12 3z"/></svg>
+                    카카오톡으로 공유
+                </button>
+                <button type="button" class="pp-btn pp-btn--ghost" id="ppShareNative" hidden>다른 앱으로 공유</button>
+                <button type="button" class="pp-btn pp-btn--ghost" id="ppShareCopyLink">링크 복사</button>
+            </div>
+        </div>`;
+    document.body.appendChild(sheet);
+
+    const titleInput = sheet.querySelector('#ppShareTitle');
+    const modeHint = sheet.querySelector('#ppShareModeHint');
+
+    sheet.querySelectorAll('input[name="shareMode"]').forEach(r => {
+        r.addEventListener('change', () => { modeHint.hidden = r.value !== 'custom' || !r.checked; });
+    });
+
+    btn.addEventListener('click', () => {
+        titleInput.value = placeName;
+        sheet.classList.add('is-open');
+    });
+
+    sheet.querySelectorAll('[data-close-share]').forEach(el => {
+        el.addEventListener('click', () => sheet.classList.remove('is-open'));
+    });
+
+    async function createShare() {
+        const mode = sheet.querySelector('input[name="shareMode"]:checked')?.value || 'original';
+        try {
+            const res = await fetch('/api/share', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ place_ids: [placeId], title: titleInput.value.trim() || placeName, name_display_mode: mode }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                ppToast(err.message || '공유 생성에 실패했어요');
+                return null;
+            }
+            return await res.json();
+        } catch { ppToast('네트워크 오류가 발생했어요'); return null; }
+    }
+
+    const nativeBtn = sheet.querySelector('#ppShareNative');
+    if (nativeBtn && typeof navigator.share === 'function') {
+        nativeBtn.hidden = false;
+        nativeBtn.addEventListener('click', async () => {
+            const data = await createShare();
+            if (!data) return;
+            sheet.classList.remove('is-open');
+            try {
+                await navigator.share({ title: data.title, text: data.title + ' — 핀픽에서 확인하세요', url: data.url });
+            } catch (e) { if (e.name !== 'AbortError') ppToast('공유에 실패했어요'); }
+        });
+    }
+
+    sheet.querySelector('#ppShareCopyLink').addEventListener('click', async () => {
+        const data = await createShare();
+        if (!data) return;
+        sheet.classList.remove('is-open');
+        try {
+            if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(data.url);
+            else { const ta = document.createElement('textarea'); ta.value = data.url; ta.style.cssText = 'position:fixed;left:-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+            ppToast('링크가 복사됐어요');
+        } catch { ppToast('복사에 실패했어요'); }
+    });
+
+    sheet.querySelector('#ppShareKakao').addEventListener('click', async () => {
+        const data = await createShare();
+        if (!data) return;
+        sheet.classList.remove('is-open');
+        function send() {
+            if (!Kakao.isInitialized()) Kakao.init('{{ config("services.kakao.js_key") }}');
+            Kakao.Share.sendDefault({
+                objectType: 'feed',
+                content: {
+                    title: data.title,
+                    description: '장소 ' + data.place_count + '개 · 나만의 장소, 나만의 지도 핀픽',
+                    imageUrl: data.thumbnail_url || '{{ asset("images/og-image.png") }}',
+                    link: { mobileWebUrl: data.url, webUrl: data.url },
+                },
+                buttons: [{ title: '장소 확인하기', link: { mobileWebUrl: data.url, webUrl: data.url } }],
+            });
+        }
+        if (typeof Kakao === 'undefined') {
+            const s = document.createElement('script');
+            s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js';
+            s.onload = send;
+            s.onerror = () => ppToast('카카오 SDK를 불러오지 못했어요');
+            document.head.appendChild(s);
+        } else { send(); }
+    });
+
+    function ppToast(msg) {
+        let t = document.getElementById('ppToast');
+        if (!t) { t = document.createElement('div'); t.id = 'ppToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
+        t.textContent = msg;
+        t.classList.add('is-show');
+        setTimeout(() => t.classList.remove('is-show'), 2500);
+    }
 })();
 
 </script>

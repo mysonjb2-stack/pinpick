@@ -19,7 +19,12 @@
 
     <ul class="pp-catmgr__list" id="ppCatList">
         @foreach($categories as $c)
-            <li class="pp-catmgr__item" data-id="{{ $c->id }}" data-default="{{ $c->is_default ? '1' : '0' }}" data-original-name="{{ $c->name }}">
+            @php
+                $autoColors = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE','#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6','#C98A8A','#A7926B','#6F9FA7','#A39CB8'];
+                $displayColor = $c->color ?: ($autoColors[$loop->index % count($autoColors)] ?? '#888');
+            @endphp
+            <li class="pp-catmgr__item" data-id="{{ $c->id }}" data-default="{{ $c->is_default ? '1' : '0' }}" data-original-name="{{ $c->name }}" data-color="{{ $c->color ?? '' }}">
+                <button type="button" class="pp-catmgr__color-dot" style="background:{{ $displayColor }}" aria-label="색상 선택"></button>
                 <button type="button" class="pp-catmgr__up" aria-label="위로">↑</button>
                 <button type="button" class="pp-catmgr__down" aria-label="아래로">↓</button>
                 <input type="text" class="pp-catmgr__name" value="{{ $c->name }}" maxlength="30">
@@ -58,6 +63,45 @@
         setTimeout(()=>t.remove(), 2000);
     }
 
+    const CAT_PALETTE = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE','#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6'];
+    const FP = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE'];
+    const FB = ['#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6','#C98A8A','#A7926B','#6F9FA7','#A39CB8'];
+    function autoColor(idx) {
+        if (idx < 0) return '#888';
+        return idx < FP.length ? FP[idx] : FB[(idx - FP.length) % FB.length];
+    }
+
+    function togglePalette(li, dotBtn) {
+        const existing = li.querySelector('.pp-catmgr__palette');
+        if (existing) { existing.remove(); return; }
+        document.querySelectorAll('.pp-catmgr__palette').forEach(p => p.remove());
+        const pal = document.createElement('div');
+        pal.className = 'pp-catmgr__palette yg-catorder-palette';
+        const currentColor = li.dataset.color || '';
+        const idx = Array.from(list.children).indexOf(li);
+        const autoC = autoColor(idx);
+        pal.innerHTML = `<button type="button" class="yg-catorder-palette__item yg-catorder-palette__auto${!currentColor ? ' is-selected' : ''}" data-val="" title="자동"><span class="yg-catorder-palette__auto-ring" style="border-color:${autoC}"></span></button>` +
+            CAT_PALETTE.map(c =>
+                `<button type="button" class="yg-catorder-palette__item${currentColor === c ? ' is-selected' : ''}" data-val="${c}" style="background:${c}"></button>`
+            ).join('');
+        li.appendChild(pal);
+        pal.addEventListener('click', async (ev) => {
+            const btn = ev.target.closest('[data-val]');
+            if (!btn) return;
+            const val = btn.dataset.val;
+            li.dataset.color = val;
+            dotBtn.style.background = val || autoColor(idx);
+            try {
+                await fetch(`/api/categories/${li.dataset.id}`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ color: val || null })
+                });
+            } catch (e) { toast('색상 변경 실패', true); }
+            pal.remove();
+        });
+    }
+
     function refreshArrows(){
         const items = Array.from(list.children);
         items.forEach((it, i) => {
@@ -70,6 +114,11 @@
     list.addEventListener('click', (e) => {
         const li = e.target.closest('.pp-catmgr__item');
         if (!li) return;
+
+        if (e.target.closest('.pp-catmgr__color-dot')) {
+            togglePalette(li, e.target.closest('.pp-catmgr__color-dot'));
+            return;
+        }
 
         if (e.target.closest('.pp-catmgr__up') || e.target.closest('.pp-catmgr__down')) {
             const dir = e.target.closest('.pp-catmgr__up') ? -1 : 1;
@@ -110,7 +159,10 @@
         li.dataset.id = String(tempId);
         li.dataset.default = '0';
         li.dataset.originalName = '';
+        li.dataset.color = '';
+        const idx = list.children.length;
         li.innerHTML = `
+            <button type="button" class="pp-catmgr__color-dot" style="background:${autoColor(idx)}" aria-label="색상 선택"></button>
             <button type="button" class="pp-catmgr__up" aria-label="위로">↑</button>
             <button type="button" class="pp-catmgr__down" aria-label="아래로">↓</button>
             <input type="text" class="pp-catmgr__name" value="${trimmed.replace(/"/g,'&quot;')}" maxlength="30">

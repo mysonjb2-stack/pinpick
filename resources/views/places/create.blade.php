@@ -294,7 +294,10 @@
     </div>
 </div>
 
-<script id="initialCategories" type="application/json">@json($categories->map(fn($c) => ['id'=>$c->id,'name'=>$c->name,'is_default'=>(bool)$c->is_default]))</script>
+@php
+    $catJson = $categories->map(fn($c) => ['id'=>$c->id,'name'=>$c->name,'color'=>$c->color,'is_default'=>(bool)$c->is_default]);
+@endphp
+<script id="initialCategories" type="application/json">@json($catJson)</script>
 @endsection
 
 @push('head')
@@ -1700,15 +1703,27 @@ function guestAlert() {
     if (confirm('카테고리 편집은 로그인 후 사용할 수 있어요. 로그인하시겠어요?')) location.href = '{{ route('login') }}';
 }
 
+const CAT_PALETTE = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE','#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6'];
+const FP = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE'];
+const FB = ['#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6','#C98A8A','#A7926B','#6F9FA7','#A39CB8'];
+function autoColor(idx) {
+    if (idx < 0) return '#888';
+    return idx < FP.length ? FP[idx] : FB[(idx - FP.length) % FB.length];
+}
+
 function renderCatOrderList() {
     catList.innerHTML = '';
     catState.forEach((c, i) => {
+        const color = c.color || '';
+        const displayColor = color || autoColor(i);
         const li = document.createElement('li');
         li.className = 'yg-catorder-item';
         li.dataset.id = c.id;
         li.dataset.origName = c.name;
+        li.dataset.color = color;
         li.innerHTML = `
             <span class="yg-catorder-item__grip">☰</span>
+            <button type="button" class="yg-catorder-item__color-dot" style="background:${displayColor}" aria-label="색상 선택"></button>
             <input class="yg-catorder-item__input" type="text" value="${escapeHtml(c.name)}" maxlength="30">
             <div class="yg-catorder-item__btns">
                 <button type="button" class="yg-catorder-item__up" ${i === 0 ? 'disabled' : ''} aria-label="위로">↑</button>
@@ -1721,7 +1736,42 @@ function renderCatOrderList() {
         li.querySelector('.yg-catorder-item__up').addEventListener('click', () => moveCatItem(li, -1));
         li.querySelector('.yg-catorder-item__down').addEventListener('click', () => moveCatItem(li, 1));
         li.querySelector('.yg-catorder-item__del').addEventListener('click', () => deleteCatItem(li));
+        li.querySelector('.yg-catorder-item__color-dot').addEventListener('click', (e) => toggleCatPalette(li, e.currentTarget));
         catList.appendChild(li);
+    });
+}
+
+function toggleCatPalette(li, dotBtn) {
+    const existing = li.querySelector('.yg-catorder-palette');
+    if (existing) { existing.remove(); return; }
+    document.querySelectorAll('.yg-catorder-palette').forEach(p => p.remove());
+    const pal = document.createElement('div');
+    pal.className = 'yg-catorder-palette';
+    const currentColor = li.dataset.color || '';
+    const idx = catState.findIndex(c => String(c.id) === String(li.dataset.id));
+    const autoC = autoColor(idx);
+    pal.innerHTML = `<button type="button" class="yg-catorder-palette__item yg-catorder-palette__auto${!currentColor ? ' is-selected' : ''}" data-val="" title="자동"><span class="yg-catorder-palette__auto-ring" style="border-color:${autoC}"></span></button>` +
+        CAT_PALETTE.map(c =>
+            `<button type="button" class="yg-catorder-palette__item${currentColor === c ? ' is-selected' : ''}" data-val="${c}" style="background:${c}"></button>`
+        ).join('');
+    li.insertBefore(pal, li.querySelector('.yg-catorder-item__btns'));
+    pal.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-val]');
+        if (!btn) return;
+        const val = btn.dataset.val;
+        li.dataset.color = val;
+        const display = val || autoColor(idx);
+        dotBtn.style.background = display;
+        const found = catState.find(c => String(c.id) === String(li.dataset.id));
+        if (found) found.color = val || null;
+        try {
+            await fetch(`/api/categories/${li.dataset.id}`, {
+                method: 'PATCH',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ color: val || null })
+            });
+        } catch (e) { ppToast('색상 변경 실패', true); }
+        pal.remove();
     });
 }
 

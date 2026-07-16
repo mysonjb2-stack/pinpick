@@ -36,12 +36,12 @@ Route::get('/login', fn() => view('auth.login'))->name('login');
 
 // 소셜 로그인
 Route::get('/auth/{provider}', [SocialAuthController::class, 'redirect'])
-    ->where('provider', 'kakao|google|naver');
-Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])
-    ->where('provider', 'kakao|google|naver');
+    ->where('provider', 'kakao|google|naver|apple');
+Route::match(['get', 'post'], '/auth/{provider}/callback', [SocialAuthController::class, 'callback'])
+    ->where('provider', 'kakao|google|naver|apple');
 Route::post('/logout', [SocialAuthController::class, 'logout'])->name('logout');
 Route::post('/auth/native/{provider}', [SocialAuthController::class, 'nativeLogin'])
-    ->where('provider', 'kakao|google|naver');
+    ->where('provider', 'kakao|google|naver|apple');
 
 // 장소 (create 폼은 비로그인도 접근 가능 - 게스트는 localStorage 저장)
 Route::get('/places/create', [PlaceController::class, 'create'])->name('places.create');

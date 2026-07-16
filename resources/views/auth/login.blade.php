@@ -5,7 +5,7 @@
 @section('content')
 @php
     $lastLogin = request()->cookie('pp_last_login');
-    $lastLogin = in_array($lastLogin, ['kakao', 'naver', 'google'], true) ? $lastLogin : null;
+    $lastLogin = in_array($lastLogin, ['kakao', 'naver', 'google', 'apple'], true) ? $lastLogin : null;
 @endphp
 <div class="pp-login">
     <div class="pp-login__logo">핀픽</div>
@@ -39,6 +39,16 @@
         </button>
     </div>
 
+    <div class="pp-login__slot pp-login__slot--apple" id="ppAppleSlot" hidden>
+        @if($lastLogin === 'apple')
+            <div class="pp-login__tip">최근 사용한 로그인 방법</div>
+        @endif
+        <button type="button" onclick="handleAppleLogin()" class="pp-login__btn pp-login__btn--apple">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+            Apple로 시작하기
+        </button>
+    </div>
+
     <div style="margin-top:30px;font-size:12px;color:var(--pp-text-sub)">
         로그인 없이 최대 5개까지 임시 저장 가능해요
     </div>
@@ -50,9 +60,15 @@ function isPinpickApp() {
 }
 
 function handleSocialLogin(provider, handlerName) {
-    if (isPinpickApp() && window.webkit?.messageHandlers?.[handlerName]) {
-        window.webkit.messageHandlers[handlerName].postMessage('');
-        return;
+    if (isPinpickApp()) {
+        if (window.pinpick_aos && typeof window.pinpick_aos[handlerName] === 'function') {
+            window.pinpick_aos[handlerName]();
+            return;
+        }
+        if (window.webkit?.messageHandlers?.[handlerName]) {
+            window.webkit.messageHandlers[handlerName].postMessage('');
+            return;
+        }
     }
     location.href = '/auth/' + provider;
 }
@@ -60,6 +76,16 @@ function handleSocialLogin(provider, handlerName) {
 function handleKakaoLogin() { handleSocialLogin('kakao', 'kakaologin'); }
 function handleGoogleLogin() { handleSocialLogin('google', 'googlelogin'); }
 function handleNaverLogin() { handleSocialLogin('naver', 'naverlogin'); }
+function handleAppleLogin() { handleSocialLogin('apple', 'applelogin'); }
+
+// iOS 기기에서만 Apple 로그인 버튼 표시
+(function() {
+    var isIOS = /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent) && ('ontouchend' in document || navigator.maxTouchPoints > 0);
+    if (isIOS || isPinpickApp()) {
+        var el = document.getElementById('ppAppleSlot');
+        if (el) el.hidden = false;
+    }
+})();
 
 function nativeLoginSuccess(provider, accessToken) {
     fetch('/auth/native/' + provider, {
@@ -83,5 +109,19 @@ function nativeLoginSuccess(provider, accessToken) {
 window.onKakaoLoginSuccess = function(t) { nativeLoginSuccess('kakao', t); };
 window.onGoogleLoginSuccess = function(t) { nativeLoginSuccess('google', t); };
 window.onNaverLoginSuccess = function(t) { nativeLoginSuccess('naver', t); };
+window.onAppleLoginSuccess = function(t, name) {
+    fetch('/auth/native/apple', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ access_token: t, name: name || null })
+    })
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(r); })
+    .then(function(data) { if (data.success) location.href = data.redirect || '/'; })
+    .catch(function() { alert('로그인에 실패했어요. 다시 시도해주세요.'); });
+};
 </script>
 @endsection

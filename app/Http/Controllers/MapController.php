@@ -15,7 +15,7 @@ class MapController extends Controller
             CategoryController::ensureUserCategories($request->user());
             $categories = \App\Models\Category::where('user_id', $request->user()->id)
                 ->orderBy('sort_order')
-                ->get(['id', 'name', 'icon']);
+                ->get(['id', 'name', 'icon', 'color']);
             $places = Place::where('user_id', $request->user()->id)
                 ->where('is_visible', true)
                 ->whereNotNull('lat')->whereNotNull('lng')

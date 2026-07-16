@@ -105,11 +105,14 @@
 (function() {
     const CATEGORY_ORDER = @json($categories->pluck('id')->values());
     const CATEGORY_NAMES = @json($categories->pluck('name', 'id'));
+    const CATEGORY_COLORS = @json($categories->pluck('color', 'id'));
     const USER_NAME = @json(auth()->user()?->name ?? '내');
     const FIXED_PALETTE = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE'];
     const FALLBACK_PALETTE = ['#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6','#C98A8A','#A7926B','#6F9FA7','#A39CB8'];
     function catColor(id) {
         const n = Number(id);
+        const custom = CATEGORY_COLORS[n];
+        if (custom) return custom;
         const idx = CATEGORY_ORDER.indexOf(n);
         if (idx < 0) {
             if (Number.isFinite(n)) return FALLBACK_PALETTE[Math.abs(n) % FALLBACK_PALETTE.length];
@@ -165,11 +168,15 @@
 
     function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-    function pinHtml(label, count, color, active) {
-        const safe = label.length > 8 ? label.slice(0, 8) + '…' : label;
+    function pinHtml(label, count, color, active, visited) {
         const badge = count > 1 ? `<span class="pp-pin__count">${count}</span>` : '';
-        const cls = active ? 'pp-pin is-active' : 'pp-pin';
-        return `<div class="${cls}"><div class="pp-pin__label"><span class="pp-pin__label-dot" style="background:${color}"></span>${escapeHtml(safe)}${badge}</div><div class="pp-pin__tail"></div></div>`;
+        const isVisited = visited && count <= 1;
+        const cls = (active ? 'pp-pin is-active' : 'pp-pin') + (isVisited ? ' pp-pin--visited' : '');
+        const dot = `<span class="pp-pin__label-dot" style="background:${color}"></span>`;
+        const check = isVisited
+            ? `<span class="pp-pin__label-check" style="color:${color}"><svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5 6.5 5 9 9.5 3.5"/></svg></span>`
+            : '';
+        return `<div class="${cls}"><div class="pp-pin__label">${dot}<span class="pp-pin__label-text">${escapeHtml(label)}</span>${check}${badge}</div><div class="pp-pin__tail"></div></div>`;
     }
 
     const PROVINCE_MAP = {
@@ -312,10 +319,10 @@
             const marker = new naver.maps.Marker({
                 position: new naver.maps.LatLng(head.lat, head.lng),
                 map: nMap,
-                icon: { content: pinHtml(label, group.length, color, false), anchor: new naver.maps.Point(0, 0) },
+                icon: { content: pinHtml(label, group.length, color, false, head.status === 'visited'), anchor: new naver.maps.Point(0, 0) },
                 title: head.name,
             });
-            marker._label = label; marker._count = group.length; marker._color = color;
+            marker._label = label; marker._count = group.length; marker._color = color; marker._visited = head.status === 'visited';
             naver.maps.Event.addListener(marker, 'click', () => {
                 if (group.length === 1) { setNaverActive(marker); openSheet(head); }
                 else { nMap.setCenter(marker.getPosition()); nMap.setZoom(Math.min(nMap.getZoom() + 2, 19)); }
@@ -325,9 +332,9 @@
     }
     function setNaverActive(m) {
         if (nActive && nActive !== m) {
-            nActive.setIcon({ content: pinHtml(nActive._label, nActive._count, nActive._color, false), anchor: new naver.maps.Point(0, 0) });
+            nActive.setIcon({ content: pinHtml(nActive._label, nActive._count, nActive._color, false, nActive._visited), anchor: new naver.maps.Point(0, 0) });
         }
-        if (m) m.setIcon({ content: pinHtml(m._label, m._count, m._color, true), anchor: new naver.maps.Point(0, 0) });
+        if (m) m.setIcon({ content: pinHtml(m._label, m._count, m._color, true, m._visited), anchor: new naver.maps.Point(0, 0) });
         nActive = m;
     }
 
@@ -401,20 +408,21 @@
             const label = group.length > 1 ? `${head.name} 외 ${group.length - 1}` : head.name;
             const color = catColor(head.category_id);
             const pos = new google.maps.LatLng(head.lat, head.lng);
-            const overlay = new HtmlOverlay(pos, pinHtml(label, group.length, color, false), () => {
+            const visited = head.status === 'visited';
+            const overlay = new HtmlOverlay(pos, pinHtml(label, group.length, color, false, visited), () => {
                 if (group.length === 1) { setGoogleActive(overlay); openSheet(head); }
                 else { gMap.setCenter(pos); gMap.setZoom(Math.min(gMap.getZoom() + 2, 19)); }
             });
-            overlay._label = label; overlay._count = group.length; overlay._color = color;
+            overlay._label = label; overlay._count = group.length; overlay._color = color; overlay._visited = visited;
             overlay.setMap(gMap);
             gMarkers.push(overlay);
         });
     }
     function setGoogleActive(o) {
         if (gActive && gActive !== o) {
-            gActive.setHtml(pinHtml(gActive._label, gActive._count, gActive._color, false));
+            gActive.setHtml(pinHtml(gActive._label, gActive._count, gActive._color, false, gActive._visited));
         }
-        if (o) o.setHtml(pinHtml(o._label, o._count, o._color, true));
+        if (o) o.setHtml(pinHtml(o._label, o._count, o._color, true, o._visited));
         gActive = o;
     }
 

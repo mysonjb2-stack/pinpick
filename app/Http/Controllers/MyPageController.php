@@ -57,7 +57,7 @@ class MyPageController extends Controller
     {
         CategoryController::ensureUserCategories($request->user());
         $categories = \App\Models\Category::where('user_id', $request->user()->id)
-            ->orderBy('sort_order')->get(['id', 'name', 'icon', 'sort_order', 'is_default']);
+            ->orderBy('sort_order')->get(['id', 'name', 'icon', 'color', 'sort_order', 'is_default']);
         return view('mypage.categories', compact('categories'));
     }
 

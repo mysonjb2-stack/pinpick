@@ -127,7 +127,7 @@
                         @php $thumbUrl = $p->images->first() ? $p->images->first()->thumb_url : ($p->thumbnail ? asset('storage/' . $p->thumbnail) : null); @endphp
                         <div class="pp-rspot__thumb"@if($thumbUrl) style="background-image:url('{{ $thumbUrl }}');background-size:cover;background-position:center"@endif>
                             @unless($thumbUrl)<span class="pp-rspot__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
-                            <span class="pp-rspot__badge pp-status-badge" data-place-id="{{ $p->id }}" data-status="{{ $p->status }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                            <span class="pp-rspot__badge pp-status-badge" data-place-id="{{ $p->id }}" data-status="{{ $p->status }}" data-visited-at="{{ $p->visited_at?->format('Y-m-d') ?? '' }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                             @if($p->status === 'visited' && $p->visited_at)
                                 <span class="pp-rspot__date pp-status-date" data-place-id="{{ $p->id }}">{{ $p->visited_at->format('Y.m.d') }}</span>
                             @endif
@@ -135,7 +135,7 @@
                         <div class="pp-rspot__body">
                             <div class="pp-rspot__name">{{ $p->name }}</div>
                             <div class="pp-rspot__meta">
-                                <span>{{ $p->category?->name ?? '' }}</span>
+                                <span><span class="pp-cat-dot" data-cat-color="{{ $p->category_id }}"></span>{{ $p->category?->name ?? '' }}</span>
                                 @if($p->themes->isNotEmpty())
                                     <span class="pp-meta-dot" aria-hidden="true"></span>
                                     @foreach($p->themes->take(2) as $theme)
@@ -396,7 +396,7 @@
         {{-- 카테고리 관리/게스트 JS 의존 히든 메타 소스 --}}
         <div class="yg-mycat-meta" hidden aria-hidden="true">
             @foreach($categories as $c)
-                <section class="yg-mycat" data-cat-id="{{ $c->id }}" data-sort="{{ $c->sort_order }}">
+                <section class="yg-mycat" data-cat-id="{{ $c->id }}" data-sort="{{ $c->sort_order }}" data-color="{{ $c->color ?? '' }}">
                     <span class="yg-mycat__catname">{{ $c->name }}</span>
                 </section>
             @endforeach
@@ -418,7 +418,7 @@
                             <img class="pp-mine-grid__thumb-img" src="{{ $mapThumb }}" alt="{{ $p->name }} 위치 지도" loading="lazy" onerror="this.remove()">
                         @endif
                         @unless($thumbUrl)<span class="pp-mine-grid__ph">{{ $p->category?->icon ?? '📌' }}</span>@endunless
-                        <span class="pp-mine-grid__badge pp-status-badge" data-place-id="{{ $p->id }}" data-status="{{ $p->status }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
+                        <span class="pp-mine-grid__badge pp-status-badge" data-place-id="{{ $p->id }}" data-status="{{ $p->status }}" data-visited-at="{{ $p->visited_at?->format('Y-m-d') ?? '' }}">{{ $p->status === 'visited' ? '방문완료' : '방문예정' }}</span>
                         <span class="pp-mine-grid__region {{ $p->is_overseas ? 'is-overseas' : '' }}">{{ $p->is_overseas ? '해외' : '국내' }}</span>
                         @if($p->status === 'visited' && $p->visited_at)
                             <span class="pp-mine-grid__date pp-status-date" data-place-id="{{ $p->id }}">{{ $p->visited_at->format('Y.m.d') }}</span>
@@ -431,7 +431,7 @@
                     <div class="pp-mine-grid__body">
                         <div class="pp-mine-grid__name">{{ $p->name }}</div>
                         <div class="pp-mine-grid__meta">
-                            <span class="pp-mine-grid__cat">{{ $p->category?->name ?? '' }}</span>
+                            <span class="pp-mine-grid__cat"><span class="pp-cat-dot" data-cat-color="{{ $p->category_id }}"></span>{{ $p->category?->name ?? '' }}</span>
                             @if($p->themes->isNotEmpty())
                                 <span class="pp-mine-grid__dot" aria-hidden="true">·</span>
                                 <span class="pp-card-theme-badge">{{ $p->themes->first()->name }}</span>
@@ -517,6 +517,7 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.7 6.78-.2.74-.75 2.81-.86 3.25-.14.55.2.54.42.4.17-.12 2.7-1.84 3.79-2.58.64.1 1.3.15 1.95.15 5.52 0 10-3.58 10-8S17.52 3 12 3z"/></svg>
                 카카오톡으로 공유
             </button>
+            <button type="button" class="pp-btn pp-btn--ghost" id="ppShareNative" hidden>다른 앱으로 공유</button>
             <button type="button" class="pp-btn pp-btn--ghost" id="ppShareCopyLink">링크 복사</button>
         </div>
     </div>
@@ -549,6 +550,24 @@
 @endsection
 
 @push('scripts')
+<script>
+window.ppCatColor = (function() {
+    const COLORS = @json($categories->pluck('color', 'id'));
+    const ORDER = @json($categories->pluck('id')->values());
+    const FP = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE'];
+    const FB = ['#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6','#C98A8A','#A7926B','#6F9FA7','#A39CB8'];
+    return function(id) {
+        const n = Number(id);
+        if (COLORS[n]) return COLORS[n];
+        const idx = ORDER.indexOf(n);
+        if (idx < 0) return Number.isFinite(n) ? FB[Math.abs(n) % FB.length] : '#888';
+        return idx < FP.length ? FP[idx] : FB[(idx - FP.length) % FB.length];
+    };
+})();
+document.querySelectorAll('[data-cat-color]').forEach(el => {
+    el.style.backgroundColor = window.ppCatColor(el.dataset.catColor);
+});
+</script>
 @auth
 <script>
 // 비로그인 저장 장소 → 로그인 계정으로 이관 (카테고리 배정 단계 포함)
@@ -832,6 +851,20 @@
         ta.select();
         document.execCommand('copy');
         ta.remove();
+    }
+
+    const nativeBtn = document.getElementById('ppShareNative');
+    if (nativeBtn && typeof navigator.share === 'function') {
+        nativeBtn.hidden = false;
+        nativeBtn.addEventListener('click', async () => {
+            const data = await createShare();
+            if (!data) return;
+            shareSheet.classList.remove('is-open');
+            window.__sharePendingPlaceIds = null;
+            try {
+                await navigator.share({ title: data.title, text: data.title + ' — 핀픽에서 확인하세요', url: data.url });
+            } catch (e) { if (e.name !== 'AbortError') showToast('공유에 실패했어요'); }
+        });
     }
 
     document.getElementById('ppShareCopyLink').addEventListener('click', async () => {
@@ -1270,6 +1303,7 @@
                 sec.className = 'yg-mycat';
                 sec.dataset.catId = newId;
                 sec.dataset.sort = '0';
+                sec.dataset.color = '';
                 sec.innerHTML = `<span class="yg-mycat__catname">${escHtml(trimmed)}</span>`;
                 metaWrap.prepend(sec);
             }
@@ -1297,18 +1331,35 @@
         } catch (e) { ppToast('네트워크 오류', true); }
     });
 
+    const CAT_PALETTE = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE','#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6'];
+    const FIXED_PALETTE = ['#C96A5D','#C9A13A','#8E9A57','#5E9B8C','#6F93C9','#9A7AAE'];
+    const FALLBACK_PALETTE = ['#D98A7A','#E0B964','#A7B578','#7FB5A8','#8EAFD9','#B898C6','#C98A8A','#A7926B','#6F9FA7','#A39CB8'];
+
+    function autoColor(catId) {
+        const sections = Array.from(document.querySelectorAll('.yg-mycat-meta .yg-mycat'));
+        const ids = sections.map(s => +s.dataset.catId);
+        const idx = ids.indexOf(+catId);
+        if (idx < 0) return '#888';
+        if (idx < FIXED_PALETTE.length) return FIXED_PALETTE[idx];
+        return FALLBACK_PALETTE[(idx - FIXED_PALETTE.length) % FALLBACK_PALETTE.length];
+    }
+
     function renderCatOrderList() {
         const sections = Array.from(document.querySelectorAll('[data-pane="mine"] .yg-mycat'));
         orderList.innerHTML = '';
         sections.forEach((sec, i) => {
             const id = sec.dataset.catId;
             const name = sec.querySelector('.yg-mycat__catname').textContent;
+            const color = sec.dataset.color || '';
+            const displayColor = color || autoColor(id);
             const li = document.createElement('li');
             li.className = 'yg-catorder-item';
             li.dataset.id = id;
             li.dataset.origName = name;
+            li.dataset.color = color;
             li.innerHTML = `
                 <span class="yg-catorder-item__grip">☰</span>
+                <button type="button" class="yg-catorder-item__color-dot" style="background:${displayColor}" aria-label="색상 선택"></button>
                 <input class="yg-catorder-item__input" type="text" value="${escHtml(name)}" maxlength="30">
                 <div class="yg-catorder-item__btns">
                     <button type="button" class="yg-catorder-item__up" ${i === 0 ? 'disabled' : ''} aria-label="위로">↑</button>
@@ -1321,7 +1372,41 @@
             li.querySelector('.yg-catorder-item__up').addEventListener('click', () => moveCatItem(li, -1));
             li.querySelector('.yg-catorder-item__down').addEventListener('click', () => moveCatItem(li, 1));
             li.querySelector('.yg-catorder-item__del').addEventListener('click', () => deleteCatItem(li));
+            li.querySelector('.yg-catorder-item__color-dot').addEventListener('click', (e) => togglePalette(li, e.currentTarget));
             orderList.appendChild(li);
+        });
+    }
+
+    function togglePalette(li, dotBtn) {
+        const existing = li.querySelector('.yg-catorder-palette');
+        if (existing) { existing.remove(); return; }
+        document.querySelectorAll('.yg-catorder-palette').forEach(p => p.remove());
+        const pal = document.createElement('div');
+        pal.className = 'yg-catorder-palette';
+        const currentColor = li.dataset.color || '';
+        const autoC = autoColor(li.dataset.id);
+        pal.innerHTML = `<button type="button" class="yg-catorder-palette__item yg-catorder-palette__auto${!currentColor ? ' is-selected' : ''}" data-val="" title="자동"><span class="yg-catorder-palette__auto-ring" style="border-color:${autoC}"></span></button>` +
+            CAT_PALETTE.map(c =>
+                `<button type="button" class="yg-catorder-palette__item${currentColor === c ? ' is-selected' : ''}" data-val="${c}" style="background:${c}"></button>`
+            ).join('');
+        li.insertBefore(pal, li.querySelector('.yg-catorder-item__btns'));
+        pal.addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-val]');
+            if (!btn) return;
+            const val = btn.dataset.val;
+            li.dataset.color = val;
+            const display = val || autoColor(li.dataset.id);
+            dotBtn.style.background = display;
+            const metaSec = document.querySelector(`.yg-mycat-meta .yg-mycat[data-cat-id="${li.dataset.id}"]`);
+            if (metaSec) metaSec.dataset.color = val;
+            try {
+                await fetch(`/api/categories/${li.dataset.id}`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ color: val || null })
+                });
+            } catch (e) { ppToast('색상 변경 실패', true); }
+            pal.remove();
         });
     }
 
@@ -1611,7 +1696,11 @@
                     if (el) {
                         el.dataset.cat = String(catId);
                         const catSpan = el.querySelector('.pp-mine-grid__cat');
-                        if (catSpan) catSpan.textContent = catName;
+                        if (catSpan) {
+                            const dot = catSpan.querySelector('.pp-cat-dot');
+                            if (dot) dot.style.backgroundColor = window.ppCatColor ? window.ppCatColor(catId) : '';
+                            catSpan.lastChild.textContent = catName;
+                        }
                     }
                 });
                 ppToast(j.moved + '개 장소가 이동됐어요');
@@ -2035,8 +2124,93 @@
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     let activePop = null;
 
-    function closePop() {
-        if (activePop) { activePop.remove(); activePop = null; }
+    function closePop() { if (activePop) { activePop.remove(); activePop = null; } }
+    function fmtDate(d) { return d.replace(/-/g, '.'); }
+    function fmtDateKo(d) { const p = d.split('-'); return parseInt(p[1]) + '월 ' + parseInt(p[2]) + '일'; }
+
+    function buildPopHtml(curStatus, visitedAt) {
+        if (curStatus === 'planned') {
+            return `
+                <button type="button" class="pp-status-pop__item is-current" data-action="noop">
+                    <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정
+                    <span class="pp-status-pop__cur">(현재)</span>
+                </button>
+                <button type="button" class="pp-status-pop__item" data-action="visit-today">
+                    <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>방문완료로 변경
+                </button>
+                <button type="button" class="pp-status-pop__item" data-action="visit-pick">
+                    <span class="pp-status-pop__ico">📅</span>다른 날짜로 완료 기록
+                </button>`;
+        }
+        return `
+            <button type="button" class="pp-status-pop__item is-current" data-action="noop">
+                <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>
+                <span>방문완료 <span class="pp-status-pop__cur">(현재)</span>${visitedAt ? '<span class="pp-status-pop__sub">' + fmtDate(visitedAt) + '</span>' : ''}</span>
+            </button>
+            <button type="button" class="pp-status-pop__item" data-action="visit-pick">
+                <span class="pp-status-pop__ico">📅</span>방문 날짜 변경
+            </button>
+            <button type="button" class="pp-status-pop__item" data-action="revert">
+                <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정으로 되돌리기
+            </button>`;
+    }
+
+    function openDatePicker(cb) {
+        const inp = document.createElement('input');
+        inp.type = 'date';
+        inp.max = new Date().toISOString().slice(0, 10);
+        inp.style.cssText = 'position:fixed;left:-9999px;top:50%;opacity:0';
+        document.body.appendChild(inp);
+        inp.addEventListener('change', () => { cb(inp.value); inp.remove(); });
+        inp.addEventListener('blur', () => setTimeout(() => inp.remove(), 300));
+        inp.showPicker ? inp.showPicker() : inp.click();
+    }
+
+    async function applyStatus(badge, placeId, newStatus, visitedAt) {
+        const oldStatus = badge.dataset.status;
+        const oldVisitedAt = badge.dataset.visitedAt;
+        const oldText = badge.textContent;
+
+        badge.dataset.status = newStatus;
+        badge.textContent = newStatus === 'visited' ? '방문완료' : '방문예정';
+        if (visitedAt) badge.dataset.visitedAt = visitedAt;
+
+        const dateEls = document.querySelectorAll(`.pp-status-date[data-place-id="${placeId}"]`);
+        if (newStatus === 'visited' && visitedAt) {
+            dateEls.forEach(d => { d.textContent = fmtDate(visitedAt); d.style.display = ''; });
+            if (!dateEls.length) {
+                const dateSpan = document.createElement('span');
+                dateSpan.className = (badge.classList.contains('pp-rspot__badge') ? 'pp-rspot__date' : 'pp-mine-grid__date') + ' pp-status-date';
+                dateSpan.dataset.placeId = placeId;
+                dateSpan.textContent = fmtDate(visitedAt);
+                badge.parentElement.appendChild(dateSpan);
+            }
+        } else if (newStatus === 'planned') {
+            dateEls.forEach(d => d.style.display = 'none');
+            badge.dataset.visitedAt = '';
+        }
+
+        try {
+            const r = await fetch(`/api/places/${placeId}/status`, {
+                method: 'PATCH',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ status: newStatus, visited_at: newStatus === 'visited' ? visitedAt : null })
+            });
+            const j = await r.json();
+            if (!j.ok) throw new Error();
+            if (newStatus === 'visited') {
+                ppStatusToast(fmtDateKo(visitedAt) + ' 방문완료로 기록했어요', placeId, oldStatus, oldVisitedAt, visitedAt);
+            } else {
+                ppStatusToast('방문예정으로 되돌렸어요', placeId, oldStatus, oldVisitedAt);
+            }
+        } catch {
+            badge.dataset.status = oldStatus;
+            badge.dataset.visitedAt = oldVisitedAt || '';
+            badge.textContent = oldText;
+            dateEls.forEach(d => d.style.display = oldStatus === 'visited' ? '' : 'none');
+            if (oldVisitedAt) dateEls.forEach(d => d.textContent = fmtDate(oldVisitedAt));
+            ppStatusToast('변경 실패', null, null);
+        }
     }
 
     document.addEventListener('click', (e) => {
@@ -2046,102 +2220,97 @@
         e.stopPropagation();
         const placeId = badge.dataset.placeId;
         const curStatus = badge.dataset.status;
+        const visitedAt = badge.dataset.visitedAt || '';
         if (!placeId) return;
         closePop();
 
         const pop = document.createElement('div');
         pop.className = 'pp-status-pop';
-        pop.innerHTML = `
-            <button type="button" class="pp-status-pop__item ${curStatus==='planned'?'is-current':''}" data-val="planned">
-                <span class="pp-status-pop__dot pp-status-pop__dot--planned"></span>방문예정
-            </button>
-            <button type="button" class="pp-status-pop__item ${curStatus==='visited'?'is-current':''}" data-val="visited">
-                <span class="pp-status-pop__dot pp-status-pop__dot--visited"></span>방문완료
-            </button>
-        `;
-
+        pop.innerHTML = buildPopHtml(curStatus, visitedAt);
         const rect = badge.getBoundingClientRect();
         pop.style.position = 'fixed';
         pop.style.top = (rect.bottom + 6) + 'px';
-        pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 150)) + 'px';
+        pop.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+        pop.style.left = 'auto';
         document.body.appendChild(pop);
         requestAnimationFrame(() => pop.classList.add('is-show'));
         activePop = pop;
 
-        pop.addEventListener('click', async (ev) => {
+        pop.addEventListener('click', (ev) => {
             const item = ev.target.closest('.pp-status-pop__item');
             if (!item) return;
-            const newStatus = item.dataset.val;
+            const action = item.dataset.action;
             closePop();
-            if (newStatus === curStatus) return;
-
-            const oldStatus = curStatus;
-            const oldText = badge.textContent;
-            badge.dataset.status = newStatus;
-            badge.textContent = newStatus === 'visited' ? '방문완료' : '방문예정';
-
-            const dateEls = document.querySelectorAll(`.pp-status-date[data-place-id="${placeId}"]`);
-            const today = new Date().toISOString().slice(0,10).replace(/-/g,'.');
-            if (newStatus === 'visited') {
-                dateEls.forEach(d => { d.textContent = today; d.style.display = ''; });
-                if (!dateEls.length) {
-                    const dateSpan = document.createElement('span');
-                    dateSpan.className = (badge.classList.contains('pp-rspot__badge') ? 'pp-rspot__date' : 'pp-mine-grid__date') + ' pp-status-date';
-                    dateSpan.dataset.placeId = placeId;
-                    dateSpan.textContent = today;
-                    badge.parentElement.appendChild(dateSpan);
-                }
-            } else {
-                dateEls.forEach(d => d.style.display = 'none');
-            }
-
-            try {
-                const r = await fetch(`/api/places/${placeId}/status`, {
-                    method: 'PATCH',
-                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ status: newStatus, visited_at: newStatus === 'visited' ? new Date().toISOString().slice(0,10) : null })
-                });
-                const j = await r.json();
-                if (!j.ok) throw new Error();
-                ppStatusToast(newStatus === 'visited' ? '방문완료로 변경했어요' : '방문예정으로 변경했어요', placeId, oldStatus);
-            } catch {
-                badge.dataset.status = oldStatus;
-                badge.textContent = oldText;
-                dateEls.forEach(d => d.style.display = oldStatus === 'visited' ? '' : 'none');
-                ppStatusToast('변경 실패', null, null);
+            if (action === 'noop') return;
+            if (action === 'visit-today') {
+                applyStatus(badge, placeId, 'visited', new Date().toISOString().slice(0, 10));
+            } else if (action === 'visit-pick') {
+                openDatePicker((d) => { if (d) applyStatus(badge, placeId, 'visited', d); });
+            } else if (action === 'revert') {
+                applyStatus(badge, placeId, 'planned', null);
             }
         });
     });
 
-    function ppStatusToast(msg, placeId, prevStatus) {
+    function ppStatusToast(msg, placeId, prevStatus, prevVisitedAt, newVisitedAt) {
         const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         let t = document.getElementById('ppToast');
         if (!t) { t = document.createElement('div'); t.id = 'ppToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
-        const undoHtml = placeId ? '<button type="button" class="pp-toast__undo">되돌리기</button>' : '';
-        t.innerHTML = esc(msg) + undoHtml;
+        if (!placeId) { t.innerHTML = esc(msg); t.classList.add('is-show'); setTimeout(() => t.classList.remove('is-show'), 2500); return; }
+
+        let actions = '';
+        if (newVisitedAt) actions += '<button type="button" class="pp-toast__undo" data-role="change-date">날짜 변경</button>';
+        actions += '<button type="button" class="pp-toast__undo" data-role="undo">되돌리기</button>';
+        t.innerHTML = esc(msg) + actions;
         t.classList.add('is-show');
-        const timer = setTimeout(() => { t.classList.remove('is-show'); }, placeId ? 5000 : 2500);
-        if (!placeId) return;
-        const undoBtn = t.querySelector('.pp-toast__undo');
-        let undone = false;
-        undoBtn.addEventListener('click', async () => {
-            if (undone) return;
-            undone = true;
+        let done = false;
+        const timer = setTimeout(() => t.classList.remove('is-show'), 5000);
+
+        const changeDateBtn = t.querySelector('[data-role="change-date"]');
+        if (changeDateBtn) {
+            changeDateBtn.addEventListener('click', () => {
+                if (done) return; done = true;
+                clearTimeout(timer);
+                t.classList.remove('is-show');
+                openDatePicker(async (d) => {
+                    if (!d) return;
+                    document.querySelectorAll(`.pp-status-badge[data-place-id="${placeId}"]`).forEach(b => { b.dataset.visitedAt = d; });
+                    const dateEls = document.querySelectorAll(`.pp-status-date[data-place-id="${placeId}"]`);
+                    dateEls.forEach(el => el.textContent = fmtDate(d));
+                    try {
+                        await fetch(`/api/places/${placeId}/status`, {
+                            method: 'PATCH',
+                            headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                            body: JSON.stringify({ status: 'visited', visited_at: d })
+                        });
+                    } catch {}
+                    ppStatusToast(fmtDateKo(d) + '로 변경했어요', null, null);
+                });
+            }, { once: true });
+        }
+
+        t.querySelector('[data-role="undo"]').addEventListener('click', async () => {
+            if (done) return; done = true;
             clearTimeout(timer);
             t.classList.remove('is-show');
             try {
                 await fetch(`/api/places/${placeId}/status`, {
                     method: 'PATCH',
                     headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ status: prevStatus, visited_at: prevStatus === 'visited' ? new Date().toISOString().slice(0,10) : null })
+                    body: JSON.stringify({ status: prevStatus, visited_at: prevVisitedAt || null })
                 });
             } catch {}
             document.querySelectorAll(`.pp-status-badge[data-place-id="${placeId}"]`).forEach(b => {
                 b.dataset.status = prevStatus;
+                b.dataset.visitedAt = prevVisitedAt || '';
                 b.textContent = prevStatus === 'visited' ? '방문완료' : '방문예정';
             });
             const dateEls = document.querySelectorAll(`.pp-status-date[data-place-id="${placeId}"]`);
-            dateEls.forEach(d => d.style.display = prevStatus === 'visited' ? '' : 'none');
+            if (prevStatus === 'visited' && prevVisitedAt) {
+                dateEls.forEach(d => { d.textContent = fmtDate(prevVisitedAt); d.style.display = ''; });
+            } else {
+                dateEls.forEach(d => d.style.display = 'none');
+            }
             ppStatusToast('되돌렸어요', null, null);
         }, { once: true });
     }

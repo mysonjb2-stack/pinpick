@@ -7,7 +7,7 @@
     <a href="{{ url('/') }}" class="pp-header__icon" aria-label="뒤로">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     </a>
-    <div class="pp-header__title">{{ $category->name }} <span class="cat-show__count">({{ $totalCount }})</span></div>
+    <div class="pp-header__title">@if($category->color)<span class="pp-cat-dot" style="background:{{ $category->color }}"></span>@endif{{ $category->name }} <span class="cat-show__count">({{ $totalCount }})</span></div>
 </header>
 @endsection
 

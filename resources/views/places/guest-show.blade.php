@@ -326,7 +326,7 @@
             dirs.innerHTML = `
                 <button type="button" class="pp-dirs__btn" data-provider="naver">
                     <span class="pp-dirs__ico pp-dirs__ico--naver">N</span>
-                    <span class="pp-dirs__lab">네이버지도 길찾기</span>
+                    <span class="pp-dirs__lab">네이버 길찾기</span>
                 </button>
                 <button type="button" class="pp-dirs__btn" data-provider="kakao">
                     <span class="pp-dirs__ico pp-dirs__ico--kakao">K</span>
@@ -359,8 +359,8 @@
         const encName = encodeURIComponent(name);
         let webUrl, appUrl;
         if (provider === 'google') {
-            appUrl = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`;
-            webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
+            return;
         } else if (provider === 'kakao') {
             appUrl = `kakaomap://route?ep=${lat},${lng}&by=CAR`;
             webUrl = `https://map.kakao.com/link/to/${encName},${lat},${lng}`;

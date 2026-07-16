@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\TrackVisit::class);
         $middleware->validateCsrfTokens(except: [
             'auth/native/*',
+            'auth/apple/callback',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
