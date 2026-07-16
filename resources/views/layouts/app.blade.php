@@ -104,5 +104,38 @@
     }
 })();
 </script>
+<div class="pp-prompt-overlay" id="ppPromptOverlay" hidden>
+    <div class="pp-prompt">
+        <p class="pp-prompt__msg" id="ppPromptMsg"></p>
+        <input class="pp-prompt__input" id="ppPromptInput" type="text" maxlength="30" autocomplete="off">
+        <div class="pp-prompt__btns">
+            <button type="button" class="pp-prompt__cancel" id="ppPromptCancel">취소</button>
+            <button type="button" class="pp-prompt__ok" id="ppPromptOk">확인</button>
+        </div>
+    </div>
+</div>
+<script>
+window.ppPrompt = function(msg) {
+    return new Promise(function(resolve) {
+        var ov = document.getElementById('ppPromptOverlay');
+        var inp = document.getElementById('ppPromptInput');
+        document.getElementById('ppPromptMsg').textContent = msg;
+        inp.value = '';
+        ov.hidden = false;
+        setTimeout(function(){ inp.focus(); }, 50);
+        function done(val) {
+            ov.hidden = true;
+            document.getElementById('ppPromptOk').removeEventListener('click', onOk);
+            document.getElementById('ppPromptCancel').removeEventListener('click', onCancel);
+            resolve(val);
+        }
+        function onOk() { done(inp.value); }
+        function onCancel() { done(null); }
+        document.getElementById('ppPromptOk').addEventListener('click', onOk);
+        document.getElementById('ppPromptCancel').addEventListener('click', onCancel);
+        inp.onkeydown = function(e) { if (e.key === 'Enter') onOk(); };
+    });
+};
+</script>
 </body>
 </html>

@@ -47,6 +47,7 @@
             </div>
 
             {{-- 카테고리 관리 패널 (홈과 동일) --}}
+            <div class="yg-catorder-backdrop" id="catOrderBackdrop" hidden></div>
             <div class="yg-catorder-panel" id="catOrderPanel" hidden>
                 <div class="yg-catorder-panel__head">
                     <span class="yg-catorder-panel__title">카테고리 관리</span>
@@ -1663,13 +1664,17 @@ function selectCategory(id) {
     else { sel.hidden = true; }
 }
 
+const catBackdrop = document.getElementById('catOrderBackdrop');
 function openCatPanel() {
     renderCatOrderList();
+    catBackdrop.hidden = false;
     catPanel.hidden = false;
 }
 function closeCatPanel() {
     catPanel.hidden = true;
+    catBackdrop.hidden = true;
 }
+catBackdrop.addEventListener('click', closeCatPanel);
 
 catTrigger.addEventListener('click', openCatPanel);
 document.getElementById('catSelectedEdit').addEventListener('click', openCatPanel);
@@ -1864,7 +1869,7 @@ catDoneBtn.addEventListener('click', async () => {
 
 catAddBtn.addEventListener('click', async () => {
     if (isGuest) return guestAlert();
-    const name = prompt('새 카테고리 이름을 입력하세요');
+    const name = await ppPrompt('새 카테고리 이름을 입력하세요');
     if (!name || !name.trim()) return;
     try {
         const r = await fetch('{{ route('api.categories.store') }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });

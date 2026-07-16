@@ -38,7 +38,7 @@ class HomeController extends Controller
 
             $allPlaces = (clone $baseQuery)
                 ->select(['id', 'name', 'original_name', 'category_id', 'lat', 'lng', 'is_overseas',
-                    'status', 'thumbnail', 'memo', 'sort_order', 'created_at',
+                    'status', 'visited_at', 'thumbnail', 'memo', 'sort_order', 'created_at',
                     'road_address', 'address', 'building_name', 'detail_location', 'user_id'])
                 ->with(['category:id,name,icon,color', 'images:id,place_id,path,sort_order', 'themes:id,name'])
                 ->latest()

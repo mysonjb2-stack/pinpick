@@ -380,6 +380,7 @@
             </div>
             </div>
         </div>
+        <div class="yg-catorder-backdrop" id="catOrderBackdrop" hidden></div>
         <div class="yg-catorder-panel" id="catOrderPanel" hidden>
             <div class="yg-catorder-panel__head">
                 <span class="yg-catorder-panel__title">카테고리 관리</span>
@@ -1194,15 +1195,22 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
     if (isGuest) return;
     const orderPanel = document.getElementById('catOrderPanel');
     const orderList = document.getElementById('catOrderList');
+    const orderBackdrop = document.getElementById('catOrderBackdrop');
     if (!orderPanel) return;
+
+    function closeCatPanel() {
+        orderPanel.hidden = true;
+        if (orderBackdrop) orderBackdrop.hidden = true;
+    }
 
     // 상단 버튼으로 열기
     document.getElementById('catOrderEditBtnHero')?.addEventListener('click', openCatPanel);
 
     // 취소 버튼 — 저장 없이 패널 닫기
-    document.getElementById('catOrderCancel').addEventListener('click', () => {
-        orderPanel.hidden = true;
-    });
+    document.getElementById('catOrderCancel').addEventListener('click', closeCatPanel);
+
+    // 배경 클릭 닫기
+    if (orderBackdrop) orderBackdrop.addEventListener('click', closeCatPanel);
 
     function openCatPanel() {
         // 사람들 탭에서 눌러도 동작하도록 먼저 내장소 탭으로 전환
@@ -1210,6 +1218,7 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
         if (mineBtn && !mineBtn.classList.contains('is-active')) {
             mineBtn.click();
         }
+        if (orderBackdrop) orderBackdrop.hidden = false;
         orderPanel.hidden = false;
         renderCatOrderList();
     }
@@ -1276,13 +1285,13 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
                 }
             }
         });
-        orderPanel.hidden = true;
+        closeCatPanel();
         ppToast('카테고리가 저장되었어요');
     });
 
     // 카테고리 추가
     document.getElementById('catOrderAdd').addEventListener('click', async () => {
-        const name = prompt('새 카테고리 이름을 입력하세요');
+        const name = await ppPrompt('새 카테고리 이름을 입력하세요');
         if (!name || !name.trim()) return;
         const trimmed = name.trim();
         try {

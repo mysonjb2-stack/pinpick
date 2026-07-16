@@ -5,7 +5,7 @@
 
 @section('header')
 <header class="pp-header">
-    <a href="{{ route('mypage') }}" class="pp-header__icon pp-header__back" aria-label="뒤로">
+    <a href="{{ route('mypage') }}" onclick="if(history.length>1){history.back();return false;}" class="pp-header__icon pp-header__back" aria-label="뒤로">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     </a>
     <div class="pp-header__title">카테고리 관리</div>
@@ -16,6 +16,8 @@
 @section('content')
 <div class="pp-catmgr">
     <p class="pp-catmgr__hint">카테고리 이름을 편집하거나 위/아래 버튼으로 순서를 바꾼 뒤 하단 저장 버튼을 눌러주세요.</p>
+
+    <button type="button" class="pp-catmgr__add" id="ppCatAdd">＋ 새 카테고리 추가</button>
 
     <ul class="pp-catmgr__list" id="ppCatList">
         @foreach($categories as $c)
@@ -34,8 +36,6 @@
             </li>
         @endforeach
     </ul>
-
-    <button type="button" class="pp-catmgr__add" id="ppCatAdd">＋ 새 카테고리 추가</button>
 </div>
 
 <div class="pp-form-submit">
@@ -148,8 +148,8 @@
         }
     });
 
-    document.getElementById('ppCatAdd').addEventListener('click', () => {
-        const name = prompt('새 카테고리 이름을 입력하세요');
+    document.getElementById('ppCatAdd').addEventListener('click', async () => {
+        const name = await ppPrompt('새 카테고리 이름을 입력하세요');
         if (!name || !name.trim()) return;
         const trimmed = name.trim();
         const tempId = nextTempId--;

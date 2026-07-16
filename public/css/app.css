@@ -1339,6 +1339,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .pp-catmgr__add {
   width: 100%;
   padding: 14px;
+  margin-bottom: 12px;
   border: 1.5px dashed var(--pp-line);
   border-radius: 12px;
   background: #fff;
@@ -1944,11 +1945,59 @@ body { background: #f8f5f2; }
   font-size: 12px; font-weight: 700; cursor: pointer;
 }
 .yg-catorder__btn:hover { background: #2b211e; color: #fff; border-color: #2b211e; }
+/* ── 커스텀 프롬프트 (앱 WebView prompt() 대체) ── */
+.pp-prompt-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.pp-prompt-overlay[hidden] { display: none; }
+.pp-prompt {
+  width: 100%; max-width: 320px;
+  background: #fff; border-radius: 16px;
+  padding: 24px 20px 16px; text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.pp-prompt__msg {
+  margin: 0 0 16px; font-size: 15px; font-weight: 600;
+  color: var(--pp-text);
+}
+.pp-prompt__input {
+  width: 100%; padding: 10px 12px;
+  border: 1.5px solid var(--pp-line, #eee1d5); border-radius: 10px;
+  font-size: 15px; outline: none;
+  background: var(--pp-bg-soft, #f8f5f2);
+  transition: border-color .15s;
+}
+.pp-prompt__input:focus { border-color: var(--pp-primary, #2b211e); background: #fff; }
+.pp-prompt__btns {
+  display: flex; gap: 8px; margin-top: 16px;
+}
+.pp-prompt__cancel, .pp-prompt__ok {
+  flex: 1; padding: 10px; border-radius: 10px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.pp-prompt__cancel {
+  background: #fff; color: #666; border: 1px solid #ddd;
+}
+.pp-prompt__ok {
+  background: var(--pp-primary, #2b211e); color: #fff; border: none;
+}
+
+.yg-catorder-backdrop {
+  position: fixed; inset: 0; z-index: 199;
+  background: rgba(0,0,0,0.35);
+}
 .yg-catorder-panel {
-  margin: 0 16px 16px; padding: 16px;
-  background: #fff; border-radius: 14px;
-  border: 1px solid #eee1d5;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  position: fixed; left: 0; right: 0; bottom: 0;
+  z-index: 200;
+  max-width: 480px; margin: 0 auto;
+  max-height: 80vh; overflow-y: auto;
+  padding: 20px 16px calc(16px + env(safe-area-inset-bottom, 0));
+  background: #fff;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
 }
 .yg-catorder-panel__head {
   display: flex; align-items: center; justify-content: space-between;
