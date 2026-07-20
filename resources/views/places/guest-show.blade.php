@@ -36,7 +36,7 @@
             <div class="pp-card__icon" id="ppGuestIcon">📌</div>
             <div class="pp-card__body">
                 <div class="pp-card__name" id="ppGuestName">로딩 중…</div>
-                <div class="pp-card__meta">
+                <div class="pp-card__meta" id="ppGuestMeta">
                     <span id="ppGuestCat">기타</span>
                 </div>
             </div>
@@ -49,6 +49,14 @@
         <div class="pp-info-row" id="ppGuestAddrRow" hidden>
             <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span id="ppGuestAddr"></span>
+        </div>
+        <div class="pp-info-row pp-info-row--sub pp-info-row--jibun" id="ppGuestJibeonRow" hidden>
+            <span class="pp-jibun-label">지번</span>
+            <span id="ppGuestJibeon"></span>
+        </div>
+        <div class="pp-info-row pp-info-row--sub" id="ppGuestDetailLocRow" hidden>
+            <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span id="ppGuestDetailLoc"></span>
         </div>
         <div class="pp-info-row pp-info-row--sub" id="ppGuestPhoneRow" hidden>
             <svg class="pp-info-row__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"/></svg>
@@ -191,10 +199,40 @@
         document.getElementById('ppGuestOrigRow').hidden = false;
     }
 
+    // 테마 뱃지
+    const themes = Array.isArray(p.themes) ? p.themes : [];
+    if (themes.length) {
+        const meta = document.getElementById('ppGuestMeta');
+        const dot = document.createElement('span');
+        dot.className = 'pp-meta-dot';
+        dot.setAttribute('aria-hidden', 'true');
+        meta.appendChild(dot);
+        themes.forEach(function(t) {
+            const badge = document.createElement('span');
+            badge.className = 'pp-theme-badge';
+            badge.textContent = t;
+            meta.appendChild(badge);
+        });
+    }
+
     const addr = p.road_address || p.address || '';
     if (addr) {
-        document.getElementById('ppGuestAddr').textContent = addr;
+        var addrDisplay = addr;
+        if (p.building_name && p.building_name !== p.name && addr.indexOf(p.building_name) === -1) {
+            addrDisplay += ' ' + p.building_name;
+        }
+        document.getElementById('ppGuestAddr').textContent = addrDisplay;
         document.getElementById('ppGuestAddrRow').hidden = false;
+    }
+
+    if (p.address && p.road_address && p.address !== p.road_address) {
+        document.getElementById('ppGuestJibeon').textContent = p.address;
+        document.getElementById('ppGuestJibeonRow').hidden = false;
+    }
+
+    if (p.detail_location) {
+        document.getElementById('ppGuestDetailLoc').textContent = p.detail_location;
+        document.getElementById('ppGuestDetailLocRow').hidden = false;
     }
 
     if (p.phone) {

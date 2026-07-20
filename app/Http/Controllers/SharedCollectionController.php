@@ -32,7 +32,7 @@ class SharedCollectionController extends Controller
                 ->whereIn('id', $request->place_ids)
                 ->where('is_visible', true)
                 ->orderBy('sort_order')
-                ->with('images')
+                ->with(['images', 'themes'])
                 ->get();
             $category = $places->first()?->category;
         } else {
@@ -43,7 +43,7 @@ class SharedCollectionController extends Controller
                 ->where('category_id', $category->id)
                 ->where('is_visible', true)
                 ->orderBy('sort_order')
-                ->with('images')
+                ->with(['images', 'themes'])
                 ->get();
         }
 
@@ -88,16 +88,20 @@ class SharedCollectionController extends Controller
                 'display_name' => $isCustom ? $place->name : ($place->original_name ?: $place->name),
                 'original_place_name' => $place->original_name ?: $place->name,
                 'address' => $place->road_address ?: $place->address,
+                'jibeon_address' => ($place->road_address && $place->address && $place->address !== $place->road_address) ? $place->address : null,
                 'building_name' => $place->building_name,
-                'detail_location' => $isCustom ? $place->detail_location : null,
+                'detail_location' => $place->detail_location,
                 'phone' => $place->phone,
                 'opening_hours' => $place->opening_hours,
                 'latitude' => $place->lat,
                 'longitude' => $place->lng,
                 'category_label' => $place->category?->name ?? $category?->name ?? '',
+                'themes' => $place->themes->pluck('name')->values()->all(),
                 'memo' => $isCustom ? $place->memo : null,
                 'thumbnail_url' => $thumbnailUrl,
                 'external_place_id' => $place->kakao_place_id ?: $place->naver_place_id,
+                'naver_place_id' => $place->naver_place_id,
+                'google_place_id' => $place->google_place_id,
                 'is_overseas' => (bool) $place->is_overseas,
                 'sort_order' => $i,
             ]);
@@ -177,12 +181,12 @@ class SharedCollectionController extends Controller
         $user = Auth::user();
 
         if ($request->new_category_name) {
-            $maxSort = Category::where('user_id', $user->id)->max('sort_order') ?? -1;
+            Category::where('user_id', $user->id)->increment('sort_order');
             $category = Category::create([
                 'user_id' => $user->id,
                 'name' => $request->new_category_name,
                 'icon' => '📌',
-                'sort_order' => $maxSort + 1,
+                'sort_order' => 0,
             ]);
         } elseif ($request->category_id) {
             $category = Category::where('id', $request->category_id)
@@ -213,7 +217,9 @@ class SharedCollectionController extends Controller
         $koreaProvinces = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
 
         foreach ($sharedPlaces as $sp) {
-            if ($sp->external_place_id && in_array($sp->external_place_id, $existingExtIds)) {
+            $isDup = ($sp->external_place_id && in_array($sp->external_place_id, $existingExtIds))
+                || ($sp->naver_place_id && in_array($sp->naver_place_id, $existingExtIds));
+            if ($isDup) {
                 $skipped++;
                 continue;
             }
@@ -233,7 +239,10 @@ class SharedCollectionController extends Controller
                 'category_id' => $category->id,
                 'name' => $sp->display_name,
                 'original_name' => $sp->original_place_name,
-                'address' => $sp->address,
+                'address' => $sp->jibeon_address,
+                'road_address' => $sp->address,
+                'building_name' => $sp->building_name,
+                'detail_location' => $sp->detail_location,
                 'phone' => $sp->phone,
                 'opening_hours' => $sp->opening_hours,
                 'lat' => $sp->latitude,
@@ -244,7 +253,16 @@ class SharedCollectionController extends Controller
                 'is_public' => false,
                 'sort_order' => ++$maxSort,
                 'kakao_place_id' => $sp->external_place_id,
+                'naver_place_id' => $sp->naver_place_id,
+                'google_place_id' => $sp->google_place_id,
             ]);
+
+            if (!empty($sp->themes)) {
+                $themeIds = \App\Models\Theme::whereIn('name', $sp->themes)->pluck('id');
+                if ($themeIds->isNotEmpty()) {
+                    $newPlace->themes()->sync($themeIds);
+                }
+            }
 
             if ($sp->thumbnail_url) {
                 $this->copySharedImage($sp, $newPlace);

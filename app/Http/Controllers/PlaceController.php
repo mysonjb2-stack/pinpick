@@ -164,7 +164,13 @@ class PlaceController extends Controller
             'places.*.status' => ['nullable', 'in:planned,visited'],
             'places.*.visited_at' => ['nullable'],
             'places.*.is_overseas' => ['nullable', 'boolean'],
+            'places.*.building_name' => ['nullable', 'string', 'max:255'],
+            'places.*.detail_location' => ['nullable', 'string', 'max:255'],
+            'places.*.themes' => ['nullable', 'array'],
+            'places.*.themes.*' => ['string', 'max:30'],
             'places.*.kakao_place_id' => ['nullable', 'string', 'max:100'],
+            'places.*.naver_place_id' => ['nullable', 'string', 'max:100'],
+            'places.*.google_place_id' => ['nullable', 'string', 'max:100'],
             'places.*.thumbnail_url' => ['nullable', 'string', 'max:500'],
             'places.*._category_id' => ['nullable', 'integer'],
             'places.*._new_category' => ['nullable', 'string', 'max:30'],
@@ -177,8 +183,20 @@ class PlaceController extends Controller
         $newCatCache = [];
 
         $maxSort = (int) Place::where('user_id', $user->id)->max('sort_order');
-        $maxCatSort = (int) Category::where('user_id', $user->id)->max('sort_order');
         $imported = 0;
+
+        $newCatNames = collect($data['places'])
+            ->filter(fn ($p) => !empty($p['_new_category']) && !isset($catByName[mb_strtolower($p['_new_category'])]))
+            ->pluck('_new_category')
+            ->map(fn ($n) => mb_strtolower($n))
+            ->unique()
+            ->values();
+
+        if ($newCatNames->isNotEmpty()) {
+            Category::where('user_id', $user->id)
+                ->increment('sort_order', $newCatNames->count());
+        }
+        $newCatSortCounter = 0;
 
         foreach ($data['places'] as $p) {
             $catId = null;
@@ -197,7 +215,7 @@ class PlaceController extends Controller
                         'user_id' => $user->id,
                         'name' => $newName,
                         'icon' => '📌',
-                        'sort_order' => ++$maxCatSort,
+                        'sort_order' => $newCatSortCounter++,
                     ]);
                     $newCatCache[$lower] = $cat->id;
                     $catId = $cat->id;
@@ -216,6 +234,12 @@ class PlaceController extends Controller
                 $openingHours = json_decode($openingHours, true);
             }
 
+            $roadAddr = $p['road_address'] ?? null;
+            $addr = $p['address'] ?? null;
+            if ($addr && $roadAddr && $addr === $roadAddr) {
+                $addr = null;
+            }
+
             $newPlace = Place::create([
                 'user_id' => $user->id,
                 'category_id' => $catId,
@@ -223,8 +247,10 @@ class PlaceController extends Controller
                 'original_name' => $p['original_name'] ?? null,
                 'phone' => $p['phone'] ?? null,
                 'opening_hours' => $openingHours,
-                'address' => $p['address'] ?? null,
-                'road_address' => $p['road_address'] ?? null,
+                'address' => $addr,
+                'road_address' => $roadAddr,
+                'building_name' => $p['building_name'] ?? null,
+                'detail_location' => $p['detail_location'] ?? null,
                 'lat' => $lat,
                 'lng' => $lng,
                 'memo' => $p['memo'] ?? null,
@@ -232,10 +258,19 @@ class PlaceController extends Controller
                 'visited_at' => $visited,
                 'is_overseas' => !empty($p['is_overseas']),
                 'kakao_place_id' => $p['kakao_place_id'] ?? null,
+                'naver_place_id' => $p['naver_place_id'] ?? null,
+                'google_place_id' => $p['google_place_id'] ?? null,
                 'sort_order' => ++$maxSort,
                 'is_visible' => true,
                 'is_public' => false,
             ]);
+
+            if (!empty($p['themes'])) {
+                $themeIds = Theme::whereIn('name', $p['themes'])->pluck('id');
+                if ($themeIds->isNotEmpty()) {
+                    $newPlace->themes()->sync($themeIds);
+                }
+            }
 
             if (!empty($p['thumbnail_url'])) {
                 $this->importGuestThumbnail($p['thumbnail_url'], $newPlace);

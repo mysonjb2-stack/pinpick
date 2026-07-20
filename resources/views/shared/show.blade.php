@@ -145,14 +145,20 @@
             'name' => $p->display_name,
             'original_name' => $p->original_place_name,
             'address' => $p->address,
+            'jibeon_address' => $p->jibeon_address,
+            'building_name' => $p->building_name,
+            'detail_location' => $p->detail_location,
             'phone' => $p->phone,
             'opening_hours' => $p->opening_hours,
             'lat' => $p->latitude,
             'lng' => $p->longitude,
             'category_label' => $p->category_label,
+            'themes' => $p->themes ?? [],
             'memo' => $p->memo,
             'thumbnail_url' => $p->thumbnail_url,
             'external_place_id' => $p->external_place_id,
+            'naver_place_id' => $p->naver_place_id,
+            'google_place_id' => $p->google_place_id,
             'is_overseas' => (bool) $p->is_overseas,
         ];
     });
@@ -417,14 +423,17 @@
 
             guestPlaces.push({
                 id: 'g_' + Date.now() + '_' + added,
-                name: p.name, category_id: '', category_name: '', category_icon: '📌',
+                name: p.name, category_id: '', category_name: p.category_label || '', category_icon: '📌',
                 category_label: shareTitle,
                 phone: p.phone || '', opening_hours: p.opening_hours || [],
-                address: p.address || '', road_address: p.address || '',
+                address: p.jibeon_address || '', road_address: p.address || '',
+                building_name: p.building_name || '', detail_location: p.detail_location || '',
                 lat: p.lat, lng: p.lng, memo: p.memo || '', status: 'planned',
                 visited_at: '', is_overseas: !!p.is_overseas,
                 original_name: p.original_name || '', kakao_place_id: p.external_place_id || '',
+                naver_place_id: p.naver_place_id || '', google_place_id: p.google_place_id || '',
                 thumbnail_url: p.thumbnail_url || '',
+                themes: p.themes || [],
             });
             added++;
         });

@@ -881,6 +881,15 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
         }
     });
 
+    // 카카오 SDK 미리 로드 (공유 버튼 클릭 시 팝업 차단 방지)
+    (function preloadKakaoSdk() {
+        if (typeof Kakao !== 'undefined') return;
+        var s = document.createElement('script');
+        s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js';
+        s.async = true;
+        document.head.appendChild(s);
+    })();
+
     document.getElementById('ppShareKakao').addEventListener('click', async () => {
         try {
             const data = await createShare();
@@ -889,31 +898,36 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
             window.__sharePendingPlaceIds = null;
 
             if (typeof Kakao === 'undefined') {
-                const s = document.createElement('script');
-                s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js';
-                s.onload = () => { sendKakaoShare(data); };
-                s.onerror = () => { showToast('카카오 SDK를 불러오지 못했어요'); };
-                document.head.appendChild(s);
-            } else {
-                sendKakaoShare(data);
+                await copyToClipboard(data.url);
+                showToast('카카오 SDK 로드 실패 — 링크가 복사됐어요');
+                return;
             }
+            sendKakaoShare(data);
         } catch (e) {
             showToast('오류가 발생했어요');
         }
     });
 
     function sendKakaoShare(data) {
-        if (!Kakao.isInitialized()) Kakao.init('{{ config("services.kakao.js_key") }}');
-        Kakao.Share.sendDefault({
-            objectType: 'feed',
-            content: {
-                title: data.title,
-                description: '장소 ' + data.place_count + '개 · 나만의 장소, 나만의 지도 핀픽',
-                imageUrl: data.thumbnail_url || '{{ asset("images/og-image.png") }}',
-                link: { mobileWebUrl: data.url, webUrl: data.url },
-            },
-            buttons: [{ title: '장소 확인하기', link: { mobileWebUrl: data.url, webUrl: data.url } }],
-        });
+        try {
+            if (!Kakao.isInitialized()) Kakao.init('{{ config("services.kakao.js_key") }}');
+            Kakao.Share.sendDefault({
+                objectType: 'feed',
+                content: {
+                    title: data.title,
+                    description: '장소 ' + data.place_count + '개 · 나만의 장소, 나만의 지도 핀픽',
+                    imageUrl: data.thumbnail_url || '{{ asset("images/og-image.png") }}',
+                    link: { mobileWebUrl: data.url, webUrl: data.url },
+                },
+                buttons: [{ title: '장소 확인하기', link: { mobileWebUrl: data.url, webUrl: data.url } }],
+            }).catch(function() {
+                copyToClipboard(data.url);
+                showToast('카카오톡 공유 실패 — 링크가 복사됐어요');
+            });
+        } catch (e) {
+            copyToClipboard(data.url);
+            showToast('카카오톡 공유 실패 — 링크가 복사됐어요');
+        }
     }
 
     function showToast(msg) {

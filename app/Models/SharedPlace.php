@@ -14,6 +14,7 @@ class SharedPlace extends Model
         'display_name',
         'original_place_name',
         'address',
+        'jibeon_address',
         'building_name',
         'detail_location',
         'phone',
@@ -24,8 +25,11 @@ class SharedPlace extends Model
         'memo',
         'thumbnail_url',
         'external_place_id',
+        'naver_place_id',
+        'google_place_id',
         'is_overseas',
         'sort_order',
+        'themes',
     ];
 
     protected $casts = [
@@ -34,6 +38,7 @@ class SharedPlace extends Model
         'sort_order' => 'integer',
         'is_overseas' => 'boolean',
         'opening_hours' => 'array',
+        'themes' => 'array',
     ];
 
     public function collection(): BelongsTo
