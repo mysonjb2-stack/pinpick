@@ -6233,3 +6233,121 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 }
 .pp-info-row--jibun { font-size: 12.5px; color: var(--pp-text-sub); margin-top: 2px; align-items: baseline; }
 .pp-info-row--detail-loc { font-size: 13px; color: var(--pp-text); margin-top: 2px; }
+
+/* ── Curation public page ── */
+.pp-cur-header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 900;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 50px; padding: 0 12px;
+  background: rgba(255,255,255,.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--pp-line);
+}
+.pp-cur-header__back {
+  border: none; background: none; cursor: pointer; padding: 6px;
+  color: var(--pp-text); display: flex; align-items: center;
+}
+.pp-cur-header__logo {
+  display: flex; align-items: center;
+}
+.pp-cur-header__logo img { border-radius: 6px; }
+.pp-cur-header__share {
+  border: none; background: none; cursor: pointer; padding: 6px;
+  color: var(--pp-text); display: flex; align-items: center;
+}
+.pp-cur__cover { width: 100%; max-height: 220px; overflow: hidden; }
+.pp-cur__cover img { width: 100%; height: 220px; object-fit: cover; display: block; }
+.pp-cur__regions {
+  display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px;
+}
+.pp-cur__region-chip {
+  display: inline-block; padding: 3px 10px; border-radius: 6px;
+  background: var(--pp-chip-bg); font-size: 12px; font-weight: 600;
+  color: var(--pp-text-sub);
+}
+.pp-cur__desc {
+  font-size: 14px; color: var(--pp-text); line-height: 1.6;
+  margin: 10px 0 0; white-space: pre-line;
+}
+.pp-cur__note {
+  font-size: 13px; color: var(--pp-text-sub); margin: 6px 0 0;
+  padding: 8px 12px; border-left: 3px solid var(--pp-primary, #e67e22);
+  background: var(--pp-bg-soft, #faf7f5); border-radius: 0 6px 6px 0;
+  font-style: italic; line-height: 1.5;
+}
+.pp-cur__source {
+  font-size: 11.5px; color: var(--pp-text-sub); margin-top: 4px;
+}
+.pp-cur__source a { color: var(--pp-accent, #2f6fed); text-decoration: underline; text-underline-offset: 2px; }
+.pp-cur__day-label {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 600; margin-top: 4px;
+}
+.pp-cur__fit-btn {
+  position: absolute; top: 10px; right: 10px; z-index: 10;
+  padding: 6px 14px; border-radius: 999px; border: none;
+  background: #fff; color: var(--pp-text); font-size: 12px; font-weight: 600;
+  box-shadow: 0 1px 5px rgba(0,0,0,.18); cursor: pointer;
+}
+.pp-share__map-wrap { position: relative; }
+.pp-share__card.is-focused {
+  border-color: var(--pp-primary, #e67e22); background: #fef9f4;
+}
+.pp-cur__days {
+  display: flex; gap: 6px; padding: 10px 14px; overflow-x: auto;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.pp-cur__days::-webkit-scrollbar { display: none; }
+.pp-cur__day-btn {
+  flex-shrink: 0; padding: 6px 14px; border-radius: 999px;
+  border: 1.5px solid var(--pp-line); background: var(--pp-bg);
+  font-size: 13px; font-weight: 600; color: var(--pp-text-sub); cursor: pointer;
+  transition: all .15s;
+}
+.pp-cur__day-btn.is-active {
+  background: var(--pp-primary); border-color: var(--pp-primary); color: #fff;
+}
+
+/* ── Explore curation cards ── */
+.pp-cur-cards { display: flex; flex-direction: column; gap: 12px; padding: 0 18px; }
+.pp-cur-card {
+  display: flex; gap: 14px; padding: 14px;
+  background: #fff; border: 1px solid var(--pp-line); border-radius: 14px;
+  cursor: pointer; transition: box-shadow .15s;
+}
+.pp-cur-card:active { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.pp-cur-card__thumb {
+  width: 80px; height: 80px; border-radius: 10px; overflow: hidden;
+  flex-shrink: 0; background: var(--pp-bg-soft);
+  display: flex; align-items: center; justify-content: center;
+}
+.pp-cur-card__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pp-cur-card__emoji { font-size: 32px; }
+.pp-cur-card__body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.pp-cur-card__title { font-size: 15px; font-weight: 700; color: var(--pp-text); margin: 0; }
+.pp-cur-card__desc {
+  font-size: 12.5px; color: var(--pp-text-sub); margin: 3px 0 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pp-cur-card__meta {
+  display: flex; gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--pp-text-sub);
+}
+.pp-cur-card__badge {
+  display: inline-block; padding: 2px 7px; border-radius: 4px;
+  background: var(--pp-chip-bg); font-size: 11px; font-weight: 600; color: var(--pp-text-sub);
+}
+.pp-cur-regions {
+  display: flex; gap: 6px; padding: 0 18px 12px; overflow-x: auto;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.pp-cur-regions::-webkit-scrollbar { display: none; }
+.pp-cur-region-chip {
+  flex-shrink: 0; padding: 6px 14px; border-radius: 999px;
+  border: 1.5px solid var(--pp-line); background: var(--pp-bg);
+  font-size: 13px; font-weight: 600; color: var(--pp-text-sub); cursor: pointer;
+}
+.pp-cur-region-chip.is-active {
+  background: var(--pp-primary); border-color: var(--pp-primary); color: #fff;
+}
+.pp-cur-empty {
+  text-align: center; padding: 40px 18px; color: var(--pp-text-sub); font-size: 14px;
+}

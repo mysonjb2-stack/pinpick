@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Curation;
 use Illuminate\Http\Response;
 
 class SitemapController extends Controller
@@ -16,6 +17,10 @@ class SitemapController extends Controller
             ['loc' => 'https://mypinpick.net/notices', 'changefreq' => 'weekly', 'priority' => '0.4'],
         ];
 
+        $curations = Curation::published()
+            ->select('id', 'updated_at')
+            ->get();
+
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 
@@ -27,6 +32,15 @@ class SitemapController extends Controller
             $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
             $xml .= "    <changefreq>{$url['changefreq']}</changefreq>\n";
             $xml .= "    <priority>{$url['priority']}</priority>\n";
+            $xml .= "  </url>\n";
+        }
+
+        foreach ($curations as $c) {
+            $xml .= "  <url>\n";
+            $xml .= "    <loc>https://mypinpick.net/c/{$c->id}</loc>\n";
+            $xml .= "    <lastmod>{$c->updated_at->toDateString()}</lastmod>\n";
+            $xml .= "    <changefreq>weekly</changefreq>\n";
+            $xml .= "    <priority>0.7</priority>\n";
             $xml .= "  </url>\n";
         }
 

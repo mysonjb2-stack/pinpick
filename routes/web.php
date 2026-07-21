@@ -7,6 +7,7 @@ use App\Http\Controllers\MapController;
 use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\PlaceController;
 use App\Http\Controllers\PublicPlaceController;
+use App\Http\Controllers\CurationController;
 use App\Http\Controllers\SharedCollectionController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\TrendingController;
@@ -94,6 +95,17 @@ Route::get('/api/geocode/forward', [PlaceController::class, 'forwardGeocodeApi']
 Route::get('/api/phone/fallback', [PlaceController::class, 'phoneFallback'])->name('api.phone.fallback');
 Route::get('/api/building-name', [PlaceController::class, 'buildingName'])->name('api.building-name');
 Route::get('/api/static-map', [PlaceController::class, 'staticMap'])->name('api.static-map');
+
+// 큐레이션 페이지 (비로그인 접근 가능)
+Route::get('/c/{id}', [CurationController::class, 'show'])
+    ->where('id', '[0-9]+')
+    ->middleware('throttle:60,1')
+    ->name('curation.show');
+Route::middleware('auth')->group(function () {
+    Route::post('/c/{id}/save', [CurationController::class, 'saveToMyPinpick'])->name('curation.save');
+});
+Route::get('/api/curations', [CurationController::class, 'apiList'])->name('api.curations.list');
+Route::get('/api/curations/regions', [CurationController::class, 'apiRegions'])->name('api.curations.regions');
 
 // 공유 페이지 (비로그인 접근 가능)
 Route::get('/s/{token}', [SharedCollectionController::class, 'show'])

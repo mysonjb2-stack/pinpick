@@ -117,4 +117,55 @@ class ImageProcessor
         $prefix = ($dir === '' || $dir === '.') ? '' : $dir . '/';
         return $prefix . 'thumb_' . $base . '.webp';
     }
+
+    /**
+     * 최대 4장의 이미지를 2x2 모자이크로 합성하여 저장.
+     * @param string[] $imagePaths public disk 상대경로
+     * @return string|null 합성된 커버 이미지 상대경로
+     */
+    public function createMosaic(array $imagePaths, string $outputDir): ?string
+    {
+        $disk = Storage::disk('public');
+        $valid = [];
+        foreach ($imagePaths as $p) {
+            if ($disk->exists($p)) $valid[] = $p;
+            if (count($valid) >= 4) break;
+        }
+        if (empty($valid)) return null;
+
+        $size = 600;
+        $canvas = $this->manager->create($size * 2, $size * 2)->fill('ffffff');
+
+        $positions = [[0, 0], [$size, 0], [0, $size], [$size, $size]];
+
+        foreach ($valid as $i => $path) {
+            $tile = $this->manager->decodePath($disk->path($path));
+            $tile->cover($size, $size);
+            $canvas->place($tile, 'top-left', $positions[$i][0], $positions[$i][1]);
+        }
+
+        if (count($valid) === 1) {
+            $canvas = $this->manager->decodePath($disk->path($valid[0]));
+            $canvas->cover($size * 2, $size * 2);
+        } elseif (count($valid) === 2) {
+            $canvas = $this->manager->create($size * 2, $size)->fill('ffffff');
+            foreach ($valid as $i => $path) {
+                $tile = $this->manager->decodePath($disk->path($path));
+                $tile->cover($size, $size);
+                $canvas->place($tile, 'top-left', $i * $size, 0);
+            }
+        } elseif (count($valid) === 3) {
+            $canvas = $this->manager->create($size * 2, $size * 2)->fill('ffffff');
+            foreach ($valid as $i => $path) {
+                $tile = $this->manager->decodePath($disk->path($path));
+                $tile->cover($size, $size);
+                $canvas->place($tile, 'top-left', $positions[$i][0], $positions[$i][1]);
+            }
+        }
+
+        $filename = 'mosaic_' . Str::random(20) . '.webp';
+        $outPath = "$outputDir/$filename";
+        $disk->put($outPath, (string) $canvas->encode(new WebpEncoder(self::MAIN_QUALITY)));
+        return $outPath;
+    }
 }
