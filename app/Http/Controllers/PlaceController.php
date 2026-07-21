@@ -123,6 +123,14 @@ class PlaceController extends Controller
             $this->tryMatchNaverPlaceId($p);
         });
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'place_id' => $place->id,
+                'message' => '장소가 저장되었어요.',
+            ]);
+        }
+
         return redirect('/')->with('success', '장소가 저장되었어요.');
     }
 
@@ -1245,9 +1253,11 @@ class PlaceController extends Controller
 
         $road = $doc['road_address']['address_name'] ?? '';
         $jibun = $doc['address']['address_name'] ?? '';
+        $building = $doc['road_address']['building_name'] ?? '';
         $address = $road ?: $jibun;
         return response()->json([
             'address' => $address,
+            'building_name' => $building,
             'region' => \App\Http\Controllers\TrendingController::regionOfStatic($address, false),
         ]);
     }

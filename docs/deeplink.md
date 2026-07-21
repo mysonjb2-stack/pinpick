@@ -16,7 +16,7 @@ pinpick://{path}[?query]
 |--------|---------------|------|
 | `pinpick://s/AbCd1234` | `https://mypinpick.net/s/AbCd1234` | 공유 페이지 |
 | `pinpick://s/AbCd1234?selected=1,3&action=save` | `https://mypinpick.net/s/AbCd1234?selected=1,3&action=save` | 공유 페이지 + 1,3번 선택 + 저장 자동 시작 |
-| `pinpick://` | `https://mypinpick.net/` | 홈 |
+| `pinpick://` | `https://mypinpick.net/` | 홈 (저장 완료 후 앱 전환 시 사용) |
 | `pinpick://places/123` | `https://mypinpick.net/places/123` | 장소 상세 |
 
 > **범용 매핑**: `pinpick://{path}?{query}` → `https://mypinpick.net/{path}?{query}`
@@ -27,7 +27,7 @@ pinpick://{path}[?query]
 | 파라미터 | 값 | 설명 |
 |----------|-----|------|
 | `selected` | 콤마 구분 숫자 (예: `1,3,5`) | sort_order(핀 번호) 기준으로 해당 장소들을 선택 상태로 복원 |
-| `action` | `save` | 페이지 로드 후 저장 플로우 자동 시작 (로그인 상태에서만 카테고리 시트 자동 오픈) |
+| `action` | `save` | 페이지 로드 후 저장 플로우 자동 시작. 앱 웹뷰(MYPINPICK)에서는 자동 처리 후 홈 이동 |
 
 ## 웹뷰 User-Agent
 
@@ -58,6 +58,23 @@ pinpick://{path}[?query]
   </intent-filter>
   ```
 - `onCreate` 또는 `onNewIntent` 에서 `intent.data` 의 path + query 추출 → 웹뷰 로드
+
+## 공유 저장 후 앱 전환 플로우
+
+### 웹에서 로그인 상태로 저장 완료 → "핀픽에서 보기"
+- 딥링크: `pinpick://` (홈 직행, action 파라미터 없음)
+- 서버에 이미 저장됐으므로 앱에서 재저장 불필요
+
+### 웹에서 게스트로 저장 → "핀픽에서 보기"
+- 딥링크: `pinpick://s/{token}?selected=...&action=save` (기존 방식)
+- 게스트 저장은 localStorage 기반이라 앱에서 재저장 필요
+
+### 앱 웹뷰에서 action=save 자동 처리
+MYPINPICK UA + `action=save`로 공유 페이지가 열리면 확인 화면 없이 자동 처리:
+- **앱 로그인 + 새 장소 있음**: 카테고리 시트 → 저장 → 토스트 → 홈 자동 이동
+- **앱 로그인 + 전부 중복**: "이미 저장된 장소예요" 토스트 → 홈 자동 이동
+- **앱 비로그인**: 게스트 자동 저장 → 토스트 → 홈 자동 이동
+- **일반 브라우저**: 기존 동작 유지 (변경 없음)
 
 ## 웹 호출 방식
 

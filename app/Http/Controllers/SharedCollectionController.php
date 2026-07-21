@@ -278,6 +278,48 @@ class SharedCollectionController extends Controller
         ]);
     }
 
+    public function checkDuplicates(Request $request, string $token)
+    {
+        $collection = SharedCollection::where('token', $token)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $request->validate([
+            'place_ids' => 'required|array|min:1',
+            'place_ids.*' => 'integer|exists:shared_places,id',
+        ]);
+
+        $user = Auth::user();
+        $sharedPlaces = SharedPlace::where('shared_collection_id', $collection->id)
+            ->whereIn('id', $request->place_ids)
+            ->get();
+
+        $existingExtIds = Place::where('user_id', $user->id)
+            ->whereNotNull('kakao_place_id')
+            ->pluck('kakao_place_id')
+            ->merge(
+                Place::where('user_id', $user->id)
+                    ->whereNotNull('naver_place_id')
+                    ->pluck('naver_place_id')
+            )
+            ->toArray();
+
+        $duplicates = 0;
+        foreach ($sharedPlaces as $sp) {
+            $isDup = ($sp->external_place_id && in_array($sp->external_place_id, $existingExtIds))
+                || ($sp->naver_place_id && in_array($sp->naver_place_id, $existingExtIds));
+            if ($isDup) {
+                $duplicates++;
+            }
+        }
+
+        return response()->json([
+            'total' => count($request->place_ids),
+            'duplicates' => $duplicates,
+            'all_duplicates' => $duplicates >= count($request->place_ids),
+        ]);
+    }
+
     private function findThumbnailPath(Place $place): ?string
     {
         $firstImage = $place->images->first();

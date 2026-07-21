@@ -89,11 +89,17 @@
     <div class="pp-share__cta-spacer"></div>
 </div>
 
-<div class="pp-share__cta" id="shareCta">
-    <button type="button" class="pp-btn pp-share__cta-btn" id="shareSaveBtn">이 장소들 내 핀픽에 담기</button>
+<div class="pp-share__reselect-bar" id="shareReselectBar" style="display:none">
+    <span id="shareReselectCount"></span>
+    <button type="button" class="pp-share__reselect-cancel" id="shareReselectCancel">취소</button>
 </div>
 
-{{-- 게스트 5개 제한 안내 --}}
+<div class="pp-share__cta" id="shareCta">
+    <button type="button" class="pp-btn pp-share__cta-btn" id="shareSaveBtn">이 장소들 내 핀픽에 담기</button>
+    <p class="pp-share__guest-hint" id="shareGuestHint" style="display:none"></p>
+</div>
+
+{{-- 게스트 저장 안내 --}}
 <div class="pp-share__select-sheet" id="shareGuestSheet">
     <div class="pp-share__select-backdrop" data-role="close"></div>
     <div class="pp-share__select-panel">
@@ -103,7 +109,7 @@
         </div>
         <div class="pp-share__select-info" id="shareGuestInfo"></div>
         <div class="pp-share__select-actions">
-            <button type="button" class="pp-btn" id="shareGuestSave">저장하기</button>
+            <button type="button" class="pp-btn" id="shareGuestPick">직접 고르기</button>
             <button type="button" class="pp-btn pp-btn--ghost" id="shareGuestLogin">로그인하고 전부 저장</button>
         </div>
     </div>
@@ -176,6 +182,7 @@
     const _qp = new URLSearchParams(location.search);
     const _qpSelected = _qp.get('selected');
     const _qpAction = _qp.get('action');
+    const IS_APP_AUTO_SAVE = IS_APP_WEBVIEW && _qpAction === 'save';
 
     function getSelectedSortOrders() {
         var orders = [];
@@ -301,6 +308,10 @@
                 selected.delete(id);
                 card.classList.remove('is-selected');
             } else {
+                if (reselectMode && selected.size >= reselectLimit) {
+                    showToast('비로그인은 ' + reselectLimit + '개까지만 선택할 수 있어요');
+                    return;
+                }
                 selected.add(id);
                 card.classList.add('is-selected');
             }
@@ -343,6 +354,13 @@
     }
 
     function updateCtaText() {
+        if (reselectMode) {
+            saveBtn.textContent = selected.size > 0 ? selected.size + '개 저장하기' : '저장할 장소를 골라주세요';
+            saveBtn.disabled = selected.size === 0;
+            updateReselectCounter();
+            return;
+        }
+        saveBtn.disabled = false;
         if (selected.size > 0) {
             saveBtn.textContent = selected.size + '개 장소 담기';
         } else {
@@ -356,6 +374,7 @@
 
     // --- CTA ---
     saveBtn.addEventListener('click', function() {
+        if (reselectMode) { doReselectSave(); return; }
         if (isAuth) { openCategorySheet(); }
         else { handleGuestSave(); }
     });
@@ -363,9 +382,33 @@
     // --- action=save 자동 시작 ---
     if (_qpAction === 'save') {
         setTimeout(function() {
-            if (isAuth) { openCategorySheet(); }
-            else { handleGuestSave(); }
+            if (IS_APP_AUTO_SAVE && isAuth) {
+                checkAndAutoSave();
+            } else if (isAuth) {
+                openCategorySheet();
+            } else {
+                handleGuestSave();
+            }
         }, 300);
+    }
+
+    async function checkAndAutoSave() {
+        var ids = getSelectedIds();
+        try {
+            var res = await fetch('/s/' + token + '/check-duplicates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ place_ids: ids }),
+            });
+            var data = await res.json();
+            if (data.all_duplicates) {
+                showDone('이미 저장된 장소예요', true);
+            } else {
+                openCategorySheet();
+            }
+        } catch (e) {
+            openCategorySheet();
+        }
     }
 
     // --- Close sheets ---
@@ -381,40 +424,137 @@
 
     // --- Guest save ---
     var GUEST_KEY = 'pinpick_guest_places';
+    var reselectMode = false;
+    var reselectLimit = 0;
+    var savedSelection = null;
+
+    function getGuestRemaining() {
+        var guestPlaces = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
+        return 5 - guestPlaces.length;
+    }
+
+    function updateGuestHint() {
+        var hint = document.getElementById('shareGuestHint');
+        if (!hint || isAuth) return;
+        var remaining = getGuestRemaining();
+        hint.textContent = '비로그인은 5개까지 저장돼요 · 남은 저장 ' + remaining + '개';
+        hint.style.display = '';
+    }
+
+    function countNewPlaces(toSave, guestPlaces) {
+        return toSave.filter(function(p) {
+            return !guestPlaces.some(function(g) {
+                return (p.external_place_id && g.kakao_place_id === p.external_place_id) ||
+                    (g.name === p.name && g.address === p.address);
+            });
+        }).length;
+    }
 
     function handleGuestSave() {
         var guestPlaces = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
         var remaining = 5 - guestPlaces.length;
         var ids = getSelectedIds();
         var toSave = places.filter(function(p) { return ids.indexOf(p.id) !== -1; });
+        var newCount = countNewPlaces(toSave, guestPlaces);
 
-        if (toSave.length > remaining && remaining >= 0) {
+        if (remaining <= 0) {
             document.getElementById('shareGuestInfo').textContent =
-                '비로그인은 최대 5개까지 저장할 수 있어요 (남은 ' + remaining + '개). 로그인하면 전부 저장돼요';
+                '비로그인 저장 5개를 모두 사용했어요.\n로그인하면 전부 저장돼요';
+            document.getElementById('shareGuestPick').style.display = 'none';
+            var loginBtn = document.getElementById('shareGuestLogin');
+            loginBtn.textContent = '로그인하고 저장';
+            loginBtn.className = 'pp-btn';
             guestSheet.classList.add('is-open');
             return;
         }
-        doGuestSave(toSave, guestPlaces, remaining);
+
+        if (newCount > remaining) {
+            document.getElementById('shareGuestInfo').textContent =
+                '비로그인은 ' + remaining + '개까지 더 저장할 수 있어요';
+            var pickBtn = document.getElementById('shareGuestPick');
+            pickBtn.textContent = '저장할 ' + remaining + '개 직접 고르기';
+            pickBtn.style.display = '';
+            pickBtn.dataset.limit = remaining;
+            var loginBtn = document.getElementById('shareGuestLogin');
+            loginBtn.textContent = '로그인하고 전부 저장';
+            loginBtn.className = 'pp-btn pp-btn--ghost';
+            guestSheet.classList.add('is-open');
+            return;
+        }
+
+        doGuestSave(toSave, guestPlaces);
     }
 
-    document.getElementById('shareGuestSave').addEventListener('click', function() {
-        var guestPlaces = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
-        var remaining = 5 - guestPlaces.length;
-        var ids = getSelectedIds();
-        var toSave = places.filter(function(p) { return ids.indexOf(p.id) !== -1; });
+    document.getElementById('shareGuestPick').addEventListener('click', function() {
+        var limit = parseInt(this.dataset.limit) || getGuestRemaining();
         guestSheet.classList.remove('is-open');
-        doGuestSave(toSave, guestPlaces, remaining);
+        enterReselectMode(limit);
     });
 
     document.getElementById('shareGuestLogin').addEventListener('click', function() {
         location.href = '/login';
     });
 
-    function doGuestSave(toSave, guestPlaces, remaining) {
+    function enterReselectMode(limit) {
+        reselectMode = true;
+        reselectLimit = limit;
+        savedSelection = new Set(selected);
+
+        selected.clear();
+        allCards.forEach(function(c) { c.classList.remove('is-selected'); });
+
+        document.getElementById('shareReselectBar').style.display = '';
+        selectAllBtn.style.display = 'none';
+        document.querySelectorAll('.pp-share__card-add').forEach(function(b) { b.style.display = ''; });
+        updateReselectCounter();
+        updateCtaText();
+    }
+
+    function exitReselectMode(restore) {
+        reselectMode = false;
+        reselectLimit = 0;
+        document.getElementById('shareReselectBar').style.display = 'none';
+        selectAllBtn.style.display = '';
+        saveBtn.disabled = false;
+
+        if (restore && savedSelection) {
+            selected.clear();
+            allCards.forEach(function(c) { c.classList.remove('is-selected'); });
+            savedSelection.forEach(function(id) {
+                selected.add(id);
+                var idx = places.findIndex(function(p) { return p.id === id; });
+                if (idx >= 0) {
+                    var card = document.querySelector('.pp-share__card[data-idx="' + idx + '"]');
+                    if (card) card.classList.add('is-selected');
+                }
+            });
+        }
+        savedSelection = null;
+        updateCtaText();
+        updateSelectAllBtn();
+    }
+
+    function updateReselectCounter() {
+        var el = document.getElementById('shareReselectCount');
+        if (el) el.textContent = '저장할 장소를 골라주세요 (' + selected.size + '/' + reselectLimit + ')';
+    }
+
+    document.getElementById('shareReselectCancel').addEventListener('click', function() {
+        exitReselectMode(true);
+    });
+
+    function doReselectSave() {
+        var guestPlaces = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
+        var ids = Array.from(selected);
+        var toSave = places.filter(function(p) { return ids.indexOf(p.id) !== -1; });
+        exitReselectMode(false);
+        doGuestSave(toSave, guestPlaces);
+    }
+
+    function doGuestSave(toSave, guestPlaces) {
         var added = 0;
         var skipped = 0;
         toSave.forEach(function(p) {
-            if (added >= remaining) return;
             var exists = guestPlaces.some(function(g) {
                 return (p.external_place_id && g.kakao_place_id === p.external_place_id) ||
                     (g.name === p.name && g.address === p.address);
@@ -446,8 +586,11 @@
         } else {
             msg = added + '개 장소가 저장됐어요!';
         }
-        showDone(msg);
+        updateGuestHint();
+        showDone(msg, false);
     }
+
+    if (!isAuth) updateGuestHint();
 
     // --- Auth save ---
     var userCats = @json($userCategories);
@@ -548,7 +691,7 @@
                 } else {
                     msg = data.saved + '개 장소가 저장됐어요!';
                 }
-                showDone(msg);
+                showDone(msg, true);
             }
         } catch (e) {
             showToast('저장에 실패했어요. 다시 시도해주세요.');
@@ -559,8 +702,14 @@
     });
 
     // --- Done state ---
-    function showDone(msg) {
+    function showDone(msg, isServerSaved) {
         showToast(msg);
+
+        if (IS_APP_AUTO_SAVE) {
+            setTimeout(function() { location.href = '/'; }, 1200);
+            return;
+        }
+
         saveBtn.textContent = '핀픽에서 보기';
         saveBtn.className = 'pp-btn pp-share__cta-btn pp-share__cta-btn--done';
         saveBtn.onclick = function() {
@@ -569,19 +718,32 @@
                 return;
             }
             if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                var orders = getSelectedSortOrders();
-                var deepPath = 's/' + token + '?action=save';
-                if (orders) deepPath += '&selected=' + orders;
-                if (/Android/i.test(navigator.userAgent)) {
-                    location.href = 'intent://' + deepPath +
-                        '#Intent;scheme=pinpick;S.browser_fallback_url=' +
-                        encodeURIComponent(location.origin + '/') + ';end';
+                if (isServerSaved) {
+                    if (/Android/i.test(navigator.userAgent)) {
+                        location.href = 'intent://#Intent;scheme=pinpick;S.browser_fallback_url=' +
+                            encodeURIComponent(location.origin + '/') + ';end';
+                    } else {
+                        location.href = 'pinpick://';
+                        setTimeout(function() {
+                            if (document.hidden) return;
+                            location.href = '/';
+                        }, 1500);
+                    }
                 } else {
-                    location.href = 'pinpick://' + deepPath;
-                    setTimeout(function() {
-                        if (document.hidden) return;
-                        location.href = '/';
-                    }, 1500);
+                    var orders = getSelectedSortOrders();
+                    var deepPath = 's/' + token + '?action=save';
+                    if (orders) deepPath += '&selected=' + orders;
+                    if (/Android/i.test(navigator.userAgent)) {
+                        location.href = 'intent://' + deepPath +
+                            '#Intent;scheme=pinpick;S.browser_fallback_url=' +
+                            encodeURIComponent(location.origin + '/') + ';end';
+                    } else {
+                        location.href = 'pinpick://' + deepPath;
+                        setTimeout(function() {
+                            if (document.hidden) return;
+                            location.href = '/';
+                        }, 1500);
+                    }
                 }
             } else {
                 location.href = '/';

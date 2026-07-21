@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:10,1');
     Route::patch('/api/share/{collection}/deactivate', [SharedCollectionController::class, 'deactivate'])->name('api.share.deactivate');
     Route::post('/s/{token}/save', [SharedCollectionController::class, 'saveToMyPinpick'])->name('share.save');
+    Route::post('/s/{token}/check-duplicates', [SharedCollectionController::class, 'checkDuplicates'])->name('share.check-duplicates');
 });
 Route::get('/notices', [MyPageController::class, 'notices'])->name('notices');
 Route::get('/faq', [MyPageController::class, 'faq'])->name('faq');

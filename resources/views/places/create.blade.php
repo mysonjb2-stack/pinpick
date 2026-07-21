@@ -6,7 +6,7 @@
 
 @section('header')
 <header class="pp-header">
-    <button class="pp-header__icon pp-header__back" onclick="history.back()" aria-label="뒤로">
+    <button class="pp-header__icon pp-header__back" id="formBackBtn" aria-label="뒤로">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
     </button>
     <div class="pp-header__title">{{ $editMode ? '장소 수정' : '장소 추가' }}</div>
@@ -191,10 +191,16 @@
             <button type="button" class="sl__search-clear" id="slClear" hidden aria-label="지우기">&times;</button>
         </div>
 
-        {{-- 탭 --}}
-        <div class="sl__tabs">
-            <button type="button" class="sl__tab is-active" data-tab="keyword">🔍 키워드 검색</button>
-            <button type="button" class="sl__tab" data-tab="mappin">🗺 지도에서 찍기</button>
+        {{-- 현위치 저장 버튼 --}}
+        <button type="button" class="sl__current-loc" id="slCurrentLoc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="8"/></svg>
+            <span>지금 이 위치 저장하기</span>
+        </button>
+
+        {{-- 탭 (숨김, JS에서 mappin 전환용으로만 사용) --}}
+        <div class="sl__tabs" style="display:none">
+            <button type="button" class="sl__tab is-active" data-tab="keyword">키워드 검색</button>
+            <button type="button" class="sl__tab" data-tab="mappin">지도에서 찍기</button>
         </div>
 
         {{-- 키워드 검색 탭 --}}
@@ -255,6 +261,11 @@
                 <p class="sl__empty-msg">검색 결과가 없어요</p>
                 <button type="button" class="sl__empty-btn" id="slManual">직접 입력하기</button>
             </div>
+            {{-- 하단 보조 링크 --}}
+            <div class="sl__bottom-links" id="slBottomLinks">
+                <button type="button" class="sl__bottom-link" id="slOpenMappin">원하는 곳이 없나요? <strong>지도에서 직접 찍기</strong></button>
+                <button type="button" class="sl__bottom-link" id="slManualEntry">직접 입력해서 추가</button>
+            </div>
         </div>
 
         {{-- 지도에서 찍기 탭 --}}
@@ -280,6 +291,48 @@
                     <button type="button" class="sl__mappin-save" id="slMappinSave">이 위치로 저장</button>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+{{-- 퀵 저장 바텀시트 --}}
+<div class="qs" id="quickSaveSheet" style="display:none">
+    <div class="qs__backdrop" id="qsBackdrop"></div>
+    <div class="qs__panel">
+        <div class="qs__head">
+            <span class="qs__title">장소 저장</span>
+            <button type="button" class="qs__close" id="qsClose" aria-label="닫기">&times;</button>
+        </div>
+        <div class="qs__body">
+            <div class="qs__field">
+                <input type="text" class="qs__name-input" id="qsName" maxlength="255" placeholder="장소명을 입력하세요">
+            </div>
+            <div class="qs__addr" id="qsAddr"></div>
+            <div class="qs__field qs__photos-field">
+                <div class="qs__photos" id="qsPhotos">
+                    <button type="button" class="qs__photo-add" id="qsPhotoAdd" aria-label="사진 추가">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" width="20" height="20"><path d="M12 5v14M5 12h14"/></svg>
+                        <span>사진 등록</span>
+                    </button>
+                </div>
+                <input type="file" id="qsPhotoInput" accept="image/jpeg,image/png,image/webp,image/heic" multiple hidden>
+                <div class="qs__exif-suggest" id="qsExifSuggest" style="display:none"></div>
+            </div>
+            <div class="qs__field">
+                <label class="qs__label">카테고리</label>
+                <div class="qs__cats" id="qsCats"></div>
+            </div>
+            <div class="qs__field">
+                <label class="qs__label">방문 상태</label>
+                <div class="qs__status" id="qsStatus">
+                    <button type="button" class="qs__status-btn is-active" data-st="planned">방문예정</button>
+                    <button type="button" class="qs__status-btn" data-st="visited">방문완료</button>
+                </div>
+            </div>
+        </div>
+        <div class="qs__actions">
+            <button type="button" class="pp-btn qs__save" id="qsSaveBtn" disabled>저장하기</button>
+            <button type="button" class="qs__detail-link" id="qsDetailLink">상세 입력 ›</button>
         </div>
     </div>
 </div>
@@ -438,8 +491,13 @@ function closeSL() {
     showKeywordInit();
 }
 
+let slAutoOpened = false;
+
 document.getElementById('searchTrigger').addEventListener('click', openSL);
-document.getElementById('slBack').addEventListener('click', closeSL);
+document.getElementById('slBack').addEventListener('click', function() {
+    if (slAutoOpened) { history.back(); return; }
+    closeSL();
+});
 
 // 수정모드 해외 장소 시 토글 초기화
 if (currentRegion === 'overseas') {
@@ -483,13 +541,28 @@ document.querySelectorAll('.sl__region-btn').forEach(btn => {
     });
 });
 
-// 탭 전환
+// 탭 전환 (숨김 탭용, 프로그래밍 호출)
+function switchToPane(pane) {
+    document.querySelectorAll('.sl__tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab === pane));
+    document.querySelectorAll('.sl__pane').forEach(p => p.classList.toggle('is-active', p.dataset.pane === pane));
+    if (pane === 'mappin') switchMappinMap();
+    var links = document.getElementById('slBottomLinks');
+    if (links) links.style.display = pane === 'mappin' ? 'none' : '';
+    var locBtn = document.getElementById('slCurrentLoc');
+    if (locBtn) locBtn.style.display = pane === 'mappin' ? 'none' : '';
+}
 document.querySelectorAll('.sl__tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.sl__tab').forEach(b => b.classList.toggle('is-active', b === btn));
-        document.querySelectorAll('.sl__pane').forEach(p => p.classList.toggle('is-active', p.dataset.pane === btn.dataset.tab));
-        if (btn.dataset.tab === 'mappin') switchMappinMap();
-    });
+    btn.addEventListener('click', () => switchToPane(btn.dataset.tab));
+});
+
+// 하단 링크: 지도에서 직접 찍기
+document.getElementById('slOpenMappin').addEventListener('click', () => switchToPane('mappin'));
+
+// 하단 링크: 직접 입력해서 추가
+document.getElementById('slManualEntry').addEventListener('click', () => {
+    slAutoOpened = false;
+    closeSL();
+    document.getElementById('f_name').focus();
 });
 
 // =========================================
@@ -551,6 +624,7 @@ function loadPopularPlaces() {
             userLat = p.coords.latitude; userLng = p.coords.longitude;
             try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat: userLat, lng: userLng })); } catch(e) {}
             fetchPopular();
+            if (typeof prefetchReverseGeo === 'function') prefetchReverseGeo();
         }, () => { fetchPopularFallback(); }, { enableHighAccuracy: false, timeout: 3000, maximumAge: 300000 });
     } else {
         fetchPopular();
@@ -691,20 +765,60 @@ function renderAcDomestic(docs) {
 }
 
 
+let _pickedDoc = null;
+let _pickedExtra = {};
+
 function pickPlace(d) {
     const _q = (slInput.value || '').trim();
     if (_q) saveRecent(_q);
+
+    _pickedDoc = d;
+    _pickedExtra = {
+        phone: d.phone || '',
+        hours: d.opening_hours ? JSON.stringify(d.opening_hours) : '',
+        building_name: '',
+        detail_location: '',
+    };
+
+    if (currentRegion === 'domestic' && d.place_name) {
+        const kakaoRoad = d.road_address_name || d.address_name || '';
+        const params = new URLSearchParams({ name: d.place_name, address: kakaoRoad });
+        fetch('/api/phone/fallback?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+            .then(r => r.json())
+            .then(j => {
+                if (j && j.phone && !_pickedExtra.phone) _pickedExtra.phone = j.phone;
+                if (j && j.opening_hours && !_pickedExtra.hours) _pickedExtra.hours = JSON.stringify(j.opening_hours);
+                if (j && j.detail_address) _pickedExtra.detail_location = j.detail_address;
+            }).catch(() => {});
+        if (kakaoRoad) {
+            fetch('/api/building-name?' + new URLSearchParams({ road_address: kakaoRoad }), { headers: { 'Accept': 'application/json' } })
+                .then(r => r.json())
+                .then(j => { if (j && j.building_name) _pickedExtra.building_name = j.building_name; })
+                .catch(() => {});
+        }
+    }
+
+    if (editMode) {
+        applyPickedToForm(d);
+        closeSL();
+    } else {
+        openQuickSave(d);
+    }
+}
+
+function applyPickedToForm(d) {
     document.getElementById('f_name').value = d.place_name || '';
     document.getElementById('f_original_name').value = d.place_name || '';
-    document.getElementById('f_phone').value = d.phone || '';
-    document.getElementById('f_hours').value = d.opening_hours ? JSON.stringify(d.opening_hours) : '';
+    document.getElementById('f_phone').value = _pickedExtra.phone || d.phone || '';
+    document.getElementById('f_hours').value = _pickedExtra.hours || '';
     const _cleanAddr = d.road_address_name || d.address_name || '';
     document.getElementById('f_road_val').value = _cleanAddr;
-    document.getElementById('f_road').value = _cleanAddr;
+    document.getElementById('f_road').value = _cleanAddr + (_pickedExtra.building_name ? ' ' + _pickedExtra.building_name : '');
     document.getElementById('f_addr').value = d.address_name || '';
     document.getElementById('f_lat').value = d.y || '';
     document.getElementById('f_lng').value = d.x || '';
-    // 국내=카카오 id, 해외=구글 place_id로 분기 저장
+    document.getElementById('f_building').value = _pickedExtra.building_name || '';
+    if (_pickedExtra.detail_location) document.getElementById('f_detail_loc').value = _pickedExtra.detail_location;
     if (currentRegion === 'overseas') {
         document.getElementById('f_kpid').value = '';
         document.getElementById('f_gpid').value = d.id || '';
@@ -713,53 +827,22 @@ function pickPlace(d) {
         document.getElementById('f_gpid').value = '';
     }
     document.getElementById('f_overseas').value = currentRegion === 'overseas' ? '1' : '0';
-    // 카카오에 전화번호/영업시간 없으면 구글로 폴백 조회 (국내만)
-    if (currentRegion === 'domestic' && d.place_name) {
-        const phoneEl = document.getElementById('f_phone');
-        const hoursEl = document.getElementById('f_hours');
-        if (!phoneEl.value) phoneEl.placeholder = '전화번호 조회 중…';
-        const kakaoRoad = d.road_address_name || d.address_name || '';
-        const params = new URLSearchParams({ name: d.place_name, address: kakaoRoad });
-        fetch('/api/phone/fallback?' + params.toString(), { headers: { 'Accept': 'application/json' } })
-            .then(r => r.json())
-            .then(j => {
-                if (j && j.phone && !phoneEl.value) phoneEl.value = j.phone;
-                if (j && j.opening_hours && !hoursEl.value) hoursEl.value = JSON.stringify(j.opening_hours);
-                const detLocEl = document.getElementById('f_detail_loc');
-                if (j && j.detail_address && !detLocEl.value) detLocEl.value = j.detail_address;
-            })
-            .catch(() => {})
-            .finally(() => { phoneEl.placeholder = ''; });
-        // 건물명 조회 (카카오 주소 검색 API)
-        if (kakaoRoad) {
-            fetch('/api/building-name?' + new URLSearchParams({ road_address: kakaoRoad }), { headers: { 'Accept': 'application/json' } })
-                .then(r => r.json())
-                .then(j => {
-                    if (j && j.building_name) {
-                        document.getElementById('f_building').value = j.building_name;
-                        const rdEl = document.getElementById('f_road');
-                        if (rdEl.value && !rdEl.value.includes(j.building_name)) {
-                            rdEl.value += ' ' + j.building_name;
-                        }
-                    }
-                })
-                .catch(() => {});
-        }
-    }
     const sp = document.getElementById('searchTrigger').querySelector('span');
     if (sp) sp.textContent = d.place_name || '';
     document.getElementById('searchTrigger').classList.add('is-filled');
-    // 카테고리 자동 추천 (국내만)
     if (currentRegion === 'domestic') {
         const cat = d.category_group_name || '';
         const catAutoMap = {'음식점':'맛집','카페':'카페','숙박':'여행','병원':'병원/약국','약국':'병원/약국'};
         const target = catAutoMap[cat];
         if (target) { const found = catState.find(c => c.name === target); if (found) selectCategory(found.id); }
     }
-    closeSL();
 }
 
-document.getElementById('slManual').addEventListener('click', () => { closeSL(); document.getElementById('f_name').focus(); });
+document.getElementById('slManual').addEventListener('click', () => {
+    slAutoOpened = false;
+    closeSL();
+    document.getElementById('f_name').focus();
+});
 
 // =========================================
 // 2-1) 검색 결과 지도 뷰
@@ -787,6 +870,7 @@ function refreshGeo() {
     navigator.geolocation.getCurrentPosition(p => {
         userLat = p.coords.latitude; userLng = p.coords.longitude;
         try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat: userLat, lng: userLng })); } catch(e) {}
+        if (typeof prefetchReverseGeo === 'function') prefetchReverseGeo();
     }, () => {}, { enableHighAccuracy: false, timeout: 5000 });
 }
 refreshGeo();
@@ -2223,5 +2307,487 @@ document.getElementById('placeForm').addEventListener('submit', function(e) {
     location.href = '/?saved=1';
 });
 @endguest
+
+// =========================================
+// 퀵 저장 바텀시트
+// =========================================
+const THEME_AUTO_MAP = {
+    '음식점': 1, '카페': 2, '숙박': 6, '관광명소': 3,
+    '문화시설': 8, '대형마트': 7, '병원': 5, '약국': 5,
+    'restaurant': 1, 'food': 1, 'cafe': 2, 'coffee': 2,
+    'lodging': 6, 'hotel': 6, 'tourist_attraction': 3,
+    'museum': 8, 'shopping_mall': 7, 'hospital': 5, 'pharmacy': 5,
+};
+
+let qsData = null;
+let qsCatId = null;
+let qsStatus = 'planned';
+let qsFiles = [];
+
+function qsRenderPhotos() {
+    const wrap = document.getElementById('qsPhotos');
+    wrap.querySelectorAll('.qs__photo-thumb').forEach(el => el.remove());
+    const addBtn = document.getElementById('qsPhotoAdd');
+    qsFiles.forEach((f, i) => {
+        const div = document.createElement('div');
+        div.className = 'qs__photo-thumb';
+        div.innerHTML = `<img src="${URL.createObjectURL(f)}" alt=""><button type="button" class="qs__photo-thumb__del" data-qi="${i}" aria-label="삭제">&times;</button>`;
+        wrap.insertBefore(div, addBtn);
+    });
+    addBtn.style.display = qsFiles.length >= 5 ? 'none' : '';
+}
+
+let qsExifChecked = false;
+async function qsCheckExif() {
+    if (qsExifChecked) return;
+    const banner = document.getElementById('qsExifSuggest');
+    for (const f of qsFiles) {
+        const d = await readExifDate(f);
+        if (!d) continue;
+        if (qsStatus === 'visited') break;
+        qsExifChecked = true;
+        banner.innerHTML = `<span>📸 촬영일 <b>${d.replace(/-/g,'.')}</b> — 방문완료로 변경할까요?</span>`
+            + `<button type="button" class="qs__exif-yes" id="qsExifYes">네</button>`
+            + `<button type="button" class="qs__exif-no" id="qsExifNo" aria-label="닫기">&times;</button>`;
+        banner.style.display = 'flex';
+        banner.querySelector('#qsExifYes').addEventListener('click', () => {
+            qsStatus = 'visited';
+            document.querySelectorAll('#qsStatus .qs__status-btn').forEach(b => b.classList.toggle('is-active', b.dataset.st === 'visited'));
+            banner.style.display = 'none';
+        });
+        banner.querySelector('#qsExifNo').addEventListener('click', () => { banner.style.display = 'none'; });
+        break;
+    }
+}
+
+document.getElementById('qsPhotoAdd').addEventListener('click', () => {
+    if (qsFiles.length >= 5) return;
+    document.getElementById('qsPhotoInput').click();
+});
+document.getElementById('qsPhotoInput').addEventListener('change', () => {
+    const inp = document.getElementById('qsPhotoInput');
+    const files = Array.from(inp.files);
+    const remain = 5 - qsFiles.length;
+    if (remain <= 0) return;
+    const toAdd = files.slice(0, remain);
+    for (const f of toAdd) {
+        if (f.size > 10 * 1024 * 1024) { showFormToast('이미지는 10MB 이하만 가능해요'); return; }
+    }
+    qsFiles.push(...toAdd);
+    qsRenderPhotos();
+    qsCheckExif();
+    inp.value = '';
+});
+document.getElementById('qsPhotos').addEventListener('click', (e) => {
+    const del = e.target.closest('.qs__photo-thumb__del');
+    if (!del) return;
+    const idx = parseInt(del.dataset.qi);
+    qsFiles.splice(idx, 1);
+    qsRenderPhotos();
+});
+
+function openQuickSave(d, opts) {
+    const restore = opts && opts.restore;
+
+    qsData = d;
+    if (!restore) {
+        qsCatId = null;
+        qsStatus = 'planned';
+        qsFiles = [];
+        qsExifChecked = false;
+        document.getElementById('qsExifSuggest').style.display = 'none';
+    }
+    qsRenderPhotos();
+
+    document.getElementById('qsName').value = d.place_name || '';
+    const addrEl = document.getElementById('qsAddr');
+    const addrText = d.road_address_name || d.address_name || '';
+    if (d._addrPending) {
+        addrEl.textContent = '';
+        addrEl.classList.add('qs__addr--skeleton');
+    } else {
+        addrEl.textContent = addrText;
+        addrEl.classList.remove('qs__addr--skeleton');
+    }
+
+    // 카테고리 칩 렌더
+    const catsEl = document.getElementById('qsCats');
+    const recentCatId = localStorage.getItem('pp_last_cat');
+    catsEl.innerHTML = catState.map(c => {
+        const color = c.color || '#888';
+        return `<button type="button" class="qs__cat-chip" data-cat-id="${c.id}" style="--cat-color:${color}">${escapeHtml(c.name)}</button>`;
+    }).join('');
+    catsEl.querySelectorAll('.qs__cat-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            catsEl.querySelectorAll('.qs__cat-chip').forEach(b => b.classList.remove('is-active'));
+            btn.classList.add('is-active');
+            qsCatId = parseInt(btn.dataset.catId);
+            document.getElementById('qsSaveBtn').disabled = false;
+        });
+    });
+
+    if (restore && qsCatId) {
+        const chip = catsEl.querySelector(`[data-cat-id="${qsCatId}"]`);
+        if (chip) chip.classList.add('is-active');
+    } else if (!restore) {
+        // 카테고리 자동 선택: 검색결과 매핑 → 최근 사용
+        let autoSelected = false;
+        if (currentRegion === 'domestic') {
+            const catName = d.category_group_name || '';
+            const catAutoMap = {'음식점':'맛집','카페':'카페','숙박':'여행','병원':'병원/약국','약국':'병원/약국'};
+            const target = catAutoMap[catName];
+            if (target) {
+                const found = catState.find(c => c.name === target);
+                if (found) {
+                    const chip = catsEl.querySelector(`[data-cat-id="${found.id}"]`);
+                    if (chip) { chip.classList.add('is-active'); qsCatId = found.id; autoSelected = true; }
+                }
+            }
+        }
+        if (!autoSelected && recentCatId) {
+            const chip = catsEl.querySelector(`[data-cat-id="${recentCatId}"]`);
+            if (chip) { chip.classList.add('is-active'); qsCatId = parseInt(recentCatId); autoSelected = true; }
+        }
+    }
+    document.getElementById('qsSaveBtn').disabled = !qsCatId;
+
+    // 방문 상태
+    document.querySelectorAll('#qsStatus .qs__status-btn').forEach(b => {
+        b.classList.toggle('is-active', b.dataset.st === qsStatus);
+    });
+    document.querySelectorAll('#qsStatus .qs__status-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('#qsStatus .qs__status-btn').forEach(b => b.classList.remove('is-active'));
+            btn.classList.add('is-active');
+            qsStatus = btn.dataset.st;
+        };
+    });
+
+    const sheet = document.getElementById('quickSaveSheet');
+    sheet.style.display = 'flex';
+    requestAnimationFrame(() => {
+        sheet.classList.add('is-open');
+        sheet.querySelector('.qs__panel').scrollTop = 0;
+    });
+}
+
+function closeQuickSave() {
+    const sheet = document.getElementById('quickSaveSheet');
+    sheet.classList.remove('is-open');
+    setTimeout(() => { sheet.style.display = 'none'; }, 250);
+}
+
+let _qsFromDetail = false;
+let _qsDetailState = { memo: '', detailLoc: '', themeIds: [], visitedAt: '' };
+
+function qsHasDirty() {
+    if (!qsData) return false;
+    const name = document.getElementById('qsName').value.trim();
+    return !!(name || qsFiles.length || qsCatId || qsStatus !== 'planned'
+        || _qsDetailState.memo || _qsDetailState.detailLoc);
+}
+
+function qsConfirmClose() {
+    if (!qsHasDirty()) { qsFullReset(); return; }
+    if (confirm('작성 중인 내용이 사라져요. 나갈까요?')) qsFullReset();
+}
+
+function qsFullReset() {
+    _qsFromDetail = false;
+    _qsDetailState = { memo: '', detailLoc: '', themeIds: [], visitedAt: '' };
+    closeQuickSave();
+    if (slAutoOpened) {
+        closeSL();
+        history.back();
+    } else {
+        closeSL();
+    }
+}
+
+document.getElementById('qsClose').addEventListener('click', qsConfirmClose);
+document.getElementById('qsBackdrop').addEventListener('click', qsConfirmClose);
+
+// 퀵 저장 실행
+document.getElementById('qsSaveBtn').addEventListener('click', async function() {
+    if (!qsData || !qsCatId) return;
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+
+    const d = qsData;
+    const name = document.getElementById('qsName').value.trim() || d.place_name || '';
+
+    if (isGuest) {
+        const gKey = 'pinpick_guest_places';
+        const list = JSON.parse(localStorage.getItem(gKey) || '[]');
+        if (list.length >= 5) {
+            showFormToast('비로그인은 최대 5개까지 저장할 수 있어요');
+            btn.disabled = false; btn.textContent = '저장하기';
+            return;
+        }
+        const cinfo = typeof guestCatMap !== 'undefined' && guestCatMap[qsCatId] ? guestCatMap[qsCatId] : { name: '', icon: '📌' };
+        list.unshift({
+            id: 'g' + Date.now(),
+            name: name,
+            category_id: qsCatId,
+            category_name: cinfo.name,
+            category_icon: cinfo.icon,
+            category_label: null,
+            phone: _pickedExtra.phone || d.phone || '',
+            road_address: d.road_address_name || d.address_name || '',
+            address: d.address_name || '',
+            lat: d.y || '', lng: d.x || '',
+            memo: '', status: qsStatus, visited_at: '',
+            is_overseas: currentRegion === 'overseas',
+            created_at: Date.now(),
+        });
+        localStorage.setItem(gKey, JSON.stringify(list));
+        localStorage.setItem('pp_last_cat', String(qsCatId));
+        closeQuickSave();
+        closeSL();
+        showFormToast('장소가 저장됐어요!');
+        setTimeout(() => { location.href = '/?saved=1'; }, 800);
+        return;
+    }
+
+    const cat = d.category_group_name || '';
+    const themeId = THEME_AUTO_MAP[cat];
+
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('original_name', d.place_name || '');
+    fd.append('category_id', qsCatId);
+    fd.append('status', qsStatus);
+    fd.append('road_address', d.road_address_name || d.address_name || '');
+    fd.append('address', d.address_name || '');
+    fd.append('lat', d.y || '');
+    fd.append('lng', d.x || '');
+    fd.append('phone', _pickedExtra.phone || d.phone || '');
+    fd.append('opening_hours', _pickedExtra.hours || '');
+    fd.append('building_name', _pickedExtra.building_name || '');
+    fd.append('detail_location', _pickedExtra.detail_location || '');
+    fd.append('kakao_place_id', currentRegion === 'overseas' ? '' : (d.id || ''));
+    fd.append('google_place_id', currentRegion === 'overseas' ? (d.id || '') : '');
+    fd.append('is_overseas', currentRegion === 'overseas' ? 1 : 0);
+    if (themeId) fd.append('theme_ids[]', themeId);
+    qsFiles.forEach(f => fd.append('images[]', f));
+
+    try {
+        const res = await fetch('{{ route("places.store") }}', {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+            body: fd,
+        });
+        const data = await res.json();
+        if (data.success) {
+            localStorage.setItem('pp_last_cat', String(qsCatId));
+            closeQuickSave();
+            closeSL();
+            showFormToast('장소가 저장됐어요!');
+            setTimeout(() => { location.href = '/'; }, 800);
+        } else {
+            showFormToast(data.message || '저장에 실패했어요');
+        }
+    } catch (e) {
+        showFormToast('저장에 실패했어요. 다시 시도해주세요.');
+    } finally {
+        btn.disabled = !qsCatId;
+        btn.textContent = '저장하기';
+    }
+});
+
+// =========================================
+// 퀵시트 ↔ 상세 폼 내비게이션
+// =========================================
+function qsPushToForm() {
+    if (!qsData) return;
+    applyPickedToForm(qsData);
+    const qsNameVal = document.getElementById('qsName').value.trim();
+    if (qsNameVal) document.getElementById('f_name').value = qsNameVal;
+    if (qsCatId) selectCategory(qsCatId);
+    if (qsStatus) {
+        document.getElementById('f_status').value = qsStatus;
+        document.querySelectorAll('.pp-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.status === qsStatus));
+        if (qsStatus === 'visited') {
+            document.getElementById('visitedDateField').style.display = 'block';
+            if (!visitedDateInput.value) visitedDateInput.value = new Date().toISOString().slice(0, 10);
+        }
+    }
+    // 상세 상태 복원
+    document.querySelector('textarea[name="memo"]').value = _qsDetailState.memo;
+    document.getElementById('f_detail_loc').value = _qsDetailState.detailLoc;
+    if (_qsDetailState.visitedAt) visitedDateInput.value = _qsDetailState.visitedAt;
+    _qsDetailState.themeIds.forEach(tid => {
+        const chip = document.querySelector(`#themeChips [data-theme-id="${tid}"]`);
+        if (chip && !chip.classList.contains('is-active')) chip.click();
+    });
+    // 사진: qsFiles → imgFiles 동기화
+    imgFiles = [...qsFiles];
+    renderNewImgPreviews();
+}
+
+function qsPullFromForm() {
+    _qsDetailState.memo = document.querySelector('textarea[name="memo"]').value;
+    _qsDetailState.detailLoc = document.getElementById('f_detail_loc').value;
+    _qsDetailState.visitedAt = visitedDateInput.value;
+    _qsDetailState.themeIds = Array.from(document.querySelectorAll('#themeChips .pp-chip.is-active'))
+        .map(el => parseInt(el.dataset.themeId));
+    // 폼 장소명 → 퀵시트 장소명 동기화
+    const formName = document.getElementById('f_name').value.trim();
+    if (formName) document.getElementById('qsName').value = formName;
+    // 폼 카테고리 → 퀵시트 카테고리 동기화
+    const formCatId = document.getElementById('f_category').value;
+    if (formCatId) qsCatId = parseInt(formCatId);
+    // 폼 상태 → 퀵시트 상태 동기화
+    qsStatus = document.getElementById('f_status').value || 'planned';
+    // imgFiles → qsFiles 역동기화
+    qsFiles = [...imgFiles];
+}
+
+// 상세 입력 전환
+document.getElementById('qsDetailLink').addEventListener('click', () => {
+    if (!qsData) return;
+    _qsFromDetail = true;
+    qsPushToForm();
+    closeQuickSave();
+    slAutoOpened = false;
+    closeSL();
+});
+
+// 폼 헤더 뒤로 버튼
+document.getElementById('formBackBtn').addEventListener('click', () => {
+    if (_qsFromDetail && qsData) {
+        qsPullFromForm();
+        // 폼에서 수정한 장소명을 qsData에 반영
+        const backName = document.getElementById('f_name').value.trim();
+        if (backName) qsData.place_name = backName;
+        // 폼 이미지 초기화
+        imgFiles = [];
+        renderNewImgPreviews();
+        // 검색 레이어 + 퀵시트 복원
+        slAutoOpened = true;
+        openSL();
+        openQuickSave(qsData, { restore: true });
+        return;
+    }
+    history.back();
+});
+
+// 현위치 역지오코딩 프리페치
+let _geoCache = null;
+let _geoCacheFetching = false;
+
+function prefetchReverseGeo() {
+    if (_geoCache || _geoCacheFetching || userLat === null) return;
+    _geoCacheFetching = true;
+    const overseas = !isInKorea(userLat, userLng);
+    const provider = overseas ? 'google' : 'naver';
+    fetch(`/api/geocode/reverse?lat=${userLat}&lng=${userLng}&provider=${provider}`)
+        .then(r => r.json())
+        .then(j => {
+            _geoCache = { lat: userLat, lng: userLng, address: j.address || '', building_name: j.building_name || '' };
+        })
+        .catch(() => {
+            _geoCache = { lat: userLat, lng: userLng, address: '', building_name: '', failed: true };
+        })
+        .finally(() => { _geoCacheFetching = false; });
+}
+prefetchReverseGeo();
+
+// 현위치 저장
+const slLocBtn = document.getElementById('slCurrentLoc');
+slLocBtn.addEventListener('click', () => {
+    if (userLat === null) { showFormToast('위치를 확인할 수 없어요'); return; }
+
+    const lat = userLat, lng = userLng;
+    const cached = _geoCache && _geoCache.lat === lat && _geoCache.lng === lng ? _geoCache : null;
+
+    const locDoc = {
+        place_name: cached ? (cached.building_name || '') : '',
+        road_address_name: cached ? cached.address : '',
+        address_name: cached ? cached.address : '',
+        y: lat, x: lng,
+        id: '', phone: '', category_group_name: '',
+        _addrPending: !cached,
+    };
+    _pickedExtra = { phone: '', hours: '', building_name: cached ? cached.building_name : '', detail_location: '' };
+    openQuickSave(locDoc);
+
+    if (!cached) {
+        const addrEl = document.getElementById('qsAddr');
+        const overseas = !isInKorea(lat, lng);
+        const provider = overseas ? 'google' : 'naver';
+        fetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}&provider=${provider}`)
+            .then(r => r.json())
+            .then(j => {
+                const addr = j.address || '';
+                const building = j.building_name || '';
+                addrEl.textContent = addr || '주소를 가져오지 못했어요';
+                addrEl.classList.remove('qs__addr--skeleton');
+                qsData.road_address_name = addr;
+                qsData.address_name = addr;
+                qsData.place_name = building || '';
+                qsData._addrPending = false;
+                _pickedExtra.building_name = building;
+                if (building && !document.getElementById('qsName').value.trim()) {
+                    document.getElementById('qsName').value = building;
+                }
+                _geoCache = { lat, lng, address: addr, building_name: building };
+            })
+            .catch(() => {
+                addrEl.textContent = '주소를 가져오지 못했어요';
+                addrEl.classList.remove('qs__addr--skeleton');
+                qsData._addrPending = false;
+            });
+    }
+});
+
+function showFormToast(msg) {
+    let t = document.getElementById('ppFormToast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'ppFormToast';
+        t.className = 'pp-toast';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add('is-show');
+    setTimeout(() => t.classList.remove('is-show'), 2500);
+}
+
+// 지도에서 찍기 → 퀵 저장으로 전환
+(function patchMappinSave() {
+    const origBtn = document.getElementById('slMappinSave');
+    if (!origBtn || editMode) return;
+    const newBtn = origBtn.cloneNode(true);
+    origBtn.parentNode.replaceChild(newBtn, origBtn);
+    newBtn.addEventListener('click', () => {
+        let lat, lng;
+        if (currentRegion === 'overseas' && typeof gMappinMap !== 'undefined' && gMappinMap) {
+            const c = gMappinMap.getCenter();
+            lat = c.lat(); lng = c.lng();
+        } else if (typeof mappinMap !== 'undefined' && mappinMap) {
+            const c = mappinMap.getCenter();
+            lat = c.lat(); lng = c.lng();
+        }
+        if (lat === undefined) return;
+        const addr = document.getElementById('slMappinAddr').textContent || '';
+        const locDoc = {
+            place_name: '',
+            road_address_name: addr,
+            address_name: addr,
+            y: lat, x: lng,
+            id: '', phone: '', category_group_name: '',
+        };
+        _pickedExtra = { phone: '', hours: '', building_name: '', detail_location: '' };
+        openQuickSave(locDoc);
+    });
+})();
+
+// 신규 모드: 검색 레이어 자동 오픈 (모든 셋업 완료 후)
+if (!editMode) {
+    slAutoOpened = true;
+    openSL();
+}
 </script>
 @endpush
