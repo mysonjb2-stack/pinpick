@@ -1,105 +1,147 @@
 @extends('layouts.app')
 @section('page_title', '장소 둘러보기 | 핀픽')
 @section('meta_description', '다양한 맛집, 카페, 여행지를 둘러보고 나만의 지도에 저장하세요. 카테고리별 큐레이션으로 새로운 장소를 발견합니다.')
-@section('app_class', 'pp-app--home')
+@section('app_class', 'pp-app--explore')
 
 @section('header')
-<header class="ph-header">
-    <div class="ph-header__top">
-        <div class="ph-brand">
-            <small>직접 찾아보는</small>
-            <div class="ph-brand__name">탐색</div>
-        </div>
-    </div>
+<header class="pp-expl-header">
+    <small class="pp-expl-header__sub">직접 찾아보는</small>
+    <h1 class="pp-expl-header__title">탐색</h1>
 </header>
 @endsection
 
 @section('content')
-<div class="ph-content">
-    <div class="ph-section" style="padding-top:6px">
-        <div class="ph-section__title"><strong>큐레이션</strong></div>
+<div class="pp-expl">
+    <div class="pp-expl-chips" id="curChips">
+        <div class="pp-expl-chips__track">
+            <button type="button" class="pp-expl-chip is-active" data-cat="">전체</button>
+        </div>
+        <div class="pp-expl-chips__fade"></div>
     </div>
 
-    <div class="pp-cur-regions" id="curRegions">
-        <button type="button" class="pp-cur-region-chip is-active" data-region="">전체</button>
-    </div>
-
-    <div class="pp-cur-cards" id="curCards">
-        <div class="pp-cur-empty" id="curLoading">큐레이션을 불러오는 중...</div>
+    <div class="pp-expl-feed" id="curFeed">
+        <div class="pp-expl-feed__loading" id="curLoading">큐레이션을 불러오는 중...</div>
     </div>
 </div>
 
 <script>
 (function() {
+    const PLACE_MAX = 4;
+    const GRADIENTS = [
+        'linear-gradient(135deg, #e8ddd4 0%, #d4c8bc 100%)',
+        'linear-gradient(150deg, #dcd3c9 0%, #c9bfb4 100%)',
+        'linear-gradient(120deg, #e2d8ce 0%, #cec3b7 100%)',
+        'linear-gradient(160deg, #ddd4ca 0%, #d0c5b8 100%)',
+    ];
     let allCurations = [];
-    let activeRegion = '';
+    let activeCat = '';
 
-    async function loadCurations() {
+    async function init() {
         try {
-            const [curRes, regRes] = await Promise.all([
+            const [curRes, catRes] = await Promise.all([
                 fetch('/api/curations'),
-                fetch('/api/curations/regions'),
+                fetch('/api/curations/categories'),
             ]);
             allCurations = await curRes.json();
-            const regions = await regRes.json();
+            const categories = await catRes.json();
 
-            const regWrap = document.getElementById('curRegions');
-            regions.forEach(r => {
+            const track = document.querySelector('.pp-expl-chips__track');
+            categories.forEach(c => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'pp-cur-region-chip';
-                btn.dataset.region = r;
-                btn.textContent = r;
-                regWrap.appendChild(btn);
+                btn.className = 'pp-expl-chip';
+                btn.dataset.cat = c.slug;
+                btn.textContent = c.label;
+                track.appendChild(btn);
             });
 
-            regWrap.addEventListener('click', e => {
-                const chip = e.target.closest('.pp-cur-region-chip');
+            track.addEventListener('click', e => {
+                const chip = e.target.closest('.pp-expl-chip');
                 if (!chip) return;
-                regWrap.querySelectorAll('.pp-cur-region-chip').forEach(c => c.classList.remove('is-active'));
+                track.querySelectorAll('.pp-expl-chip').forEach(c => c.classList.remove('is-active'));
                 chip.classList.add('is-active');
-                activeRegion = chip.dataset.region;
-                renderCards();
+                activeCat = chip.dataset.cat;
+                renderFeed();
+                document.getElementById('curFeed').scrollIntoView({behavior: 'smooth', block: 'start'});
             });
 
-            renderCards();
+            renderFeed();
         } catch (e) {
             document.getElementById('curLoading').textContent = '큐레이션을 불러올 수 없습니다.';
         }
     }
 
-    function renderCards() {
-        const wrap = document.getElementById('curCards');
-        const filtered = activeRegion
-            ? allCurations.filter(c => c.region_label === activeRegion)
+    function renderFeed() {
+        const feed = document.getElementById('curFeed');
+        const filtered = activeCat
+            ? allCurations.filter(c => c.category === activeCat)
             : allCurations;
 
         if (!filtered.length) {
-            wrap.innerHTML = '<div class="pp-cur-empty">아직 큐레이션이 없습니다.</div>';
+            feed.innerHTML = '<div class="pp-expl-empty">'
+                + '<div class="pp-expl-empty__icon">📭</div>'
+                + '<p>아직 이 카테고리에 큐레이션이 없어요</p>'
+                + '<button type="button" class="pp-expl-empty__btn" onclick="document.querySelector(\'[data-cat=\\&quot;\\&quot;]\').click()">전체 보기</button>'
+                + '</div>';
             return;
         }
 
-        wrap.innerHTML = filtered.map(c => {
-            const thumb = c.cover_url
-                ? '<img src="' + esc(c.cover_url) + '" alt="" loading="lazy">'
-                : '<span class="pp-cur-card__emoji">📍</span>';
-            const typeBadge = c.type === 'course' ? '<span class="pp-cur-card__badge">코스</span>' : '';
-            const regionBadge = c.region_label ? '<span class="pp-cur-card__badge">' + esc(c.region_label) + '</span>' : '';
-            return '<a href="/c/' + c.id + '" class="pp-cur-card">'
-                + '<div class="pp-cur-card__thumb">' + thumb + '</div>'
-                + '<div class="pp-cur-card__body">'
-                + '<h3 class="pp-cur-card__title">' + esc(c.title) + '</h3>'
-                + (c.description ? '<p class="pp-cur-card__desc">' + esc(c.description) + '</p>' : '')
-                + '<div class="pp-cur-card__meta">' + typeBadge + regionBadge
-                + '<span>장소 ' + (c.places_count || 0) + '곳</span>'
-                + (c.save_count > 0 ? '<span>' + c.save_count + '명 담기</span>' : '')
-                + '</div></div></a>';
+        feed.innerHTML = filtered.map(c => renderSection(c)).join('');
+    }
+
+    function renderSection(c) {
+        const places = c.places_list || [];
+        const catLabel = c.category_label || '';
+        const savesMeta = c.save_count > 0
+            ? '<span class="pp-expl-sec__saves"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> ' + c.save_count + '명이 담아갔어요</span>'
+            : '';
+
+        const savedClass = c.is_saved ? ' is-saved' : '';
+        const savedLabel = c.is_saved ? '담음' : '담기';
+        const savedIcon = c.is_saved ? '✓' : '+';
+
+        let cardsHtml = places.slice(0, PLACE_MAX).map((p, i) => {
+            const hasBg = !!p.thumb_url;
+            const bgStyle = hasBg ? 'background-image:url(' + esc(p.thumb_url) + ')' : GRADIENTS[i % GRADIENTS.length];
+            const styleAttr = hasBg ? bgStyle : 'background:' + bgStyle;
+            const placeholderClass = hasBg ? '' : ' pp-expl-pcard--ph';
+            const regionCat = [p.region, p.category_label].filter(Boolean).join(' · ');
+            return '<a href="/c/' + c.id + '?place=' + p.id + '" class="pp-expl-pcard' + placeholderClass + '" style="' + styleAttr + '">'
+                + (!hasBg ? '<div class="pp-expl-pcard__pin-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>' : '')
+                + '<div class="pp-expl-pcard__overlay">'
+                + '<div class="pp-expl-pcard__name">' + esc(p.name) + '</div>'
+                + (regionCat ? '<div class="pp-expl-pcard__sub">' + esc(regionCat) + '</div>' : '')
+                + '</div></a>';
         }).join('');
+
+        if (places.length > PLACE_MAX) {
+            cardsHtml += '<a href="/c/' + c.id + '" class="pp-expl-pcard pp-expl-pcard--more">'
+                + '<span class="pp-expl-pcard__more-label">전체 보기</span>'
+                + '<span class="pp-expl-pcard__more-count">' + c.places_count + '곳</span>'
+                + '<span class="pp-expl-pcard__more-arrow">→</span></a>';
+        }
+
+        return '<div class="pp-expl-sec">'
+            + '<div class="pp-expl-sec__head">'
+            + '<div class="pp-expl-sec__left">'
+            + '<div class="pp-expl-sec__meta">'
+            + '<span class="pp-expl-sec__cat">' + esc(catLabel) + '</span>'
+            + '<span class="pp-expl-sec__count">' + (c.places_count || 0) + '개 장소</span>'
+            + '</div>'
+            + '<a href="/c/' + c.id + '" class="pp-expl-sec__title">' + esc(c.title) + '</a>'
+            + (c.description ? '<p class="pp-expl-sec__desc">' + esc(c.description) + '</p>' : '')
+            + savesMeta
+            + '</div>'
+            + '<a href="/c/' + c.id + '?action=save" class="pp-expl-sec__save-btn' + savedClass + '" onclick="event.stopPropagation()">'
+            + '<span>' + savedIcon + ' ' + savedLabel + '</span></a>'
+            + '</div>'
+            + '<div class="pp-expl-scroll"><div class="pp-expl-scroll__track">' + cardsHtml + '</div></div>'
+            + '</div>';
     }
 
     function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-    loadCurations();
+    init();
 })();
 </script>
 @endsection

@@ -79,6 +79,17 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                     </select>
                 </div>
                 <div class="ad-form-group">
+                    <label>카테고리 *</label>
+                    <select class="ad-input" name="category" required>
+                        <option value="">선택하세요</option>
+                        @foreach(config('curation_categories') as $slug => $cat)
+                            <option value="{{ $slug }}" {{ old('category', $curation?->category) === $slug ? 'selected' : '' }}>
+                                {{ $cat['icon'] }} {{ $cat['label'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="ad-form-group">
                     <label>설명</label>
                     <textarea class="ad-input" name="description">{{ old('description', $curation?->description) }}</textarea>
                 </div>

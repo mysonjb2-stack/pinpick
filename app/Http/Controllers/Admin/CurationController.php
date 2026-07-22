@@ -29,9 +29,11 @@ class CurationController extends Controller
 
     public function store(Request $request)
     {
+        $cats = implode(',', array_keys(config('curation_categories')));
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'type' => 'required|in:list,course',
+            'category' => "required|in:{$cats}",
             'description' => 'nullable|string|max:2000',
             'region_label' => 'nullable|string|max:255',
             'cover_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
@@ -59,9 +61,11 @@ class CurationController extends Controller
 
     public function update(Request $request, Curation $curation)
     {
+        $cats = implode(',', array_keys(config('curation_categories')));
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'type' => 'required|in:list,course',
+            'category' => "required|in:{$cats}",
             'description' => 'nullable|string|max:2000',
             'region_label' => 'nullable|string|max:255',
             'cover_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',

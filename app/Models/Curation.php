@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 class Curation extends Model
 {
     protected $fillable = [
-        'title', 'slug', 'type', 'description', 'cover_image',
+        'title', 'slug', 'type', 'category', 'description', 'cover_image',
         'region_label', 'status', 'published_at',
         'view_count', 'save_count',
     ];

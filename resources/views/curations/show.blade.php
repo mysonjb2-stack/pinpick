@@ -393,6 +393,28 @@
         });
     });
 
+    // --- ?place= deep link ---
+    const urlParams = new URLSearchParams(location.search);
+    const placeParam = urlParams.get('place');
+    if (placeParam) {
+        const card = document.querySelector('.pp-share__card[data-id="'+placeParam+'"]');
+        if (card) {
+            const idx = parseInt(card.dataset.idx);
+            setTimeout(() => { handleCardTap(idx); card.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 500);
+        }
+    }
+
+    // --- ?action=save auto-trigger ---
+    if (urlParams.get('action') === 'save') {
+        setTimeout(() => {
+            places.forEach(p => selected.add(p.id));
+            allCards.forEach(c => c.classList.add('is-selected'));
+            updateCtaText();
+            updateSelectAllBtn();
+            saveBtn.click();
+        }, 600);
+    }
+
     // --- Selection ---
     const saveBtn = document.getElementById('shareSaveBtn');
     const selectAllBtn = document.getElementById('shareSelectAll');

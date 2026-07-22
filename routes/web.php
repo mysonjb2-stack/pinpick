@@ -105,6 +105,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/c/{id}/save', [CurationController::class, 'saveToMyPinpick'])->name('curation.save');
 });
 Route::get('/api/curations', [CurationController::class, 'apiList'])->name('api.curations.list');
+Route::get('/api/curations/categories', [CurationController::class, 'apiCategories'])->name('api.curations.categories');
 Route::get('/api/curations/regions', [CurationController::class, 'apiRegions'])->name('api.curations.regions');
 
 // 공유 페이지 (비로그인 접근 가능)

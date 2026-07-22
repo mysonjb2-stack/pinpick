@@ -148,42 +148,76 @@ class CurationController extends Controller
 
     public function apiList(Request $request)
     {
-        $region = $request->get('region');
+        $category = $request->get('category');
         $curations = Curation::published()
+            ->with(['places' => fn($q) => $q->orderBy('sort_order')->limit(6)])
             ->withCount('places')
-            ->when($region, fn($q) => $q->where('region_label', 'like', "%{$region}%"))
+            ->when($category, fn($q) => $q->where('category', $category))
             ->orderByDesc('published_at')
             ->limit(50)
-            ->get(['id', 'title', 'slug', 'type', 'description', 'cover_image',
-                    'region_label', 'save_count', 'published_at']);
+            ->get(['id', 'title', 'slug', 'type', 'category', 'description',
+                    'cover_image', 'save_count', 'published_at']);
 
-        $curations->each(function ($c) {
-            $c->cover_url = $c->cover_image ? asset('storage/' . $c->cover_image) : null;
+        $savedIds = [];
+        if (Auth::check()) {
+            $savedIds = \App\Models\Place::where('user_id', Auth::id())
+                ->whereNotNull('kakao_place_id')
+                ->pluck('kakao_place_id')
+                ->merge(
+                    \App\Models\Place::where('user_id', Auth::id())
+                        ->whereNotNull('naver_place_id')
+                        ->pluck('naver_place_id')
+                )
+                ->toArray();
+        }
+
+        $curations->each(function ($c) use ($savedIds) {
+            $coverUrl = $c->cover_image ? asset('storage/' . $c->cover_image) : null;
+            $c->cover_url = $coverUrl;
+            $catConfig = config("curation_categories.{$c->category}");
+            $c->category_label = $catConfig['label'] ?? $c->category;
+
+            $hasSaved = false;
+            $c->places_list = $c->places->map(function ($p) use ($coverUrl, &$hasSaved, $savedIds) {
+                $thumb = $p->thumb_url ?: $coverUrl;
+                if (!empty($savedIds)) {
+                    if (($p->external_place_id && in_array($p->external_place_id, $savedIds))
+                        || ($p->naver_place_id && in_array($p->naver_place_id, $savedIds))) {
+                        $hasSaved = true;
+                    }
+                }
+                return [
+                    'id' => $p->id,
+                    'name' => $p->place_name,
+                    'address' => $p->address,
+                    'category_label' => $p->category_label,
+                    'thumb_url' => $thumb,
+                    'region' => $p->address ? mb_substr(explode(' ', $p->address)[0] ?? '', 0, 10) : '',
+                ];
+            });
+            $c->is_saved = $hasSaved;
+            unset($c->places);
         });
 
         return response()->json($curations);
     }
 
-    public function apiRegions()
+    public function apiCategories()
     {
-        $labels = Curation::published()
-            ->whereNotNull('region_label')
-            ->pluck('region_label');
+        $usedCategories = Curation::published()
+            ->select('category')
+            ->groupBy('category')
+            ->pluck('category')
+            ->toArray();
 
-        $counts = [];
-        foreach ($labels as $label) {
-            foreach (array_map('trim', explode(',', $label)) as $tag) {
-                if ($tag === '') continue;
-                $counts[$tag] = ($counts[$tag] ?? 0) + 1;
+        $all = config('curation_categories');
+        $result = [];
+        foreach ($all as $slug => $cat) {
+            if (in_array($slug, $usedCategories)) {
+                $result[] = ['slug' => $slug, 'label' => $cat['label'], 'icon' => $cat['icon']];
             }
         }
 
-        $regions = collect($counts)
-            ->filter(fn($c) => $c >= 1)
-            ->keys()
-            ->sort()
-            ->values();
-
-        return response()->json($regions);
+        return response()->json($result);
     }
 }
