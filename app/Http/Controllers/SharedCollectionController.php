@@ -181,13 +181,18 @@ class SharedCollectionController extends Controller
         $user = Auth::user();
 
         if ($request->new_category_name) {
-            Category::where('user_id', $user->id)->increment('sort_order');
-            $category = Category::create([
-                'user_id' => $user->id,
-                'name' => $request->new_category_name,
-                'icon' => '📌',
-                'sort_order' => 0,
-            ]);
+            $category = Category::where('user_id', $user->id)
+                ->where('name', $request->new_category_name)
+                ->first();
+            if (!$category) {
+                Category::where('user_id', $user->id)->increment('sort_order');
+                $category = Category::create([
+                    'user_id' => $user->id,
+                    'name' => $request->new_category_name,
+                    'icon' => '📌',
+                    'sort_order' => 0,
+                ]);
+            }
         } elseif ($request->category_id) {
             $category = Category::where('id', $request->category_id)
                 ->where('user_id', $user->id)

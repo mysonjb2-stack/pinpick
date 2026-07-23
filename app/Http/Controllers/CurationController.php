@@ -6,10 +6,13 @@ use App\Models\Category;
 use App\Models\Curation;
 use App\Models\CurationPlace;
 use App\Models\Place;
+use App\Models\PlaceImage;
 use App\Models\Theme;
+use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class CurationController extends Controller
 {
@@ -51,13 +54,18 @@ class CurationController extends Controller
         $user = Auth::user();
 
         if ($request->new_category_name) {
-            Category::where('user_id', $user->id)->increment('sort_order');
-            $category = Category::create([
-                'user_id' => $user->id,
-                'name' => $request->new_category_name,
-                'icon' => '📌',
-                'sort_order' => 0,
-            ]);
+            $category = Category::where('user_id', $user->id)
+                ->where('name', $request->new_category_name)
+                ->first();
+            if (!$category) {
+                Category::where('user_id', $user->id)->increment('sort_order');
+                $category = Category::create([
+                    'user_id' => $user->id,
+                    'name' => $request->new_category_name,
+                    'icon' => '📌',
+                    'sort_order' => 0,
+                ]);
+            }
         } elseif ($request->category_id) {
             $category = Category::where('id', $request->category_id)
                 ->where('user_id', $user->id)
@@ -111,11 +119,12 @@ class CurationController extends Controller
                 $memo = "Day {$cp->day_number}";
             }
 
-            Place::create([
+            $newPlace = Place::create([
                 'user_id' => $user->id,
                 'category_id' => $category->id,
                 'name' => $cp->place_name,
                 'original_name' => $cp->place_name,
+                'address' => $cp->jibeon_address,
                 'road_address' => $cp->address,
                 'building_name' => $cp->building_name,
                 'phone' => $cp->phone,
@@ -131,6 +140,25 @@ class CurationController extends Controller
                 'naver_place_id' => $cp->naver_place_id,
                 'google_place_id' => $cp->google_place_id,
             ]);
+
+            if (!empty($cp->photos)) {
+                foreach ($cp->photos as $i => $photoPath) {
+                    if (Storage::disk('public')->exists($photoPath)) {
+                        PlaceImage::create([
+                            'place_id' => $newPlace->id,
+                            'path' => $photoPath,
+                            'sort_order' => $i,
+                        ]);
+                    }
+                }
+                $firstPhoto = $cp->photos[0];
+                $thumbPath = ImageProcessor::thumbPathFor($firstPhoto);
+                if (Storage::disk('public')->exists($thumbPath)) {
+                    $newPlace->update(['thumbnail' => $thumbPath]);
+                } elseif (Storage::disk('public')->exists($firstPhoto)) {
+                    $newPlace->update(['thumbnail' => $firstPhoto]);
+                }
+            }
 
             $saved++;
         }
@@ -178,8 +206,8 @@ class CurationController extends Controller
             $c->category_label = $catConfig['label'] ?? $c->category;
 
             $hasSaved = false;
-            $c->places_list = $c->places->map(function ($p) use ($coverUrl, &$hasSaved, $savedIds) {
-                $thumb = $p->thumb_url ?: $coverUrl;
+            $c->places_list = $c->places->map(function ($p) use (&$hasSaved, $savedIds) {
+                $thumb = $p->thumb_url;
                 if (!empty($savedIds)) {
                     if (($p->external_place_id && in_array($p->external_place_id, $savedIds))
                         || ($p->naver_place_id && in_array($p->naver_place_id, $savedIds))) {

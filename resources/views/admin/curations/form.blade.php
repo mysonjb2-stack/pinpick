@@ -6,7 +6,7 @@
 .cur-form { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 @media (max-width: 900px) { .cur-form { grid-template-columns: 1fr; } }
 .cur-left, .cur-right { display: flex; flex-direction: column; gap: 16px; }
-.cur-cover { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 8px; }
+.cur-cover { display: none; }
 .cur-places { display: flex; flex-direction: column; gap: 8px; }
 .cur-place { background: var(--ad-card); border: 1px solid var(--ad-border); border-radius: 8px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; }
 .cur-place__num { width: 24px; height: 24px; border-radius: 50%; background: var(--ad-primary); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
@@ -35,6 +35,28 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
 .cur-place__photo-del { position: absolute; top: 1px; right: 1px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; line-height: 18px; text-align: center; border: none; cursor: pointer; padding: 0; }
 .cur-place__photo-add { width: 56px; height: 56px; border-radius: 6px; border: 1.5px dashed var(--ad-border); background: #f8fafc; display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--ad-text-sub); cursor: pointer; flex-shrink: 0; }
 .cur-place__photo-add:hover { border-color: var(--ad-primary); color: var(--ad-primary); }
+.cur-place__photos.is-dragover { background: #e8f4fd; outline: 2px dashed var(--ad-primary); outline-offset: -2px; border-radius: 8px; padding: 4px; }
+.cur-place__photo { cursor: grab; transition: opacity .15s, transform .15s; }
+.cur-place__photo.is-drag-src { opacity: .35; }
+.cur-place__photo.is-drag-over { transform: scale(1.1); outline: 2px solid var(--ad-primary); outline-offset: 1px; border-radius: 6px; }
+.cur-place__photo-loading { width: 56px; height: 56px; border-radius: 6px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 18px; animation: pulse-load 1s ease-in-out infinite; }
+@keyframes pulse-load { 0%,100%{opacity:1} 50%{opacity:.5} }
+.cur-place__url-row { display: flex; gap: 4px; width: 100%; margin-top: 4px; }
+.cur-place__url-row textarea { flex: 1; min-width: 0; font-size: 12px; padding: 4px 8px; border: 1px solid var(--ad-border); border-radius: 4px; background: var(--ad-card); resize: vertical; min-height: 28px; max-height: 80px; line-height: 1.4; font-family: inherit; }
+.cur-place__url-row textarea:focus { border-color: var(--ad-primary); outline: none; }
+.cur-place__url-row .ad-btn { align-self: flex-end; }
+.cur-place__hint { width: 100%; font-size: 11px; color: var(--ad-text-sub); margin-top: 2px; opacity: .7; }
+
+/* Drag handle & reorder */
+.cur-place { position: relative; transition: box-shadow .15s, opacity .15s; }
+.cur-place__handle { cursor: grab; font-size: 18px; color: var(--ad-text-sub); line-height: 1; user-select: none; flex-shrink: 0; padding: 2px 4px 2px 0; touch-action: none; }
+.cur-place__handle:active { cursor: grabbing; }
+.cur-place.is-place-dragging { opacity: .4; box-shadow: none; }
+.cur-place.is-place-over { box-shadow: 0 -3px 0 0 var(--ad-primary); }
+.cur-place__order-btns { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.cur-place__order-btn { width: 22px; height: 22px; border: 1px solid var(--ad-border); border-radius: 4px; background: var(--ad-card); font-size: 13px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ad-text-sub); padding: 0; }
+.cur-place__order-btn:hover:not(:disabled) { border-color: var(--ad-primary); color: var(--ad-primary); }
+.cur-place__order-btn:disabled { opacity: .3; cursor: default; }
 </style>
 @endpush
 
@@ -98,13 +120,6 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                     <input class="ad-input" name="region_label" value="{{ old('region_label', $curation?->region_label) }}" placeholder="예: 서울, 분당, 맛집 (쉼표로 구분)">
                     <small style="color:var(--ad-text-sub);font-size:11px">쉼표로 구분하면 개별 칩으로 표시됩니다</small>
                 </div>
-                <div class="ad-form-group">
-                    <label>커버 이미지</label>
-                    <input type="file" class="ad-input" name="cover_image" accept="image/*">
-                    @if($curation?->cover_image)
-                        <img src="{{ asset('storage/' . $curation->cover_image) }}" class="cur-cover" alt="">
-                    @endif
-                </div>
             </div>
 
             @if($curation)
@@ -141,6 +156,7 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                 <div class="cur-places" id="placeList">
                     @foreach($curation->places as $i => $p)
                     <div class="cur-place" data-place-id="{{ $p->id }}">
+                        <div class="cur-place__handle" title="드래그하여 순서 변경">≡</div>
                         <div class="cur-place__num">{{ $i + 1 }}</div>
                         <div class="cur-place__body">
                             <div class="cur-place__name">{{ $p->place_name }}</div>
@@ -148,21 +164,31 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                             @if($p->source_channel)
                             <div class="cur-place__source">{{ $p->source_channel }}@if($p->source_date) ({{ $p->source_date->format('Y.m.d') }})@endif</div>
                             @endif
-                            <div class="cur-place__photos" data-pid="{{ $p->id }}">
+                            <div class="cur-place__photos" data-pid="{{ $p->id }}" tabindex="0">
                                 @if($p->photos)
                                     @foreach($p->photos as $pi => $photo)
-                                    <div class="cur-place__photo">
-                                        <img src="{{ asset('storage/' . \App\Services\ImageProcessor::thumbPathFor($photo)) }}" alt="">
+                                    <div class="cur-place__photo" draggable="true" data-pidx="{{ $pi }}">
+                                        <img src="{{ config('app.url') . '/storage/' . \App\Services\ImageProcessor::thumbPathFor($photo) }}" alt="">
                                         <button type="button" class="cur-place__photo-del" onclick="deletePhoto({{ $p->id }}, {{ $pi }}, this)">✕</button>
                                     </div>
                                     @endforeach
                                 @endif
-                                @if(!$p->photos || count($p->photos) < 3)
+                                @if(!$p->photos || count($p->photos) < 5)
                                 <label class="cur-place__photo-add">
                                     +
                                     <input type="file" accept="image/*" multiple hidden onchange="uploadPhotos({{ $p->id }}, this)">
                                 </label>
+                                <div class="cur-place__url-row">
+                                    <textarea rows="3" placeholder="이미지 URL (여러 줄 가능)" class="cur-url-input"></textarea>
+                                    <button type="button" class="ad-btn ad-btn--sm cur-url-btn" onclick="uploadFromUrl({{ $p->id }}, this)">URL</button>
+                                </div>
+                                <div class="cur-place__hint">URL 여러 개 입력 시 줄바꿈으로 구분 · URL 여러 개 줄바꿈 입력 → Ctrl+Enter 또는 URL 버튼 · Ctrl+V 붙여넣기 · 드래그앤드롭</div>
                                 @endif
+                            </div>
+                            <div class="cur-place__meta">
+                                <input class="short" data-field="phone" value="{{ $p->phone }}" placeholder="전화번호">
+                                <input class="short" data-field="building_name" value="{{ $p->building_name }}" placeholder="건물명">
+                                <input class="url" data-field="opening_hours" value="{{ is_array($p->opening_hours) ? json_encode($p->opening_hours, JSON_UNESCAPED_UNICODE) : $p->opening_hours }}" placeholder="영업시간">
                             </div>
                             <div class="cur-place__meta">
                                 <input class="short" data-field="source_channel" value="{{ $p->source_channel }}" placeholder="출처 채널">
@@ -173,6 +199,10 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                                 @endif
                                 <input class="short" data-field="editor_note" value="{{ $p->editor_note }}" placeholder="코멘트">
                             </div>
+                        </div>
+                        <div class="cur-place__order-btns">
+                            <button type="button" class="cur-place__order-btn" onclick="movePlaceUp(this)" title="위로">↑</button>
+                            <button type="button" class="cur-place__order-btn" onclick="movePlaceDown(this)" title="아래로">↓</button>
                         </div>
                         <div class="cur-place__actions">
                             <button type="button" class="ad-btn ad-btn--sm" onclick="savePlace({{ $p->id }}, this)">저장</button>
@@ -287,9 +317,11 @@ async function doSearch(q) {
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 async function addPlaceFromSearch(d, isOverseas) {
+    const addr = d.road_address_name || d.address_name || '';
     const body = {
         place_name: d.place_name,
-        address: d.road_address_name || d.address_name || '',
+        address: addr,
+        jibeon_address: d.address_name || '',
         latitude: d.y,
         longitude: d.x,
         category_label: d.category_group_name || '',
@@ -299,6 +331,15 @@ async function addPlaceFromSearch(d, isOverseas) {
     };
     if (isOverseas && d.id) body.google_place_id = d.id;
     if (d.opening_hours) body.opening_hours = d.opening_hours;
+
+    if (!isOverseas && addr) {
+        try {
+            const br = await fetch('/api/building-name?road_address=' + encodeURIComponent(addr));
+            const bd = await br.json();
+            if (bd.building_name) body.building_name = bd.building_name;
+        } catch(e) {}
+    }
+
     try {
         const r = await fetch('/admin/curations/' + curationId + '/places', {
             method: 'POST',
@@ -308,10 +349,38 @@ async function addPlaceFromSearch(d, isOverseas) {
         const data = await r.json();
         if (data.success) {
             appendPlaceCard(data.place);
+            if (!isOverseas) enrichNaverData(data.place.id, d.place_name, d.y, d.x, addr);
         } else {
             alert(data.message || '추가 실패');
         }
     } catch(e) { alert('추가 실패: ' + e.message); }
+}
+
+async function enrichNaverData(placeId, name, lat, lng, address) {
+    try {
+        const r = await fetch('/admin/curations/places/' + placeId + '/enrich-naver', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            body: JSON.stringify({ name, lat, lng, address }),
+        });
+        const data = await r.json();
+        if (data.success) {
+            const card = document.querySelector('[data-place-id="' + placeId + '"]');
+            if (!card) return;
+            if (data.phone) {
+                const phoneInp = card.querySelector('[data-field="phone"]');
+                if (phoneInp && !phoneInp.value) phoneInp.value = data.phone;
+            }
+            if (data.building_name) {
+                const bnInp = card.querySelector('[data-field="building_name"]');
+                if (bnInp && !bnInp.value) bnInp.value = data.building_name;
+            }
+            if (data.opening_hours) {
+                const hoursInp = card.querySelector('[data-field="opening_hours"]');
+                if (hoursInp && !hoursInp.value) hoursInp.value = data.opening_hours;
+            }
+        }
+    } catch(e) {}
 }
 
 function appendPlaceCard(p) {
@@ -321,10 +390,21 @@ function appendPlaceCard(p) {
         ? '<input style="width:60px" data-field="day_number" type="number" min="1" value="" placeholder="Day">'
         : '';
     const html = '<div class="cur-place" data-place-id="' + p.id + '">'
+        + '<div class="cur-place__handle" title="드래그하여 순서 변경">≡</div>'
         + '<div class="cur-place__num">' + (idx + 1) + '</div>'
         + '<div class="cur-place__body">'
         + '<div class="cur-place__name">' + esc(p.place_name) + '</div>'
         + '<div class="cur-place__addr">' + esc(p.address || '') + '</div>'
+        + '<div class="cur-place__photos" data-pid="' + p.id + '" tabindex="0">'
+        + '<label class="cur-place__photo-add">+<input type="file" accept="image/*" multiple hidden onchange="uploadPhotos(' + p.id + ',this)"></label>'
+        + '<div class="cur-place__url-row"><textarea rows="3" placeholder="이미지 URL (여러 줄 가능)" class="cur-url-input"></textarea><button type="button" class="ad-btn ad-btn--sm cur-url-btn" onclick="uploadFromUrl(' + p.id + ',this)">URL</button></div>'
+        + '<div class="cur-place__hint">URL 여러 개 줄바꿈 입력 → Ctrl+Enter 또는 URL 버튼 · Ctrl+V 붙여넣기 · 드래그앤드롭</div>'
+        + '</div>'
+        + '<div class="cur-place__meta">'
+        + '<input class="short" data-field="phone" value="' + esc(p.phone || '') + '" placeholder="전화번호">'
+        + '<input class="short" data-field="building_name" value="' + esc(p.building_name || '') + '" placeholder="건물명">'
+        + '<input class="url" data-field="opening_hours" value="" placeholder="영업시간">'
+        + '</div>'
         + '<div class="cur-place__meta">'
         + '<input class="short" data-field="source_channel" value="" placeholder="출처 채널">'
         + '<input class="url" data-field="source_url" value="" placeholder="출처 URL">'
@@ -332,6 +412,10 @@ function appendPlaceCard(p) {
         + dayInput
         + '<input class="short" data-field="editor_note" value="" placeholder="코멘트">'
         + '</div></div>'
+        + '<div class="cur-place__order-btns">'
+        + '<button type="button" class="cur-place__order-btn" onclick="movePlaceUp(this)" title="위로">↑</button>'
+        + '<button type="button" class="cur-place__order-btn" onclick="movePlaceDown(this)" title="아래로">↓</button>'
+        + '</div>'
         + '<div class="cur-place__actions">'
         + '<button type="button" class="ad-btn ad-btn--sm" onclick="savePlace(' + p.id + ', this)">저장</button>'
         + '<button type="button" class="ad-btn ad-btn--sm ad-btn--danger" onclick="removePlace(' + p.id + ', this)">삭제</button>'
@@ -374,54 +458,317 @@ async function removePlace(placeId, btn) {
 }
 
 function renumber() {
-    document.querySelectorAll('.cur-place__num').forEach((el, i) => el.textContent = i + 1);
-    document.getElementById('placeCount').textContent = document.querySelectorAll('.cur-place').length + '개';
+    const cards = document.querySelectorAll('.cur-place');
+    cards.forEach((card, i) => {
+        card.querySelector('.cur-place__num').textContent = i + 1;
+        const btns = card.querySelectorAll('.cur-place__order-btn');
+        if (btns[0]) btns[0].disabled = i === 0;
+        if (btns[1]) btns[1].disabled = i === cards.length - 1;
+    });
+    document.getElementById('placeCount').textContent = cards.length + '개';
 }
+
+async function saveOrder() {
+    const ids = Array.from(document.querySelectorAll('.cur-place')).map(c => +c.dataset.placeId);
+    try {
+        const r = await fetch('/admin/curations/' + curationId + '/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            body: JSON.stringify({ ids }),
+        });
+        const d = await r.json();
+        if (!d.success) throw new Error('저장 실패');
+    } catch (e) {
+        alert('순서 저장 실패: ' + e.message);
+        location.reload();
+    }
+}
+
+function movePlaceUp(btn) {
+    const card = btn.closest('.cur-place');
+    const prev = card.previousElementSibling;
+    if (!prev || !prev.classList.contains('cur-place')) return;
+    card.parentNode.insertBefore(card, prev);
+    renumber();
+    saveOrder();
+}
+
+function movePlaceDown(btn) {
+    const card = btn.closest('.cur-place');
+    const next = card.nextElementSibling;
+    if (!next || !next.classList.contains('cur-place')) return;
+    card.parentNode.insertBefore(next, card);
+    renumber();
+    saveOrder();
+}
+
+// Place drag-and-drop (handle only)
+(function() {
+    const list = document.getElementById('placeList');
+    if (!list) return;
+    let dragEl = null;
+    let handleGrabbed = false;
+
+    list.addEventListener('mousedown', function(e) {
+        handleGrabbed = !!e.target.closest('.cur-place__handle');
+    });
+
+    list.addEventListener('dragstart', function(e) {
+        if (e.target.closest('.cur-place__photo')) return;
+        if (!handleGrabbed) { e.preventDefault(); return; }
+        dragEl = e.target.closest('.cur-place');
+        if (!dragEl) { e.preventDefault(); return; }
+        handleGrabbed = false;
+        dragEl.classList.add('is-place-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragEl.dataset.placeId);
+    });
+
+    list.addEventListener('dragover', function(e) {
+        if (!dragEl || e.dataTransfer.types.includes('text/x-photo-reorder')) return;
+        const target = e.target.closest('.cur-place');
+        if (!target || target === dragEl) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        list.querySelectorAll('.cur-place').forEach(c => c.classList.remove('is-place-over'));
+        target.classList.add('is-place-over');
+    });
+
+    list.addEventListener('dragleave', function(e) {
+        const target = e.target.closest('.cur-place');
+        if (target) target.classList.remove('is-place-over');
+    });
+
+    list.addEventListener('drop', function(e) {
+        if (!dragEl || e.dataTransfer.types.includes('text/x-photo-reorder')) return;
+        e.preventDefault();
+        const target = e.target.closest('.cur-place');
+        if (!target || target === dragEl) return;
+        const cards = Array.from(list.querySelectorAll('.cur-place'));
+        const fromIdx = cards.indexOf(dragEl);
+        const toIdx = cards.indexOf(target);
+        if (fromIdx < toIdx) {
+            target.parentNode.insertBefore(dragEl, target.nextSibling);
+        } else {
+            target.parentNode.insertBefore(dragEl, target);
+        }
+        list.querySelectorAll('.cur-place').forEach(c => c.classList.remove('is-place-over'));
+        renumber();
+        saveOrder();
+    });
+
+    list.addEventListener('dragend', function() {
+        if (dragEl) dragEl.classList.remove('is-place-dragging');
+        list.querySelectorAll('.cur-place').forEach(c => c.classList.remove('is-place-over'));
+        dragEl = null;
+    });
+
+    // Make place cards draggable via handle
+    list.querySelectorAll('.cur-place').forEach(c => c.setAttribute('draggable', 'true'));
+    new MutationObserver(() => {
+        list.querySelectorAll('.cur-place:not([draggable])').forEach(c => c.setAttribute('draggable', 'true'));
+    }).observe(list, { childList: true });
+})();
 
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.cur-search-wrap')) searchResults.classList.remove('is-open');
 });
 
-// 사진 업로드
-async function uploadPhotos(placeId, input) {
-    const files = input.files;
-    if (!files.length) return;
-    const fd = new FormData();
-    for (let i = 0; i < Math.min(files.length, 3); i++) fd.append('photos[]', files[i]);
-    try {
-        const r = await fetch('/admin/curations/places/' + placeId + '/photos', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-            body: fd,
-        });
-        const data = await r.json();
-        if (data.success) {
-            const wrap = document.querySelector('.cur-place__photos[data-pid="'+placeId+'"]');
-            wrap.innerHTML = '';
-            data.photos.forEach((p, i) => {
-                wrap.innerHTML += '<div class="cur-place__photo"><img src="'+p.thumb+'" alt=""><button type="button" class="cur-place__photo-del" onclick="deletePhoto('+placeId+','+i+',this)">✕</button></div>';
-            });
-            if (data.photos.length < 3) {
-                wrap.innerHTML += '<label class="cur-place__photo-add">+<input type="file" accept="image/*" multiple hidden onchange="uploadPhotos('+placeId+',this)"></label>';
-            }
-        } else {
-            alert(data.message || '업로드 실패');
-        }
-    } catch(e) { alert('업로드 실패: ' + e.message); }
-    input.value = '';
+// ── 사진 관리 ──
+
+function rebuildPhotos(pid, photos) {
+    const wrap = document.querySelector('.cur-place__photos[data-pid="'+pid+'"]');
+    if (!wrap) return;
+    let h = '';
+    photos.forEach((p, i) => {
+        h += '<div class="cur-place__photo" draggable="true" data-pidx="'+i+'"><img src="'+esc(p.thumb)+'" alt=""><button type="button" class="cur-place__photo-del" onclick="deletePhoto('+pid+','+i+',this)">✕</button></div>';
+    });
+    if (photos.length < 5) {
+        h += '<label class="cur-place__photo-add">+<input type="file" accept="image/*" multiple hidden onchange="uploadPhotos('+pid+',this)"></label>';
+        h += '<div class="cur-place__url-row"><textarea rows="3" placeholder="이미지 URL (여러 줄 가능)" class="cur-url-input"></textarea><button type="button" class="ad-btn ad-btn--sm cur-url-btn" onclick="uploadFromUrl('+pid+',this)">URL</button></div>';
+        h += '<div class="cur-place__hint">URL 여러 개 줄바꿈 입력 → Ctrl+Enter 또는 URL 버튼 · Ctrl+V 붙여넣기 · 드래그앤드롭</div>';
+    }
+    wrap.innerHTML = h;
 }
 
-async function deletePhoto(placeId, idx, btn) {
+function photoCount(pid) {
+    const w = document.querySelector('.cur-place__photos[data-pid="'+pid+'"]');
+    return w ? w.querySelectorAll('.cur-place__photo').length : 0;
+}
+
+function addLoader(wrap) {
+    const el = document.createElement('div');
+    el.className = 'cur-place__photo-loading';
+    el.textContent = '⏳';
+    const add = wrap.querySelector('.cur-place__photo-add');
+    if (add) wrap.insertBefore(el, add); else wrap.prepend(el);
+    return el;
+}
+
+async function uploadFiles(pid, fileList) {
+    const wrap = document.querySelector('.cur-place__photos[data-pid="'+pid+'"]');
+    if (!wrap) return;
+    const remaining = 3 - photoCount(pid);
+    if (remaining <= 0) { alert('최대 3장까지 등록할 수 있습니다.'); return; }
+    const imgs = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (!imgs.length) return;
+    const toUpload = imgs.slice(0, remaining);
+    if (imgs.length > remaining) alert('최대 3장 제한으로 ' + toUpload.length + '장만 업로드합니다.');
+    const loader = addLoader(wrap);
+    const fd = new FormData();
+    toUpload.forEach(f => fd.append('photos[]', f));
+    try {
+        const r = await fetch('/admin/curations/places/'+pid+'/photos', {
+            method: 'POST', headers: {'X-CSRF-TOKEN': csrf, 'Accept': 'application/json'}, body: fd,
+        });
+        const data = await r.json();
+        if (data.success) rebuildPhotos(pid, data.photos);
+        else { loader.remove(); alert(data.error || '업로드 실패'); }
+    } catch(e) { loader.remove(); alert('업로드 실패: '+e.message); }
+}
+
+function uploadPhotos(pid, input) { uploadFiles(pid, input.files); input.value = ''; }
+
+async function uploadFromUrl(pid, btn) {
+    const wrap = btn.closest('.cur-place__photos') || document.querySelector('.cur-place__photos[data-pid="'+pid+'"]');
+    const ta = wrap.querySelector('.cur-url-input');
+    const urls = ta.value.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!urls.length) { ta.focus(); return; }
+    const bad = urls.find(u => !/^https?:\/\//i.test(u));
+    if (bad) { alert('유효하지 않은 URL:\n' + bad); return; }
+    const remain = 3 - photoCount(pid);
+    if (remain <= 0) { alert('최대 3장까지 등록할 수 있습니다.'); return; }
+    const batch = urls.slice(0, remain);
+    if (batch.length < urls.length) alert((urls.length - batch.length) + '개 URL은 3장 제한으로 건너뜁니다.');
+    const origText = btn.textContent;
+    btn.disabled = true; btn.textContent = '0/' + batch.length + ' 처리중…';
+    const loaders = batch.map(() => addLoader(wrap));
+    let lastPhotos = null, fail = [];
+    for (let i = 0; i < batch.length; i++) {
+        btn.textContent = (i+1) + '/' + batch.length + ' 처리중…';
+        try {
+            const r = await fetch('/admin/curations/places/'+pid+'/photos/url', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json'},
+                body: JSON.stringify({url: batch[i]}),
+            });
+            const data = await r.json();
+            if (data.success) { lastPhotos = data.photos; loaders[i]?.remove(); }
+            else { loaders[i]?.remove(); fail.push((i+1) + ': ' + (data.error || '실패')); }
+        } catch(e) { loaders[i]?.remove(); fail.push((i+1) + ': ' + e.message); }
+    }
+    if (lastPhotos) rebuildPhotos(pid, lastPhotos);
+    else loaders.forEach(l => l?.remove());
+    if (fail.length) alert('일부 실패:\n' + fail.join('\n'));
+    btn.disabled = false; btn.textContent = origText;
+}
+
+async function deletePhoto(pid, idx, btn) {
     if (!confirm('이 사진을 삭제할까요?')) return;
     try {
-        const r = await fetch('/admin/curations/places/' + placeId + '/photos', {
+        const r = await fetch('/admin/curations/places/'+pid+'/photos', {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
-            body: JSON.stringify({ index: idx }),
+            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json'},
+            body: JSON.stringify({index: idx}),
         });
-        if ((await r.json()).success) location.reload();
+        const data = await r.json();
+        if (data.success) rebuildPhotos(pid, data.photos);
     } catch(e) { alert('삭제 실패'); }
 }
+
+async function reorderPhotos(pid, fromIdx, toIdx) {
+    const wrap = document.querySelector('.cur-place__photos[data-pid="'+pid+'"]');
+    const count = wrap.querySelectorAll('.cur-place__photo').length;
+    const order = Array.from({length: count}, (_, i) => i);
+    const [moved] = order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, moved);
+    try {
+        const r = await fetch('/admin/curations/places/'+pid+'/photos/reorder', {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json'},
+            body: JSON.stringify({order}),
+        });
+        const data = await r.json();
+        if (data.success) rebuildPhotos(pid, data.photos);
+    } catch(e) { alert('순서 변경 실패'); }
+}
+
+// ── 드래그앤드롭 · 붙여넣기 ──
+let photoDragPid = null, photoDragFrom = -1;
+
+document.addEventListener('dragstart', function(e) {
+    const ph = e.target.closest('.cur-place__photo[draggable]');
+    if (!ph) return;
+    photoDragPid = parseInt(ph.closest('.cur-place__photos').dataset.pid);
+    photoDragFrom = parseInt(ph.dataset.pidx);
+    ph.classList.add('is-drag-src');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/x-photo-reorder', '1');
+});
+
+document.addEventListener('dragend', function() {
+    photoDragPid = null; photoDragFrom = -1;
+    document.querySelectorAll('.is-drag-src,.is-drag-over,.is-dragover').forEach(el =>
+        el.classList.remove('is-drag-src','is-drag-over','is-dragover'));
+});
+
+document.addEventListener('dragover', function(e) {
+    if (photoDragPid !== null) {
+        const ph = e.target.closest('.cur-place__photo[draggable]');
+        if (ph && parseInt(ph.closest('.cur-place__photos').dataset.pid) === photoDragPid) {
+            e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+            document.querySelectorAll('.is-drag-over').forEach(el => el.classList.remove('is-drag-over'));
+            if (parseInt(ph.dataset.pidx) !== photoDragFrom) ph.classList.add('is-drag-over');
+        }
+        return;
+    }
+    if (e.dataTransfer.types.includes('Files')) {
+        const wrap = e.target.closest('.cur-place__photos');
+        if (wrap) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; wrap.classList.add('is-dragover'); }
+    }
+});
+
+document.addEventListener('dragleave', function(e) {
+    const wrap = e.target.closest('.cur-place__photos');
+    if (wrap && !wrap.contains(e.relatedTarget)) wrap.classList.remove('is-dragover');
+});
+
+document.addEventListener('drop', function(e) {
+    if (photoDragPid !== null) {
+        const ph = e.target.closest('.cur-place__photo[draggable]');
+        if (ph) {
+            e.preventDefault();
+            const toIdx = parseInt(ph.dataset.pidx);
+            if (photoDragFrom !== toIdx) reorderPhotos(photoDragPid, photoDragFrom, toIdx);
+        }
+        return;
+    }
+    const wrap = e.target.closest('.cur-place__photos');
+    if (wrap && e.dataTransfer.files.length) {
+        e.preventDefault(); wrap.classList.remove('is-dragover');
+        uploadFiles(parseInt(wrap.dataset.pid), e.dataTransfer.files);
+    }
+});
+
+document.addEventListener('paste', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const wrap = e.target.closest('.cur-place__photos');
+    if (!wrap) return;
+    const images = [];
+    for (const item of (e.clipboardData?.items || [])) {
+        if (item.type.startsWith('image/')) { const f = item.getAsFile(); if (f) images.push(f); }
+    }
+    if (images.length) { e.preventDefault(); uploadFiles(parseInt(wrap.dataset.pid), images); }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.classList.contains('cur-url-input')) {
+        e.preventDefault();
+        const wrap = e.target.closest('.cur-place__photos');
+        const btn = wrap.querySelector('.cur-url-btn');
+        uploadFromUrl(parseInt(wrap.dataset.pid), btn);
+    }
+});
 
 // 발행 토글
 const toggleBtn = document.getElementById('togglePublishBtn');
@@ -452,6 +799,8 @@ if (delBtn) {
         } catch(e) { alert('삭제 실패'); }
     });
 }
+
+renumber();
 </script>
 @endpush
 @endif

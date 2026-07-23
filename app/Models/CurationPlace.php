@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CurationPlace extends Model
 {
     protected $fillable = [
-        'curation_id', 'place_name', 'address', 'latitude', 'longitude',
+        'curation_id', 'place_name', 'address', 'jibeon_address', 'latitude', 'longitude',
         'category_label', 'thumbnail_url', 'photos', 'external_place_id', 'is_overseas',
         'source_channel', 'source_url', 'source_date', 'day_number',
         'sort_order', 'editor_note', 'phone', 'opening_hours',
