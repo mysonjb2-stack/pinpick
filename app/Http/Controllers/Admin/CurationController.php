@@ -24,12 +24,18 @@ class CurationController extends Controller
     public function index(Request $request)
     {
         $q = $request->get('q');
-        $curations = Curation::withCount('places')
+        $status = $request->get('status');
+        $curations = Curation::withCount(['places', 'reports'])
+            ->with('author:id,name')
             ->when($q, fn($query) => $query->where('title', 'like', "%{$q}%"))
-            ->orderByDesc('created_at')
+            ->when($status, fn($query) => $query->where('status', $status))
+            ->orderByRaw("FIELD(status, 'pending') DESC")
+            ->orderByDesc('updated_at')
             ->paginate(20);
 
-        return view('admin.curations.index', compact('curations', 'q'));
+        $pendingCount = Curation::where('status', 'pending')->count();
+
+        return view('admin.curations.index', compact('curations', 'q', 'status', 'pendingCount'));
     }
 
     public function create()
@@ -89,7 +95,7 @@ class CurationController extends Controller
 
     public function togglePublish(Curation $curation)
     {
-        if ($curation->status === 'published') {
+        if ($curation->status === 'approved') {
             $curation->update(['status' => 'draft', 'published_at' => null]);
             return back()->with('success', '발행이 취소되었습니다.');
         }
@@ -100,8 +106,39 @@ class CurationController extends Controller
 
         $this->generateMosaicCover($curation);
 
-        $curation->update(['status' => 'published', 'published_at' => now()]);
+        $curation->update(['status' => 'approved', 'published_at' => now()]);
         return back()->with('success', '발행되었습니다.');
+    }
+
+    public function approve(Curation $curation)
+    {
+        $this->generateMosaicCover($curation);
+        $curation->update([
+            'status' => 'approved',
+            'published_at' => $curation->published_at ?: now(),
+            'rejected_reason' => null,
+            'approved_snapshot' => null,
+        ]);
+        return back()->with('success', '승인되었습니다. 탐색에 공개됩니다.');
+    }
+
+    public function reject(Request $request, Curation $curation)
+    {
+        $request->validate(['reason' => 'required|string|max:500']);
+        $curation->update([
+            'status' => 'rejected',
+            'rejected_reason' => $request->reason,
+        ]);
+        return back()->with('success', '반려되었습니다.');
+    }
+
+    public function suspend(Curation $curation)
+    {
+        $curation->update([
+            'status' => 'suspended',
+            'approved_snapshot' => null,
+        ]);
+        return back()->with('success', '강제 비공개 처리되었습니다.');
     }
 
     private function generateMosaicCover(Curation $curation): void
@@ -368,92 +405,159 @@ class CurationController extends Controller
         $lng = (float) ($request->input('lng') ?: $place->longitude);
         $address = $request->input('address', $place->address);
 
-        $result = ['success' => true, 'phone' => null, 'opening_hours' => null, 'naver_place_id' => null];
+        $result = ['success' => true, 'phone' => null, 'opening_hours' => null, 'naver_place_id' => null, 'detail_address' => null];
 
+        $update = [];
+
+        // 1) 네이버 검색 — 전화번호, 건물명, 지번주소, naver_place_id
         $clientId = config('services.naver_search.client_id');
         $clientSecret = config('services.naver_search.client_secret');
-        if (!$clientId || !$clientSecret) {
-            return response()->json($result);
+        if ($clientId && $clientSecret) {
+            try {
+                $query = $name;
+                if ($address) {
+                    $parts = preg_split('/\s+/u', trim($address));
+                    if (is_array($parts) && count($parts) >= 2) {
+                        $query = $name . ' ' . $parts[0] . ' ' . $parts[1];
+                    }
+                }
+
+                $response = Http::withHeaders([
+                    'X-Naver-Client-Id' => $clientId,
+                    'X-Naver-Client-Secret' => $clientSecret,
+                ])->timeout(3)->get('https://openapi.naver.com/v1/search/local.json', [
+                    'query' => $query,
+                    'display' => 5,
+                ]);
+
+                if ($response->successful()) {
+                    $items = $response->json('items') ?? [];
+                    $best = null;
+                    $bestDist = INF;
+                    foreach ($items as $item) {
+                        $mx = (float) ($item['mapx'] ?? 0);
+                        $my = (float) ($item['mapy'] ?? 0);
+                        if ($mx <= 0 || $my <= 0) continue;
+                        if ($mx > 1000000) { $mx /= 1e7; $my /= 1e7; }
+                        $dist = $this->haversineDist($lat, $lng, $my, $mx);
+                        if ($dist < $bestDist) {
+                            $bestDist = $dist;
+                            $best = $item;
+                        }
+                    }
+
+                    if ($best && $bestDist <= 300) {
+                        $phone = trim(strip_tags($best['telephone'] ?? ''));
+                        if ($phone) $result['phone'] = $phone;
+
+                        $roadAddr = $best['roadAddress'] ?? '';
+                        if ($roadAddr && $address) {
+                            $kakaoTokens = preg_split('/\s+/', trim($address));
+                            $lastToken = end($kakaoTokens);
+                            $pos = mb_strrpos($roadAddr, $lastToken);
+                            if ($pos !== false) {
+                                $extra = trim(mb_substr($roadAddr, $pos + mb_strlen($lastToken)));
+                                if ($extra) $result['building_name'] = $extra;
+                            }
+                        }
+
+                        $jibeon = trim(strip_tags($best['address'] ?? ''));
+                        if ($jibeon) $result['jibeon_address'] = $jibeon;
+
+                        if ($phone && !$place->phone) $update['phone'] = $phone;
+                        if (!empty($result['building_name']) && !$place->building_name) {
+                            $update['building_name'] = $result['building_name'];
+                        }
+                        if ($jibeon && !$place->jibeon_address) {
+                            $update['jibeon_address'] = $jibeon;
+                        }
+
+                        $matcher = app(NaverPlaceMatcher::class);
+                        $placeId = $matcher->match($name, $lat, $lng, $address);
+                        if ($placeId) {
+                            $result['naver_place_id'] = $placeId;
+                            $update['naver_place_id'] = $placeId;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::info('curation enrichNaver failed', ['error' => $e->getMessage()]);
+            }
         }
 
-        try {
-            $query = $name;
-            if ($address) {
-                $parts = preg_split('/\s+/u', trim($address));
-                if (is_array($parts) && count($parts) >= 2) {
-                    $query = $name . ' ' . $parts[0] . ' ' . $parts[1];
-                }
-            }
+        // 2) Google Places — 영업시간, 전화번호(네이버에서 못 찾았으면), 상세주소
+        $googleInfo = $this->infoFromGooglePlaces($name, $address ?: '');
+        if ($googleInfo['opening_hours']) {
+            $result['opening_hours'] = $googleInfo['opening_hours'];
+            if (!$place->opening_hours) $update['opening_hours'] = $googleInfo['opening_hours'];
+        }
+        if ($googleInfo['phone'] && !$result['phone']) {
+            $result['phone'] = $googleInfo['phone'];
+            if (!$place->phone && !isset($update['phone'])) $update['phone'] = $googleInfo['phone'];
+        }
+        if ($googleInfo['detail_address']) {
+            $result['detail_address'] = $googleInfo['detail_address'];
+        }
 
-            $response = Http::withHeaders([
-                'X-Naver-Client-Id' => $clientId,
-                'X-Naver-Client-Secret' => $clientSecret,
-            ])->timeout(3)->get('https://openapi.naver.com/v1/search/local.json', [
-                'query' => $query,
-                'display' => 5,
-            ]);
-
-            if (!$response->successful()) {
-                return response()->json($result);
-            }
-
-            $items = $response->json('items') ?? [];
-            $best = null;
-            $bestDist = INF;
-            foreach ($items as $item) {
-                $mx = (float) ($item['mapx'] ?? 0);
-                $my = (float) ($item['mapy'] ?? 0);
-                if ($mx <= 0 || $my <= 0) continue;
-                if ($mx > 1000000) { $mx /= 1e7; $my /= 1e7; }
-                $dist = $this->haversineDist($lat, $lng, $my, $mx);
-                if ($dist < $bestDist) {
-                    $bestDist = $dist;
-                    $best = $item;
-                }
-            }
-
-            if ($best && $bestDist <= 300) {
-                $phone = trim(strip_tags($best['telephone'] ?? ''));
-                if ($phone) $result['phone'] = $phone;
-
-                $roadAddr = $best['roadAddress'] ?? '';
-                if ($roadAddr && $address) {
-                    $extra = trim(str_replace($address, '', $roadAddr));
-                    if (!$extra) {
-                        $normalized = preg_replace('/\s+/', ' ', $address);
-                        $extra = trim(str_replace($normalized, '', $roadAddr));
-                    }
-                    if ($extra) $result['building_name'] = $extra;
-                }
-
-                $jibeon = trim(strip_tags($best['address'] ?? ''));
-                if ($jibeon) $result['jibeon_address'] = $jibeon;
-
-                $update = [];
-                if ($phone && !$place->phone) $update['phone'] = $phone;
-                if (!empty($result['building_name']) && !$place->building_name) {
-                    $update['building_name'] = $result['building_name'];
-                }
-                if ($jibeon && !$place->jibeon_address) {
-                    $update['jibeon_address'] = $jibeon;
-                }
-
-                $matcher = app(NaverPlaceMatcher::class);
-                $placeId = $matcher->match($name, $lat, $lng, $address);
-                if ($placeId) {
-                    $result['naver_place_id'] = $placeId;
-                    $update['naver_place_id'] = $placeId;
-                }
-
-                if (!empty($update)) {
-                    $place->update($update);
-                }
-            }
-        } catch (\Throwable $e) {
-            Log::info('curation enrichNaver failed', ['error' => $e->getMessage()]);
+        if (!empty($update)) {
+            $place->update($update);
         }
 
         return response()->json($result);
+    }
+
+    private function infoFromGooglePlaces(string $name, string $address): array
+    {
+        $empty = ['phone' => '', 'opening_hours' => null, 'detail_address' => ''];
+        $key = config('services.google_places.api_key');
+        if (!$key) return $empty;
+        $query = trim($address !== '' ? ($address . ' ' . $name) : $name);
+        try {
+            $res = Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'X-Goog-Api-Key' => $key,
+                'X-Goog-FieldMask' => 'places.displayName,places.internationalPhoneNumber,places.nationalPhoneNumber,places.formattedAddress,places.regularOpeningHours',
+            ])->timeout(6)->post('https://places.googleapis.com/v1/places:searchText', [
+                'textQuery' => $query,
+                'languageCode' => 'ko',
+                'regionCode' => 'KR',
+                'maxResultCount' => 3,
+            ]);
+            if (!$res->successful()) return $empty;
+            $places = $res->json()['places'] ?? [];
+            $normName = $this->normalizeName($name);
+            foreach ($places as $p) {
+                $title = $this->normalizeName($p['displayName']['text'] ?? '');
+                $tel = trim($p['nationalPhoneNumber'] ?? ($p['internationalPhoneNumber'] ?? ''));
+                $hours = $p['regularOpeningHours']['weekdayDescriptions'] ?? null;
+                $detailAddr = $this->extractDetailAddress($p['formattedAddress'] ?? '', $address);
+                if (!$tel && !$hours && !$detailAddr) continue;
+                if ($title && $normName && (str_contains($title, $normName) || str_contains($normName, $title))) {
+                    return ['phone' => $tel, 'opening_hours' => $hours, 'detail_address' => $detailAddr];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Curation Google Places lookup error', ['msg' => $e->getMessage()]);
+        }
+        return $empty;
+    }
+
+    private function extractDetailAddress(string $googleAddr, string $kakaoRoad): string
+    {
+        if ($googleAddr === '' || $kakaoRoad === '') return '';
+        $kakaoTokens = preg_split('/\s+/', trim($kakaoRoad));
+        $lastToken = end($kakaoTokens);
+        $pos = mb_strrpos($googleAddr, $lastToken);
+        if ($pos === false) return '';
+        $after = mb_substr($googleAddr, $pos + mb_strlen($lastToken));
+        return trim($after) ?: '';
+    }
+
+    private function normalizeName(string $s): string
+    {
+        $s = preg_replace('/\s+/u', '', $s);
+        $s = preg_replace('/[\p{P}\p{S}]/u', '', $s);
+        return mb_strtolower((string) $s);
     }
 
     public function removePlace(CurationPlace $place)
@@ -520,5 +624,93 @@ class CurationController extends Controller
         $dLng = deg2rad($lng2 - $lng1);
         $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
         return 2 * $R * asin(min(1.0, sqrt($a)));
+    }
+
+    public function searchTourImages(Request $request, CurationPlace $place)
+    {
+        $apiKey = config('services.tour_api.key');
+        if (!$apiKey) {
+            return response()->json(['error' => 'TOUR_API_KEY가 설정되지 않았습니다.'], 422);
+        }
+
+        $keyword = preg_replace('/\s*(본점|지점|분점|센터|점)\s*$/u', '', trim($place->place_name));
+        $keyword = preg_replace('/\s+.{1,3}점$/u', '', $keyword);
+
+        $base = 'https://apis.data.go.kr/B551011/KorService2';
+
+        try {
+            $searchRes = Http::timeout(8)->get("{$base}/searchKeyword2", [
+                'serviceKey' => $apiKey,
+                'MobileOS' => 'ETC',
+                'MobileApp' => 'Pinpick',
+                '_type' => 'json',
+                'keyword' => $keyword,
+                'numOfRows' => 5,
+                'pageNo' => 1,
+            ]);
+
+            if (!$searchRes->successful()) {
+                return response()->json(['error' => 'TourAPI 검색 실패 (HTTP ' . $searchRes->status() . ')'], 502);
+            }
+
+            $body = $searchRes->json();
+            $items = $body['response']['body']['items']['item'] ?? [];
+            if (empty($items)) {
+                return response()->json(['images' => [], 'message' => '공식 이미지를 찾지 못했어요']);
+            }
+
+            $contentId = null;
+            foreach ($items as $item) {
+                if ($place->latitude && $place->longitude && isset($item['mapy'], $item['mapx'])) {
+                    $dist = $this->haversineDist($place->latitude, $place->longitude, (float)$item['mapy'], (float)$item['mapx']);
+                    if ($dist < 1000) {
+                        $contentId = $item['contentid'];
+                        break;
+                    }
+                }
+            }
+            if (!$contentId) {
+                $contentId = $items[0]['contentid'] ?? null;
+            }
+            if (!$contentId) {
+                return response()->json(['images' => [], 'message' => '공식 이미지를 찾지 못했어요']);
+            }
+
+            $imageRes = Http::timeout(8)->get("{$base}/detailImage2", [
+                'serviceKey' => $apiKey,
+                'MobileOS' => 'ETC',
+                'MobileApp' => 'Pinpick',
+                '_type' => 'json',
+                'contentId' => $contentId,
+                'imageYN' => 'Y',
+                'subImageYN' => 'Y',
+                'numOfRows' => 20,
+            ]);
+
+            if (!$imageRes->successful()) {
+                return response()->json(['error' => 'TourAPI 이미지 조회 실패'], 502);
+            }
+
+            $imgItems = $imageRes->json()['response']['body']['items']['item'] ?? [];
+            if (empty($imgItems)) {
+                return response()->json(['images' => [], 'message' => '공식 이미지를 찾지 못했어요']);
+            }
+
+            $images = [];
+            foreach ($imgItems as $img) {
+                $images[] = [
+                    'original' => $img['originimgurl'] ?? $img['imgname'] ?? '',
+                    'thumbnail' => $img['smallimageurl'] ?? $img['originimgurl'] ?? '',
+                    'source' => '한국관광공사',
+                    'license' => $img['cpyrhtDivCd'] ?? '',
+                ];
+            }
+
+            return response()->json(['images' => $images]);
+
+        } catch (\Throwable $e) {
+            Log::warning('TourAPI search error', ['msg' => $e->getMessage()]);
+            return response()->json(['error' => 'TourAPI 호출 실패: ' . $e->getMessage()], 502);
+        }
     }
 }

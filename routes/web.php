@@ -8,6 +8,7 @@ use App\Http\Controllers\MyPageController;
 use App\Http\Controllers\PlaceController;
 use App\Http\Controllers\PublicPlaceController;
 use App\Http\Controllers\CurationController;
+use App\Http\Controllers\MyCurationController;
 use App\Http\Controllers\SharedCollectionController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\TrendingController;
@@ -103,6 +104,17 @@ Route::get('/c/{id}', [CurationController::class, 'show'])
     ->name('curation.show');
 Route::middleware('auth')->group(function () {
     Route::post('/c/{id}/save', [CurationController::class, 'saveToMyPinpick'])->name('curation.save');
+    Route::post('/c/{curation}/report', [MyCurationController::class, 'report'])->name('curation.report');
+
+    // 내 큐레이션
+    Route::get('/my/curations', [MyCurationController::class, 'index'])->name('my.curations');
+    Route::get('/my/curations/create', [MyCurationController::class, 'create'])->name('my.curations.create');
+    Route::post('/my/curations', [MyCurationController::class, 'store'])->name('my.curations.store');
+    Route::get('/my/curations/{curation}/edit', [MyCurationController::class, 'edit'])->name('my.curations.edit');
+    Route::put('/my/curations/{curation}', [MyCurationController::class, 'update'])->name('my.curations.update');
+    Route::post('/my/curations/{curation}/unpublish', [MyCurationController::class, 'unpublish'])->name('my.curations.unpublish');
+    Route::delete('/my/curations/{curation}', [MyCurationController::class, 'destroy'])->name('my.curations.destroy');
+    Route::get('/api/my/places', [MyCurationController::class, 'loadPlaces'])->name('api.my.places');
 });
 Route::get('/api/curations', [CurationController::class, 'apiList'])->name('api.curations.list');
 Route::get('/api/curations/categories', [CurationController::class, 'apiCategories'])->name('api.curations.categories');

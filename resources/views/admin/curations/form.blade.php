@@ -47,6 +47,34 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
 .cur-place__url-row .ad-btn { align-self: flex-end; }
 .cur-place__hint { width: 100%; font-size: 11px; color: var(--ad-text-sub); margin-top: 2px; opacity: .7; }
 
+/* Tour image modal */
+.tour-modal { display:none; position:fixed; inset:0; z-index:9000; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }
+.tour-modal.is-open { display:flex; }
+.tour-modal__panel { background:#fff; border-radius:12px; width:90%; max-width:640px; max-height:80vh; display:flex; flex-direction:column; }
+.tour-modal__head { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--ad-border); }
+.tour-modal__head h3 { margin:0; font-size:16px; }
+.tour-modal__close { border:none; background:none; font-size:22px; cursor:pointer; color:var(--ad-text-sub); }
+.tour-modal__body { flex:1; overflow-y:auto; padding:14px 18px; }
+.tour-modal__grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.tour-modal__img { position:relative; cursor:pointer; border-radius:8px; overflow:hidden; border:2px solid transparent; aspect-ratio:1; }
+.tour-modal__img.is-selected { border-color:var(--ad-primary); }
+.tour-modal__img img { width:100%; height:100%; object-fit:cover; }
+.tour-modal__img-check { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; background:var(--ad-primary); color:#fff; font-size:14px; display:none; align-items:center; justify-content:center; }
+.tour-modal__img.is-selected .tour-modal__img-check { display:flex; }
+.tour-modal__source { position:absolute; bottom:0; left:0; right:0; padding:2px 6px; background:rgba(0,0,0,.6); color:#fff; font-size:10px; text-align:center; }
+.tour-modal__foot { padding:12px 18px; border-top:1px solid var(--ad-border); display:flex; justify-content:space-between; align-items:center; }
+.tour-modal__count { font-size:13px; color:var(--ad-text-sub); }
+.tour-modal__empty { text-align:center; padding:40px 20px; color:var(--ad-text-sub); }
+.tour-btn { font-size:11px; padding:3px 8px; border:1px solid var(--ad-primary); color:var(--ad-primary); border-radius:4px; background:#fff; cursor:pointer; white-space:nowrap; }
+.tour-btn:hover { background:var(--ad-primary); color:#fff; }
+.tour-btn:disabled { opacity:.4; cursor:default; }
+
+/* Opening hours display */
+.cur-hours { font-size:12px; color:var(--ad-text-sub); line-height:1.6; max-width:220px; }
+.cur-hours__line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cur-hours__edit { font-size:11px; color:var(--ad-primary); cursor:pointer; border:none; background:none; padding:0; margin-top:2px; }
+.cur-hours__raw { display:none; }
+
 /* Drag handle & reorder */
 .cur-place { position: relative; transition: box-shadow .15s, opacity .15s; }
 .cur-place__handle { cursor: grab; font-size: 18px; color: var(--ad-text-sub); line-height: 1; user-select: none; flex-shrink: 0; padding: 2px 4px 2px 0; touch-action: none; }
@@ -65,15 +93,27 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
     @csrf
     @if($curation) @method('PUT') @endif
 
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div style="display:flex;gap:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button type="submit" class="ad-btn ad-btn--primary">저장</button>
             @if($curation)
-                <button type="button" class="ad-btn {{ $curation->status === 'published' ? 'ad-btn--danger' : '' }}" id="togglePublishBtn">
-                    {{ $curation->status === 'published' ? '발행 취소' : '발행하기' }}
-                </button>
-                @if($curation->status === 'published')
+                @if($curation->author_type === 'admin')
+                    <button type="button" class="ad-btn {{ $curation->status === 'approved' ? 'ad-btn--danger' : '' }}" id="togglePublishBtn">
+                        {{ $curation->status === 'approved' ? '발행 취소' : '발행하기' }}
+                    </button>
+                @endif
+                @if($curation->status === 'pending')
+                    <button type="button" class="ad-btn" style="background:#4CAF50;color:#fff" onclick="if(confirm('승인하시겠습니까?'))document.getElementById('approveForm').submit()">승인</button>
+                    <button type="button" class="ad-btn" style="color:#C62828" onclick="rejectThis()">반려</button>
+                @endif
+                @if($curation->status === 'approved' && $curation->author_type === 'user')
+                    <button type="button" class="ad-btn ad-btn--danger" onclick="if(confirm('강제 비공개 처리?'))document.getElementById('suspendForm').submit()">강제 비공개</button>
+                @endif
+                @if(in_array($curation->status, ['approved', 'pending']))
                     <a href="{{ route('curation.show', $curation->id) }}" target="_blank" class="ad-btn cur-preview-link">미리보기 ↗</a>
+                @endif
+                @if($curation->author_type === 'user')
+                    <span class="ad-badge ad-badge--blue" style="margin-left:8px">작성자: {{ $curation->author?->name ?? '탈퇴' }}</span>
                 @endif
             @endif
         </div>
@@ -184,11 +224,31 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                                 </div>
                                 <div class="cur-place__hint">URL 여러 개 입력 시 줄바꿈으로 구분 · URL 여러 개 줄바꿈 입력 → Ctrl+Enter 또는 URL 버튼 · Ctrl+V 붙여넣기 · 드래그앤드롭</div>
                                 @endif
+                                @unless($p->is_overseas)
+                                <button type="button" class="tour-btn" onclick="searchTourImages({{ $p->id }})">🔍 이미지 찾기</button>
+                                @endunless
                             </div>
                             <div class="cur-place__meta">
                                 <input class="short" data-field="phone" value="{{ $p->phone }}" placeholder="전화번호">
                                 <input class="short" data-field="building_name" value="{{ $p->building_name }}" placeholder="건물명">
-                                <input class="url" data-field="opening_hours" value="{{ is_array($p->opening_hours) ? json_encode($p->opening_hours, JSON_UNESCAPED_UNICODE) : $p->opening_hours }}" placeholder="영업시간">
+                                @php
+                                    $hoursRaw = is_array($p->opening_hours) ? json_encode($p->opening_hours, JSON_UNESCAPED_UNICODE) : ($p->opening_hours ?? '');
+                                    $hoursArr = is_array($p->opening_hours) ? $p->opening_hours : null;
+                                @endphp
+                                <div class="cur-hours-wrap">
+                                    @if($hoursArr)
+                                        <div class="cur-hours" title="{{ implode("\n", $hoursArr) }}">
+                                            @foreach(array_slice($hoursArr, 0, 3) as $line)
+                                                <div class="cur-hours__line">{{ $line }}</div>
+                                            @endforeach
+                                            @if(count($hoursArr) > 3)
+                                                <div class="cur-hours__line">…외 {{ count($hoursArr) - 3 }}일</div>
+                                            @endif
+                                            <button type="button" class="cur-hours__edit" onclick="toggleHoursEdit(this)">원본 수정</button>
+                                        </div>
+                                    @endif
+                                    <input class="url cur-hours__raw{{ $hoursArr ? '' : ' cur-hours__raw--visible' }}" data-field="opening_hours" value="{{ $hoursRaw }}" placeholder="영업시간"@if($hoursArr) style="display:none"@endif>
+                                </div>
                             </div>
                             <div class="cur-place__meta">
                                 <input class="short" data-field="source_channel" value="{{ $p->source_channel }}" placeholder="출처 채널">
@@ -220,6 +280,32 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
         </div>
     </div>
 </form>
+
+<!-- TourAPI 이미지 검색 모달 -->
+<div class="tour-modal" id="tourModal">
+    <div class="tour-modal__panel">
+        <div class="tour-modal__head">
+            <h3 id="tourModalTitle">관광 이미지 검색</h3>
+            <button type="button" class="tour-modal__close" onclick="closeTourModal()">✕</button>
+        </div>
+        <div class="tour-modal__body" id="tourModalBody">
+            <div class="tour-modal__empty">검색 중...</div>
+        </div>
+        <div class="tour-modal__foot">
+            <span class="tour-modal__count" id="tourModalCount">0장 선택</span>
+            <button type="button" class="ad-btn ad-btn--primary ad-btn--sm" id="tourModalConfirm" onclick="confirmTourImages()" disabled>선택한 이미지 등록</button>
+        </div>
+    </div>
+</div>
+
+@if($curation)
+    @if($curation->status === 'pending')
+        <form id="approveForm" method="POST" action="{{ route('admin.curations.approve', $curation) }}" style="display:none">@csrf</form>
+    @endif
+    @if($curation->status === 'approved' && $curation->author_type === 'user')
+        <form id="suspendForm" method="POST" action="{{ route('admin.curations.suspend', $curation) }}" style="display:none">@csrf</form>
+    @endif
+@endif
 @endsection
 
 @if($curation)
@@ -377,7 +463,38 @@ async function enrichNaverData(placeId, name, lat, lng, address) {
             }
             if (data.opening_hours) {
                 const hoursInp = card.querySelector('[data-field="opening_hours"]');
-                if (hoursInp && !hoursInp.value) hoursInp.value = data.opening_hours;
+                if (hoursInp && !hoursInp.value) {
+                    const val = Array.isArray(data.opening_hours) ? JSON.stringify(data.opening_hours) : data.opening_hours;
+                    hoursInp.value = val;
+                    if (Array.isArray(data.opening_hours)) {
+                        const wrap = hoursInp.closest('.cur-hours-wrap');
+                        if (wrap) {
+                            const display = document.createElement('div');
+                            display.className = 'cur-hours';
+                            display.title = data.opening_hours.join('\n');
+                            data.opening_hours.slice(0, 3).forEach(l => {
+                                const d = document.createElement('div');
+                                d.className = 'cur-hours__line';
+                                d.textContent = l;
+                                display.appendChild(d);
+                            });
+                            if (data.opening_hours.length > 3) {
+                                const d = document.createElement('div');
+                                d.className = 'cur-hours__line';
+                                d.textContent = '…외 ' + (data.opening_hours.length - 3) + '일';
+                                display.appendChild(d);
+                            }
+                            const editBtn = document.createElement('button');
+                            editBtn.type = 'button';
+                            editBtn.className = 'cur-hours__edit';
+                            editBtn.textContent = '원본 수정';
+                            editBtn.onclick = function() { toggleHoursEdit(this); };
+                            display.appendChild(editBtn);
+                            wrap.insertBefore(display, hoursInp);
+                            hoursInp.style.display = 'none';
+                        }
+                    }
+                }
             }
         }
     } catch(e) {}
@@ -399,11 +516,12 @@ function appendPlaceCard(p) {
         + '<label class="cur-place__photo-add">+<input type="file" accept="image/*" multiple hidden onchange="uploadPhotos(' + p.id + ',this)"></label>'
         + '<div class="cur-place__url-row"><textarea rows="3" placeholder="이미지 URL (여러 줄 가능)" class="cur-url-input"></textarea><button type="button" class="ad-btn ad-btn--sm cur-url-btn" onclick="uploadFromUrl(' + p.id + ',this)">URL</button></div>'
         + '<div class="cur-place__hint">URL 여러 개 줄바꿈 입력 → Ctrl+Enter 또는 URL 버튼 · Ctrl+V 붙여넣기 · 드래그앤드롭</div>'
+        + (p.is_overseas ? '' : '<button type="button" class="tour-btn" onclick="searchTourImages(' + p.id + ')">🔍 이미지 찾기</button>')
         + '</div>'
         + '<div class="cur-place__meta">'
         + '<input class="short" data-field="phone" value="' + esc(p.phone || '') + '" placeholder="전화번호">'
         + '<input class="short" data-field="building_name" value="' + esc(p.building_name || '') + '" placeholder="건물명">'
-        + '<input class="url" data-field="opening_hours" value="" placeholder="영업시간">'
+        + '<div class="cur-hours-wrap"><input class="url" data-field="opening_hours" value="" placeholder="영업시간"></div>'
         + '</div>'
         + '<div class="cur-place__meta">'
         + '<input class="short" data-field="source_channel" value="" placeholder="출처 채널">'
@@ -785,6 +903,18 @@ if (toggleBtn) {
     });
 }
 
+function rejectThis() {
+    const reason = prompt('반려 사유를 입력해주세요:');
+    if (!reason) return;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/curations/' + curationId + '/reject';
+    form.innerHTML = '<input type="hidden" name="_token" value="' + csrf + '">'
+        + '<input type="hidden" name="reason" value="' + reason.replace(/"/g, '&quot;') + '">';
+    document.body.appendChild(form);
+    form.submit();
+}
+
 // 삭제
 const delBtn = document.getElementById('deleteCurBtn');
 if (delBtn) {
@@ -799,6 +929,120 @@ if (delBtn) {
         } catch(e) { alert('삭제 실패'); }
     });
 }
+
+// ── 영업시간 토글 ──
+function toggleHoursEdit(btn) {
+    const wrap = btn.closest('.cur-hours-wrap');
+    const display = wrap.querySelector('.cur-hours');
+    const input = wrap.querySelector('[data-field="opening_hours"]');
+    display.style.display = 'none';
+    input.style.display = '';
+    input.focus();
+}
+
+// ── TourAPI 이미지 검색 ──
+let tourPlaceId = null;
+let tourSelected = [];
+
+async function searchTourImages(pid) {
+    tourPlaceId = pid;
+    tourSelected = [];
+    const modal = document.getElementById('tourModal');
+    const body = document.getElementById('tourModalBody');
+    const count = document.getElementById('tourModalCount');
+    const confirm = document.getElementById('tourModalConfirm');
+    const remaining = 3 - photoCount(pid);
+
+    body.innerHTML = '<div class="tour-modal__empty">🔍 검색 중...</div>';
+    count.textContent = '0장 선택 (최대 ' + remaining + '장)';
+    confirm.disabled = true;
+    modal.classList.add('is-open');
+
+    if (remaining <= 0) {
+        body.innerHTML = '<div class="tour-modal__empty">이미 3장이 등록되어 있어요. 기존 사진을 삭제한 뒤 시도해주세요.</div>';
+        return;
+    }
+
+    try {
+        const r = await fetch('/admin/curations/places/' + pid + '/tour-images', {
+            headers: { 'Accept': 'application/json' },
+        });
+        const data = await r.json();
+        if (data.error) {
+            body.innerHTML = '<div class="tour-modal__empty">' + esc(data.error) + '</div>';
+            return;
+        }
+        if (!data.images || !data.images.length) {
+            body.innerHTML = '<div class="tour-modal__empty">📭 ' + esc(data.message || '공식 이미지를 찾지 못했어요') + '<br><small>수동으로 URL을 등록해주세요</small></div>';
+            return;
+        }
+
+        body.innerHTML = '<div class="tour-modal__grid">' + data.images.map((img, i) =>
+            '<div class="tour-modal__img" data-idx="' + i + '" data-url="' + esc(img.original) + '" onclick="toggleTourImg(this,' + remaining + ')">'
+            + '<img src="' + esc(img.thumbnail) + '" alt="" loading="lazy">'
+            + '<div class="tour-modal__img-check">✓</div>'
+            + '<div class="tour-modal__source">' + esc(img.source) + '</div>'
+            + '</div>'
+        ).join('') + '</div>';
+    } catch(e) {
+        body.innerHTML = '<div class="tour-modal__empty">네트워크 오류: ' + esc(e.message) + '</div>';
+    }
+}
+
+function toggleTourImg(el, max) {
+    const url = el.dataset.url;
+    if (el.classList.contains('is-selected')) {
+        el.classList.remove('is-selected');
+        tourSelected = tourSelected.filter(u => u !== url);
+    } else {
+        if (tourSelected.length >= max) {
+            alert('최대 ' + max + '장까지 선택할 수 있어요.');
+            return;
+        }
+        el.classList.add('is-selected');
+        tourSelected.push(url);
+    }
+    const remaining = 3 - photoCount(tourPlaceId);
+    document.getElementById('tourModalCount').textContent = tourSelected.length + '장 선택 (최대 ' + remaining + '장)';
+    document.getElementById('tourModalConfirm').disabled = tourSelected.length === 0;
+}
+
+async function confirmTourImages() {
+    if (!tourSelected.length || !tourPlaceId) return;
+    const btn = document.getElementById('tourModalConfirm');
+    btn.disabled = true;
+    btn.textContent = '등록 중...';
+
+    const wrap = document.querySelector('.cur-place__photos[data-pid="'+tourPlaceId+'"]');
+    let fail = [];
+    for (let i = 0; i < tourSelected.length; i++) {
+        btn.textContent = (i+1) + '/' + tourSelected.length + ' 처리중…';
+        try {
+            const r = await fetch('/admin/curations/places/'+tourPlaceId+'/photos/url', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRF-TOKEN':csrf,'Accept':'application/json'},
+                body: JSON.stringify({ url: tourSelected[i], source: '한국관광공사' }),
+            });
+            const data = await r.json();
+            if (data.success) { rebuildPhotos(tourPlaceId, data.photos); }
+            else { fail.push((i+1) + ': ' + (data.error || '실패')); }
+        } catch(e) { fail.push((i+1) + ': ' + e.message); }
+    }
+
+    closeTourModal();
+    if (fail.length) alert('일부 실패:\n' + fail.join('\n'));
+}
+
+function closeTourModal() {
+    document.getElementById('tourModal').classList.remove('is-open');
+    document.getElementById('tourModalConfirm').textContent = '선택한 이미지 등록';
+    tourPlaceId = null;
+    tourSelected = [];
+}
+
+document.getElementById('tourModal').addEventListener('click', function(e) {
+    if (e.target === this) closeTourModal();
+});
 
 renumber();
 </script>

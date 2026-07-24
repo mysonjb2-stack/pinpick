@@ -19,7 +19,12 @@ class CurationController extends Controller
     public function show(int $id)
     {
         $curation = Curation::where('id', $id)
-            ->published()
+            ->where(function ($q) {
+                $q->where('status', 'approved')
+                  ->orWhere(function ($q2) {
+                      $q2->where('status', 'pending')->whereNotNull('approved_snapshot');
+                  });
+            })
             ->firstOrFail();
 
         $viewKey = "curation_view:{$curation->id}:" . (request()->ip() ?? 'unknown');
@@ -28,7 +33,21 @@ class CurationController extends Controller
             Cache::put($viewKey, true, 300);
         }
 
-        $curation->load('places');
+        $curation->load(['places', 'author']);
+
+        if ($curation->status === 'pending' && $curation->approved_snapshot) {
+            $snap = $curation->approved_snapshot;
+            $curation->title = $snap['title'] ?? $curation->title;
+            $curation->description = $snap['description'] ?? $curation->description;
+            $curation->category = $snap['category'] ?? $curation->category;
+            $curation->region_label = $snap['region_label'] ?? $curation->region_label;
+            $curation->cover_image = $snap['cover_image'] ?? $curation->cover_image;
+
+            if (!empty($snap['places'])) {
+                $snapPlaces = collect($snap['places'])->map(fn($p) => new CurationPlace($p));
+                $curation->setRelation('places', $snapPlaces);
+            }
+        }
 
         $userCategories = [];
         if (Auth::check()) {
@@ -177,14 +196,18 @@ class CurationController extends Controller
     public function apiList(Request $request)
     {
         $category = $request->get('category');
-        $curations = Curation::published()
-            ->with(['places' => fn($q) => $q->orderBy('sort_order')->limit(6)])
+        $curations = Curation::where(function ($q) {
+                $q->where('status', 'approved')
+                  ->orWhere(fn($q2) => $q2->where('status', 'pending')->whereNotNull('approved_snapshot'));
+            })
+            ->with(['places' => fn($q) => $q->orderBy('sort_order')->limit(6), 'author:id,name,profile_image'])
             ->withCount('places')
             ->when($category, fn($q) => $q->where('category', $category))
             ->orderByDesc('published_at')
             ->limit(50)
             ->get(['id', 'title', 'slug', 'type', 'category', 'description',
-                    'cover_image', 'save_count', 'published_at']);
+                    'cover_image', 'save_count', 'published_at',
+                    'author_type', 'author_user_id', 'status', 'approved_snapshot']);
 
         $savedIds = [];
         if (Auth::check()) {
@@ -200,6 +223,19 @@ class CurationController extends Controller
         }
 
         $curations->each(function ($c) use ($savedIds) {
+            if ($c->status === 'pending' && $c->approved_snapshot) {
+                $snap = $c->approved_snapshot;
+                $c->title = $snap['title'] ?? $c->title;
+                $c->description = $snap['description'] ?? $c->description;
+                $c->category = $snap['category'] ?? $c->category;
+                $c->cover_image = $snap['cover_image'] ?? $c->cover_image;
+                if (!empty($snap['places'])) {
+                    $snapPlaces = collect($snap['places'])->map(fn($p) => new CurationPlace($p));
+                    $c->setRelation('places', $snapPlaces);
+                    $c->places_count = count($snap['places']);
+                }
+            }
+
             $coverUrl = $c->cover_image ? asset('storage/' . $c->cover_image) : null;
             $c->cover_url = $coverUrl;
             $catConfig = config("curation_categories.{$c->category}");
@@ -224,7 +260,12 @@ class CurationController extends Controller
                 ];
             });
             $c->is_saved = $hasSaved;
-            unset($c->places);
+            $c->author_name = $c->author_type === 'user' && $c->author
+                ? $c->author->name : '핀픽';
+            $c->author_avatar = $c->author_type === 'user' && $c->author && $c->author->profile_image
+                ? $c->author->profile_image : null;
+            $c->is_official = $c->author_type === 'admin';
+            unset($c->places, $c->author, $c->status, $c->approved_snapshot);
         });
 
         return response()->json($curations);
@@ -232,7 +273,10 @@ class CurationController extends Controller
 
     public function apiCategories()
     {
-        $usedCategories = Curation::published()
+        $usedCategories = Curation::where(function ($q) {
+                $q->where('status', 'approved')
+                  ->orWhere(fn($q2) => $q2->where('status', 'pending')->whereNotNull('approved_snapshot'));
+            })
             ->select('category')
             ->groupBy('category')
             ->pluck('category')

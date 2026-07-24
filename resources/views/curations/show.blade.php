@@ -39,7 +39,19 @@
 
 /* ── Map: fills container ── */
 .pp-cur-map { position: absolute; inset: 0; z-index: 1; }
-.pp-cur-map__el { width: 100%; height: 100%; }
+.pp-cur-map__el { width: 100%; height: 100%; opacity: 0; transition: opacity .2s ease; }
+.pp-cur-map__el.is-ready { opacity: 1; }
+.pp-cur-map__skel {
+  position: absolute; inset: 0; z-index: 0;
+  background: var(--pp-bg-sub, #f5f0eb);
+  display: flex; align-items: center; justify-content: center;
+}
+.pp-cur-map__skel::after {
+  content: ''; width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--pp-line, #e0d8d0); border-top-color: var(--pp-primary, #2b211e);
+  animation: curMapSpin .8s linear infinite;
+}
+@keyframes curMapSpin { to { transform: rotate(360deg); } }
 
 /* ── Header overlay: inside container ── */
 .pp-cur-hdr {
@@ -88,13 +100,70 @@
 
 /* Sheet header */
 .pp-cur-sheet__hdr { padding: 4px 18px 12px; cursor: grab; touch-action: none; user-select: none; }
+.pp-cur-sheet__title-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
 .pp-cur-sheet__title {
   font-size: 20px; font-weight: 800; color: var(--pp-text);
-  margin: 0; letter-spacing: -0.02em; line-height: 1.3;
+  margin: 0; letter-spacing: -0.02em; line-height: 1.3; flex: 1; min-width: 0;
 }
+.pp-cur-sheet__share-btn {
+  flex-shrink: 0; border: none; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--pp-bg-card, #f5f5f5); color: var(--pp-text-sub);
+  cursor: pointer; border-radius: 50%;
+}
+.pp-cur-sheet__share-btn:active { background: var(--pp-chip-bg); }
 .pp-cur-sheet__summary {
   font-size: 13px; color: var(--pp-text-sub); margin: 4px 0 0;
 }
+.pp-cur-sheet__author {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px;
+}
+.pp-cur-author__avatar {
+  width: 22px; height: 22px; border-radius: 50%; object-fit: cover;
+  flex-shrink: 0; background: var(--pp-chip-bg);
+}
+.pp-cur-author__avatar--initial {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  background: var(--pp-text-sub, #8c7e72);
+}
+.pp-cur-author__name { font-size: 13px; font-weight: 600; color: var(--pp-text); }
+.pp-cur-author__dot { font-size: 11px; color: var(--pp-text-sub); }
+.pp-cur-author__count { font-size: 12px; color: var(--pp-text-sub); }
+
+/* Report */
+.pp-cur-report { text-align: center; padding: 12px 0 0; }
+.pp-cur-report__btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: none; background: none; font-size: 12px; color: var(--pp-text-sub);
+  cursor: pointer; padding: 6px 12px;
+}
+.pp-cur-report-sheet {
+  display: none; position: fixed; inset: 0; z-index: 1200;
+  align-items: flex-end; justify-content: center;
+}
+.pp-cur-report-sheet.is-open { display: flex; }
+.pp-cur-report-sheet__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+.pp-cur-report-sheet__panel {
+  position: relative; width: 100%; max-width: 480px; background: var(--pp-bg);
+  border-radius: 16px 16px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+}
+.pp-cur-report-sheet__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.pp-cur-report-sheet__head h3 { font-size: 16px; font-weight: 700; margin: 0; color: var(--pp-text); }
+.pp-cur-report-sheet__close { border: none; background: none; font-size: 22px; color: var(--pp-text-sub); cursor: pointer; }
+.pp-cur-report-opt {
+  display: block; padding: 10px 0; border-bottom: 1px solid var(--pp-line);
+  font-size: 14px; color: var(--pp-text); cursor: pointer;
+}
+.pp-cur-report-opt input { accent-color: var(--pp-primary); margin-right: 8px; }
+.pp-cur-report-detail {
+  width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--pp-line);
+  border-radius: 10px; font-size: 13px; resize: none; min-height: 60px;
+  color: var(--pp-text); background: var(--pp-bg); box-sizing: border-box;
+}
+.pp-cur-report-submit { width: 100%; margin-top: 12px; }
 
 /* Detail area */
 .pp-cur-sheet__detail { padding: 0 18px 12px; }
@@ -286,6 +355,7 @@
 @section('content')
 {{-- Full-screen map --}}
 <div class="pp-cur-map">
+    <div class="pp-cur-map__skel" id="curMapSkel"></div>
     <div class="pp-cur-map__el" id="curMap"></div>
 </div>
 
@@ -293,9 +363,6 @@
 <div class="pp-cur-hdr">
     <button type="button" class="pp-cur-hdr__btn" id="curBack" aria-label="뒤로">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <button type="button" class="pp-cur-hdr__btn" id="curShareBtn" aria-label="공유">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
     </button>
 </div>
 
@@ -309,11 +376,33 @@
     <div class="pp-cur-sheet__scroll" id="curSheetScroll">
         {{-- Peek: always visible --}}
         <div class="pp-cur-sheet__hdr" id="curSheetHdr">
-            <h1 class="pp-cur-sheet__title">{{ $curation->title }}</h1>
+            <div class="pp-cur-sheet__title-row">
+                <h1 class="pp-cur-sheet__title">{{ $curation->title }}</h1>
+                <button type="button" class="pp-cur-sheet__share-btn" id="curShareBtn" aria-label="공유">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                </button>
+            </div>
             <p class="pp-cur-sheet__summary">
                 장소 {{ $curation->places->count() }}곳
                 @if($curation->save_count > 0) · {{ number_format($curation->save_count) }}명이 담아갔어요 @endif
             </p>
+            <div class="pp-cur-sheet__author">
+                @if($curation->author_type === 'user' && $curation->author)
+                    @if($curation->author->profile_image)
+                        <img class="pp-cur-author__avatar" src="{{ $curation->author->profile_image }}" alt="">
+                    @else
+                        <span class="pp-cur-author__avatar pp-cur-author__avatar--initial">{{ mb_substr($curation->author->name, 0, 1) }}</span>
+                    @endif
+                    <span class="pp-cur-author__name">{{ $curation->author->name }}</span>
+                    <span class="pp-cur-author__dot">·</span>
+                    <span class="pp-cur-author__count">{{ $curation->places->count() }}개 매장</span>
+                @else
+                    <img class="pp-cur-author__avatar" src="{{ asset('icon-192.png') }}" alt="">
+                    <span class="pp-cur-author__name">핀픽</span>
+                    <span class="pp-cur-author__dot">·</span>
+                    <span class="pp-cur-author__count">{{ $curation->places->count() }}개 매장</span>
+                @endif
+            </div>
         </div>
 
         {{-- Detail: visible from mid --}}
@@ -400,8 +489,39 @@
         @endforeach
 
         <div class="pp-cur-sheet__bottom-pad"></div>
+
+        @auth
+        <div class="pp-cur-report">
+            <button type="button" class="pp-cur-report__btn" id="curReportBtn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                신고
+            </button>
+        </div>
+        @endauth
     </div>
 </div>
+
+{{-- Report Sheet --}}
+@auth
+<div class="pp-cur-report-sheet" id="curReportSheet">
+    <div class="pp-cur-report-sheet__backdrop" data-close-report></div>
+    <div class="pp-cur-report-sheet__panel">
+        <div class="pp-cur-report-sheet__head">
+            <h3>리스트 신고</h3>
+            <button type="button" data-close-report class="pp-cur-report-sheet__close">&times;</button>
+        </div>
+        <div class="pp-cur-report-sheet__body">
+            <label class="pp-cur-report-opt"><input type="radio" name="reportReason" value="spam"> 스팸/광고</label>
+            <label class="pp-cur-report-opt"><input type="radio" name="reportReason" value="inappropriate"> 부적절한 콘텐츠</label>
+            <label class="pp-cur-report-opt"><input type="radio" name="reportReason" value="copyright"> 저작권 침해</label>
+            <label class="pp-cur-report-opt"><input type="radio" name="reportReason" value="false_info"> 허위 정보</label>
+            <label class="pp-cur-report-opt"><input type="radio" name="reportReason" value="other"> 기타</label>
+            <textarea class="pp-cur-report-detail" id="curReportDetail" placeholder="상세 내용 (선택)" maxlength="500"></textarea>
+        </div>
+        <button type="button" class="pp-btn pp-cur-report-submit" id="curReportSubmit">신고하기</button>
+    </div>
+</div>
+@endauth
 
 {{-- CTA --}}
 <div class="pp-cur-cta" id="curCta">
@@ -494,11 +614,58 @@
             'external_place_id' => $p->external_place_id,
             'naver_place_id' => $p->naver_place_id,
             'google_place_id' => $p->google_place_id,
+            'opening_hours' => $p->opening_hours,
+            'jibeon_address' => $p->jibeon_address,
             'is_overseas' => (bool) $p->is_overseas,
             'day_number' => $p->day_number,
             'source_channel' => $p->source_channel,
         ];
     });
+
+    // Server-side initial map center/zoom (480px shell, mid snap)
+    $validCoords = $curation->places->filter(fn($p) => $p->latitude && $p->longitude);
+    $initZoom = 8;
+    $initLat = 37.5;
+    $initLng = 127.0;
+
+    if ($validCoords->count() >= 1) {
+        $lats = $validCoords->pluck('latitude')->map(fn($v) => (float)$v);
+        $lngs = $validCoords->pluck('longitude')->map(fn($v) => (float)$v);
+        $minLat = $lats->min(); $maxLat = $lats->max();
+        $minLng = $lngs->min(); $maxLng = $lngs->max();
+        $midLat = ($minLat + $maxLat) / 2;
+        $midLng = ($minLng + $maxLng) / 2;
+
+        // Fixed layout constants (480px shell, mid snap = 52%)
+        $containerH = 480;
+        $headerH = 66;
+        $sheetVisH = round($containerH * 0.52);
+        $visH = $containerH - $sheetVisH - $headerH;
+        $containerW = 480;
+
+        if ($validCoords->count() === 1) {
+            $initZoom = 15;
+        } else {
+            $pad = 80;
+            $effW = max($containerW - $pad, 50);
+            $effH = max($visH - $pad, 50);
+            $lngSpan = $maxLng - $minLng;
+            $mercMax = log(tan(M_PI / 4 + deg2rad($maxLat) / 2));
+            $mercMin = log(tan(M_PI / 4 + deg2rad($minLat) / 2));
+            $mercSpan = abs($mercMax - $mercMin);
+            $z = 18;
+            if ($lngSpan > 0) $z = min($z, log($effW * 360 / ($lngSpan * 256)) / log(2));
+            if ($mercSpan > 0) $z = min($z, log($effH * 2 * M_PI / (256 * $mercSpan)) / log(2));
+            $initZoom = max(2, min((int)floor($z), 14));
+        }
+
+        // Center offset: shift south so pins appear in visible area center
+        $deltaY = $containerH / 2 - ($headerH + $visH / 2);
+        $mpp = 156543.03392 * cos(deg2rad($midLat)) / pow(2, $initZoom);
+        $latOff = $deltaY * $mpp / 111320;
+        $initLat = $midLat - $latOff;
+        $initLng = $midLng;
+    }
 @endphp
 <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={{ config('services.naver_map.client_id') }}"></script>
 <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js" integrity="sha384-DKYJZ8NLiK8MN4/C5P2dtSmLQ4KwPaoqAfyA/DQ/7hV+E1NASW+/MNlHjao0fzm" crossorigin="anonymous"></script>
@@ -552,6 +719,24 @@
         shareSheet.classList.remove('is-open');
     });
 
+    // ── Report ──
+    const reportSheet = document.getElementById('curReportSheet');
+    if (reportSheet) {
+        document.getElementById('curReportBtn').addEventListener('click', () => reportSheet.classList.add('is-open'));
+        reportSheet.querySelectorAll('[data-close-report]').forEach(el => el.addEventListener('click', () => reportSheet.classList.remove('is-open')));
+        document.getElementById('curReportSubmit').addEventListener('click', () => {
+            const reason = reportSheet.querySelector('input[name="reportReason"]:checked');
+            if (!reason) { alert('신고 사유를 선택해주세요.'); return; }
+            fetch('/c/' + curationId + '/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ reason: reason.value, detail: document.getElementById('curReportDetail').value }),
+            }).then(r => r.json()).then(d => {
+                if (d.success) { showToast('신고가 접수되었어요'); reportSheet.classList.remove('is-open'); }
+            }).catch(() => alert('신고 실패'));
+        });
+    }
+
     // ── Container ref ──
     const container = document.querySelector('.pp-app');
     const containerH = () => container.offsetHeight;
@@ -559,57 +744,100 @@
     // ── Map ──
     let map = null, markers = [];
     const pinSize = 28;
+    const HEADER_H = 66;
+    const DEBUG_FIT = false;
+
     function pinHtml(num, hl) {
         const bg = hl ? '#e67e22' : 'var(--pp-primary,#2b211e)';
         const sc = hl ? 'transform:scale(1.25);' : '';
         return '<div style="background:'+bg+';color:#fff;width:'+pinSize+'px;height:'+pinSize+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .15s;'+sc+'">'+num+'</div>';
     }
 
-    function sheetMidTop() { return Math.round(containerH() * 0.48); }
-    function mapBottomPad() { return containerH() - sheetMidTop() + 20; }
+    function visiblePlaces() {
+        if (activeDay === 'all') return places;
+        const d = parseInt(activeDay);
+        return places.filter(p => p.day_number === d);
+    }
 
-    function calcOffsetCenter(lat, lng, zoom) {
+    function getSheetTopPx() {
         const ch = containerH();
-        const offsetPx = Math.round(ch * 0.26);
+        const sH = sheetH();
+        const offsets = getOffsets();
+        return ch - sH + offsets[sheetState];
+    }
+
+    function getVisibleMapArea() {
+        const top = HEADER_H;
+        const bottom = Math.max(top + 60, getSheetTopPx());
+        return { top: top, bottom: bottom, height: bottom - top };
+    }
+
+    function mercY(lat) {
+        return Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+    }
+
+    function calcZoom(vp, viewW, viewH) {
+        const PAD = 80;
+        const effW = Math.max(viewW - PAD, 50);
+        const effH = Math.max(viewH - PAD, 50);
+        const lats = vp.map(p => p.lat), lngs = vp.map(p => p.lng);
+        const lngSpan = Math.max(...lngs) - Math.min(...lngs);
+        const mSpan = Math.abs(mercY(Math.max(...lats)) - mercY(Math.min(...lats)));
+        let z = 18;
+        if (lngSpan > 0) z = Math.min(z, Math.log2(effW * 360 / (lngSpan * 256)));
+        if (mSpan > 0) z = Math.min(z, Math.log2(effH * 2 * Math.PI / (256 * mSpan)));
+        return Math.max(2, Math.min(Math.floor(z), 14));
+    }
+
+    function centerForVisible(lat, lng, zoom) {
+        const ch = containerH();
+        const vis = getVisibleMapArea();
+        const deltaY = ch / 2 - (vis.top + vis.height / 2);
         const mpp = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
-        const latOff = offsetPx * mpp / 111320;
-        return new naver.maps.LatLng(lat - latOff, lng);
+        return new naver.maps.LatLng(lat - deltaY * mpp / 111320, lng);
     }
 
     function fitMapToAll() {
         if (!map) return;
-        const vp = places.filter(p => p.lat && p.lng);
+        const vp = visiblePlaces().filter(p => p.lat && p.lng);
         if (!vp.length) return;
         if (vp.length === 1) {
-            map.setZoom(14);
-            map.setCenter(calcOffsetCenter(vp[0].lat, vp[0].lng, 14));
-        } else if (vp.length >= 2) {
-            map.fitBounds(fullBounds, { top: 40, right: 30, bottom: 40, left: 30 });
-            var z = Math.min(map.getZoom() - 1, 14);
+            map.setZoom(15);
+            map.setCenter(centerForVisible(vp[0].lat, vp[0].lng, 15));
+        } else {
+            const vis = getVisibleMapArea();
+            const cw = container.offsetWidth;
+            const z = calcZoom(vp, cw, vis.height);
+            const midLat = (Math.min(...vp.map(p=>p.lat)) + Math.max(...vp.map(p=>p.lat))) / 2;
+            const midLng = (Math.min(...vp.map(p=>p.lng)) + Math.max(...vp.map(p=>p.lng))) / 2;
             map.setZoom(z);
-            var midLat = (Math.min(...vp.map(p=>p.lat)) + Math.max(...vp.map(p=>p.lat))) / 2;
-            var midLng = (Math.min(...vp.map(p=>p.lng)) + Math.max(...vp.map(p=>p.lng))) / 2;
-            var sheetPx = containerH() - sheetMidTop();
-            var offsetPx = Math.round(sheetPx / 2);
-            var mpp = 156543.03392 * Math.cos(midLat * Math.PI / 180) / Math.pow(2, z);
-            var latShift = offsetPx * mpp / 111320;
-            map.setCenter(new naver.maps.LatLng(midLat - latShift, midLng));
+            map.setCenter(centerForVisible(midLat, midLng, z));
         }
+        if (DEBUG_FIT) showDebugBox();
+    }
+
+    function showDebugBox() {
+        let el = document.getElementById('dbgFitBox');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'dbgFitBox';
+            el.style.cssText = 'position:absolute;left:0;right:0;z-index:999;pointer-events:none;border:2px solid rgba(255,0,0,.6);background:rgba(255,0,0,.06);';
+            container.appendChild(el);
+        }
+        const vis = getVisibleMapArea();
+        el.style.top = vis.top + 'px';
+        el.style.height = vis.height + 'px';
+        el.style.display = '';
     }
 
     const fitBtn = document.getElementById('curFitBtn');
+    const mapEl = document.getElementById('curMap');
+    const skelEl = document.getElementById('curMapSkel');
+
     if (places.length && typeof naver !== 'undefined') {
-        fullBounds = new naver.maps.LatLngBounds();
-        const validPlaces = places.filter(p => p.lat && p.lng);
-        validPlaces.forEach(p => fullBounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
-
-        const initCenter = validPlaces.length === 1
-            ? calcOffsetCenter(validPlaces[0].lat, validPlaces[0].lng, 14)
-            : fullBounds.getCenter();
-
         map = new naver.maps.Map('curMap', {
-            center: initCenter,
-            zoom: validPlaces.length === 1 ? 14 : 12,
+            center: new naver.maps.LatLng({{ $initLat }}, {{ $initLng }}),
+            zoom: {{ $initZoom }},
             zoomControl: false, scaleControl: false, logoControl: false, mapDataControl: false,
         });
 
@@ -626,19 +854,25 @@
         });
         naver.maps.Event.addListener(map, 'click', () => resetHighlight());
 
-        let mapFitCount = 0;
-        function onMapReady() {
-            if (mapFitCount >= 2) return;
-            mapFitCount++;
-            setTimeout(fitMapToAll, mapFitCount === 1 ? 100 : 400);
+        let initFitDone = false;
+        function doInitFit() {
+            if (initFitDone) return;
+            initFitDone = true;
+            fitMapToAll();
+            mapEl.classList.add('is-ready');
+            setTimeout(() => { if (skelEl) skelEl.style.display = 'none'; }, 250);
         }
-        naver.maps.Event.addListener(map, 'init_stylemap', onMapReady);
-        naver.maps.Event.addListener(map, 'init', onMapReady);
-        naver.maps.Event.addListener(map, 'idle', onMapReady);
-        setTimeout(onMapReady, 300);
-        setTimeout(onMapReady, 800);
+        naver.maps.Event.addListener(map, 'idle', doInitFit);
+        setTimeout(doInitFit, 1200);
 
-        window.addEventListener('resize', () => { if (map) map.autoResize(); });
+        window.addEventListener('resize', () => {
+            if (!map) return;
+            map.autoResize();
+            setTimeout(fitMapToAll, 100);
+        });
+    } else {
+        mapEl.classList.add('is-ready');
+        if (skelEl) skelEl.style.display = 'none';
     }
 
     function highlightPin(idx) {
@@ -661,36 +895,42 @@
     }
     fitBtn.addEventListener('click', () => resetHighlight());
 
-    function panToVisible(lat, lng) {
-        const target = calcOffsetCenter(lat, lng, map.getZoom());
-        map.panTo(target, { duration: 300 });
+    function focusPin(lat, lng, zoom) {
+        const z = zoom || 16;
+        map.setZoom(z);
+        map.setCenter(centerForVisible(lat, lng, z));
     }
 
     function handlePinTap(idx) {
         if (activeMarkerIdx === idx) { resetHighlight(); return; }
         const p = places[idx];
         if (!map || !p.lat || !p.lng) return;
-        map.setZoom(16);
-        setTimeout(() => panToVisible(p.lat, p.lng), 50);
-        highlightPin(idx);
-        document.querySelectorAll('.pp-cur-card').forEach(c => c.classList.remove('is-focused'));
-        const card = document.querySelector('.pp-cur-card[data-idx="'+idx+'"]');
-        if (card) {
-            card.classList.add('is-focused');
-            if (sheetState === 'peek') setSheetState('mid');
-            setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350);
-        }
+        const wasPeek = sheetState === 'peek';
+        if (wasPeek) setSheetState('mid');
+        setTimeout(() => {
+            focusPin(p.lat, p.lng, 16);
+            highlightPin(idx);
+            document.querySelectorAll('.pp-cur-card').forEach(c => c.classList.remove('is-focused'));
+            const card = document.querySelector('.pp-cur-card[data-idx="'+idx+'"]');
+            if (card) {
+                card.classList.add('is-focused');
+                setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+            }
+        }, wasPeek ? 350 : 10);
     }
 
     function handleCardTap(idx) {
         if (activeMarkerIdx === idx) { resetHighlight(); return; }
         const p = places[idx];
         if (!map || !p.lat || !p.lng) return;
-        map.setZoom(16);
-        setTimeout(() => panToVisible(p.lat, p.lng), 50);
-        highlightPin(idx);
-        document.querySelectorAll('.pp-cur-card').forEach(c => c.classList.remove('is-focused'));
-        document.querySelector('.pp-cur-card[data-idx="'+idx+'"]')?.classList.add('is-focused');
+        const wasFull = sheetState === 'full';
+        if (wasFull) setSheetState('mid');
+        setTimeout(() => {
+            focusPin(p.lat, p.lng, 16);
+            highlightPin(idx);
+            document.querySelectorAll('.pp-cur-card').forEach(c => c.classList.remove('is-focused'));
+            document.querySelector('.pp-cur-card[data-idx="'+idx+'"]')?.classList.add('is-focused');
+        }, wasFull ? 350 : 10);
     }
 
     // ── Bottom Sheet ──
@@ -730,9 +970,6 @@
             sheetScroll.style.maxHeight = Math.max(120, visibleH) + 'px';
         } else {
             sheetScroll.style.maxHeight = (PEEK_PX - handleH) + 'px';
-        }
-        if (activeMarkerIdx < 0 && state !== 'full') {
-            setTimeout(fitMapToAll, 350);
         }
     }
 
@@ -861,9 +1098,9 @@
         if (card) {
             const idx = parseInt(card.dataset.idx);
             setTimeout(() => {
-                setSheetState('full');
-                setTimeout(() => { handleCardTap(idx); card.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 400);
-            }, 500);
+                handleCardTap(idx);
+                setTimeout(() => card.scrollIntoView({behavior: 'smooth', block: 'center'}), 400);
+            }, 800);
         }
     }
 
@@ -959,7 +1196,9 @@
             list.unshift({
                 id: 'g' + Date.now() + Math.random().toString(36).slice(2,6),
                 name: p.name, category_id: null, category_name: curTitle, category_icon: '📌',
-                phone: p.phone || '', road_address: p.address || '', address: '',
+                phone: p.phone || '', road_address: p.address || '', address: p.jibeon_address || '',
+                building_name: p.building_name || '',
+                opening_hours: p.opening_hours || null,
                 lat: p.lat, lng: p.lng, memo: curationType === 'course' && p.day_number ? 'Day ' + p.day_number : '',
                 status: 'planned', visited_at: '', is_overseas: p.is_overseas, created_at: Date.now(),
             });

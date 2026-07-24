@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Curation;
 use App\Models\Place;
 use Illuminate\Http\Request;
 
@@ -75,9 +76,13 @@ class HomeController extends Controller
             }
         }
 
+        $pendingCurationCount = $request->user()
+            ? Curation::byUser($request->user()->id)->where('status', 'pending')->count()
+            : 0;
+
         return view('home.index', compact(
             'categories', 'myPlaces', 'selectedCategory', 'q', 'curation', 'categoryLatest',
-            'recentPlaces', 'savedCount', 'weekNewCount', 'defaultRegion'
+            'recentPlaces', 'savedCount', 'weekNewCount', 'defaultRegion', 'pendingCurationCount'
         ));
     }
 

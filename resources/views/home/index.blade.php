@@ -492,34 +492,55 @@
     <div class="pp-share-sheet__panel">
         <div class="pp-share-sheet__handle"></div>
         <div class="pp-share-sheet__head">
-            <h3 class="pp-share-sheet__title">장소 공유</h3>
+            <h3 class="pp-share-sheet__title">공유</h3>
             <button type="button" class="pp-share-sheet__close" data-close-share aria-label="닫기">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
         </div>
-        <div class="pp-share-sheet__field">
-            <label class="pp-share-sheet__label">공유 제목</label>
-            <input type="text" class="pp-share-sheet__input" id="ppShareTitle" maxlength="100">
+
+        <div class="pp-share-section">
+            <div class="pp-share-section__label">지인에게 공유</div>
+            <div class="pp-share-sheet__field">
+                <label class="pp-share-sheet__label">공유 제목</label>
+                <input type="text" class="pp-share-sheet__input" id="ppShareTitle" maxlength="100">
+            </div>
+            <div class="pp-share-sheet__field">
+                <label class="pp-share-sheet__label">장소명 표시 방식</label>
+                <label class="pp-share-sheet__radio">
+                    <input type="radio" name="shareMode" value="original" checked>
+                    <span>기본 장소명으로 보내기</span>
+                </label>
+                <label class="pp-share-sheet__radio">
+                    <input type="radio" name="shareMode" value="custom">
+                    <span>내가 지은 이름과 메모 포함</span>
+                </label>
+                <p class="pp-share-sheet__hint" id="ppShareModeHint" hidden>직접 입력한 장소명과 메모가 상대방에게 그대로 보여요</p>
+            </div>
+            <div class="pp-share-sheet__buttons">
+                <button type="button" class="pp-btn pp-btn--kakao-share" id="ppShareKakao">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.7 6.78-.2.74-.75 2.81-.86 3.25-.14.55.2.54.42.4.17-.12 2.7-1.84 3.79-2.58.64.1 1.3.15 1.95.15 5.52 0 10-3.58 10-8S17.52 3 12 3z"/></svg>
+                    카카오톡으로 공유
+                </button>
+                <button type="button" class="pp-btn pp-btn--ghost" id="ppShareNative" hidden>다른 앱으로 공유</button>
+                <button type="button" class="pp-btn pp-btn--ghost" id="ppShareCopyLink">링크 복사</button>
+            </div>
         </div>
-        <div class="pp-share-sheet__field">
-            <label class="pp-share-sheet__label">장소명 표시 방식</label>
-            <label class="pp-share-sheet__radio">
-                <input type="radio" name="shareMode" value="original" checked>
-                <span>기본 장소명으로 보내기</span>
-            </label>
-            <label class="pp-share-sheet__radio">
-                <input type="radio" name="shareMode" value="custom">
-                <span>내가 지은 이름과 메모 포함</span>
-            </label>
-            <p class="pp-share-sheet__hint" id="ppShareModeHint" hidden>직접 입력한 장소명과 메모가 상대방에게 그대로 보여요</p>
-        </div>
-        <div class="pp-share-sheet__buttons">
-            <button type="button" class="pp-btn pp-btn--kakao-share" id="ppShareKakao">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.7 6.78-.2.74-.75 2.81-.86 3.25-.14.55.2.54.42.4.17-.12 2.7-1.84 3.79-2.58.64.1 1.3.15 1.95.15 5.52 0 10-3.58 10-8S17.52 3 12 3z"/></svg>
-                카카오톡으로 공유
-            </button>
-            <button type="button" class="pp-btn pp-btn--ghost" id="ppShareNative" hidden>다른 앱으로 공유</button>
-            <button type="button" class="pp-btn pp-btn--ghost" id="ppShareCopyLink">링크 복사</button>
+
+        <div class="pp-share-divider"></div>
+
+        <div class="pp-share-section">
+            <div class="pp-share-section__label">나만 알던 장소, 같이 볼까요?</div>
+            @if($pendingCurationCount > 0)
+                <a href="{{ route('my.curations') }}" class="pp-share-curation-status">
+                    <span class="pp-share-curation-status__dot"></span>
+                    검토하고 있어요 {{ $pendingCurationCount }}건
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 6 15 12 9 18"/></svg>
+                </a>
+            @endif
+            <a href="#" class="pp-share-curation-btn" id="ppShareCurationBtn">
+                ✨ 내 리스트 공개하기
+            </a>
+            <p class="pp-share-curation-btn__sub">검토를 거쳐 탐색 탭에서 모두가 볼 수 있어요</p>
         </div>
     </div>
 </div>
@@ -803,6 +824,20 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
         titleInput.value = activeTab.textContent.trim();
         shareSheet.classList.add('is-open');
     });
+
+    const curationBtn = document.getElementById('ppShareCurationBtn');
+    if (curationBtn) {
+        curationBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            shareSheet.classList.remove('is-open');
+            const activeTab = document.querySelector('#ppHeroTabs .pp-hero2__tab.is-active');
+            let url = '{{ route("my.curations.create") }}';
+            if (activeTab && activeTab.dataset.cat !== 'all') {
+                url += '?category_id=' + activeTab.dataset.cat + '&suggest_title=' + encodeURIComponent(activeTab.textContent.trim());
+            }
+            location.href = url;
+        });
+    }
 
     shareSheet.querySelectorAll('[data-close-share]').forEach(el => {
         el.addEventListener('click', () => { shareSheet.classList.remove('is-open'); window.__sharePendingPlaceIds = null; });

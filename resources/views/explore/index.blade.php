@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('page_title', '장소 둘러보기 | 핀픽')
-@section('meta_description', '다양한 맛집, 카페, 여행지를 둘러보고 나만의 지도에 저장하세요. 카테고리별 큐레이션으로 새로운 장소를 발견합니다.')
+@section('meta_description', '다양한 맛집, 카페, 여행지를 둘러보고 나만의 지도에 저장하세요. 카테고리별 추천 리스트로 새로운 장소를 발견합니다.')
 @section('app_class', 'pp-app--explore')
 
 @section('header')
@@ -20,7 +20,7 @@
     </div>
 
     <div class="pp-expl-feed" id="curFeed">
-        <div class="pp-expl-feed__loading" id="curLoading">큐레이션을 불러오는 중...</div>
+        <div class="pp-expl-feed__loading" id="curLoading">리스트를 불러오는 중...</div>
     </div>
 </div>
 
@@ -33,6 +33,7 @@
         'linear-gradient(120deg, #e2d8ce 0%, #cec3b7 100%)',
         'linear-gradient(160deg, #ddd4ca 0%, #d0c5b8 100%)',
     ];
+    const IS_LOGGED_IN = {{ auth()->check() ? 'true' : 'false' }};
     let allCurations = [];
     let activeCat = '';
 
@@ -67,7 +68,7 @@
 
             renderFeed();
         } catch (e) {
-            document.getElementById('curLoading').textContent = '큐레이션을 불러올 수 없습니다.';
+            document.getElementById('curLoading').textContent = '리스트를 불러올 수 없습니다.';
         }
     }
 
@@ -80,18 +81,35 @@
         if (!filtered.length) {
             feed.innerHTML = '<div class="pp-expl-empty">'
                 + '<div class="pp-expl-empty__icon">📭</div>'
-                + '<p>아직 이 카테고리에 큐레이션이 없어요</p>'
+                + '<p>아직 이 카테고리에 리스트가 없어요</p>'
                 + '<button type="button" class="pp-expl-empty__btn" onclick="document.querySelector(\'[data-cat=\\&quot;\\&quot;]\').click()">전체 보기</button>'
                 + '</div>';
             return;
         }
 
-        feed.innerHTML = filtered.map(c => renderSection(c)).join('');
+        let html = '';
+        filtered.forEach((c, i) => {
+            html += renderSection(c);
+            if (i === 0 && IS_LOGGED_IN) {
+                html += renderCtaCard();
+            }
+        });
+        if (filtered.length > 0 && !IS_LOGGED_IN) {
+            html += renderCtaCard();
+        }
+        feed.innerHTML = html;
+    }
+
+    function renderCtaCard() {
+        const href = IS_LOGGED_IN ? '{{ route("my.curations.create") }}' : '{{ route("login") }}';
+        return '<div class="pp-expl-cta">'
+            + '<div class="pp-expl-cta__text">나만 알던 장소, 같이 볼까요?</div>'
+            + '<a href="' + href + '" class="pp-expl-cta__btn">내 리스트 만들기</a>'
+            + '</div>';
     }
 
     function renderSection(c) {
         const places = c.places_list || [];
-        const catLabel = c.category_label || '';
         const savesMeta = c.save_count > 0
             ? '<span class="pp-expl-sec__saves"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> ' + c.save_count + '명이 담아갔어요</span>'
             : '';
@@ -100,13 +118,21 @@
         const savedLabel = c.is_saved ? '담음' : '담기';
         const savedIcon = c.is_saved ? '✓' : '+';
 
+        const authorAvatar = c.is_official
+            ? '<img class="pp-expl-author__avatar" src="{{ asset("icon-192.png") }}" alt="">'
+            : (c.author_avatar
+                ? '<img class="pp-expl-author__avatar" src="' + esc(c.author_avatar) + '" alt="">'
+                : '<span class="pp-expl-author__avatar pp-expl-author__avatar--initial">' + esc((c.author_name || '?').charAt(0)) + '</span>');
+        const authorName = c.is_official ? '핀픽' : esc(c.author_name || '');
+        const catLabel = c.category_label || '';
+
         let cardsHtml = places.slice(0, PLACE_MAX).map((p, i) => {
             const hasBg = !!p.thumb_url;
             const bgStyle = hasBg ? 'background-image:url(' + esc(p.thumb_url) + ')' : GRADIENTS[i % GRADIENTS.length];
             const styleAttr = hasBg ? bgStyle : 'background:' + bgStyle;
             const placeholderClass = hasBg ? '' : ' pp-expl-pcard--ph';
             const regionCat = [p.region, p.category_label].filter(Boolean).join(' · ');
-            return '<a href="/c/' + c.id + '?place=' + p.id + '" class="pp-expl-pcard' + placeholderClass + '" style="' + styleAttr + '">'
+            return '<a href="/c/' + c.id + '" class="pp-expl-pcard' + placeholderClass + '" style="' + styleAttr + '">'
                 + (!hasBg ? '<div class="pp-expl-pcard__pin-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>' : '')
                 + '<div class="pp-expl-pcard__overlay">'
                 + '<div class="pp-expl-pcard__name">' + esc(p.name) + '</div>'
@@ -124,9 +150,11 @@
         return '<div class="pp-expl-sec">'
             + '<div class="pp-expl-sec__head">'
             + '<div class="pp-expl-sec__left">'
-            + '<div class="pp-expl-sec__meta">'
-            + '<span class="pp-expl-sec__cat">' + esc(catLabel) + '</span>'
-            + '<span class="pp-expl-sec__count">' + (c.places_count || 0) + '개 장소</span>'
+            + '<div class="pp-expl-author">'
+            + authorAvatar
+            + '<span class="pp-expl-author__name">' + authorName + '</span>'
+            + '<span class="pp-expl-author__dot">·</span>'
+            + '<span class="pp-expl-author__count">' + (c.places_count || 0) + '개 매장</span>'
             + '</div>'
             + '<a href="/c/' + c.id + '" class="pp-expl-sec__title">' + esc(c.title) + '</a>'
             + (c.description ? '<p class="pp-expl-sec__desc">' + esc(c.description) + '</p>' : '')

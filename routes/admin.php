@@ -39,6 +39,10 @@ Route::middleware('admin.auth')->group(function () {
     Route::put('curations/places/{place}/photos/reorder', [CurationController::class, 'reorderPlacePhotos'])->name('admin.curations.reorder-photos');
     Route::delete('curations/places/{place}/photos', [CurationController::class, 'deletePlacePhoto'])->name('admin.curations.delete-photo');
     Route::post('curations/places/{place}/enrich-naver', [CurationController::class, 'enrichNaver'])->name('admin.curations.enrich-naver');
+    Route::post('curations/{curation}/approve', [CurationController::class, 'approve'])->name('admin.curations.approve');
+    Route::post('curations/{curation}/reject', [CurationController::class, 'reject'])->name('admin.curations.reject');
+    Route::post('curations/{curation}/suspend', [CurationController::class, 'suspend'])->name('admin.curations.suspend');
+    Route::get('curations/places/{place}/tour-images', [CurationController::class, 'searchTourImages'])->name('admin.curations.tour-images');
 
     Route::get('admins', [AdminUserController::class, 'index'])->name('admin.admins.index');
     Route::post('admins', [AdminUserController::class, 'store'])->name('admin.admins.store');

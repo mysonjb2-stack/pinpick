@@ -128,38 +128,32 @@ class ImageProcessor
         $disk = Storage::disk('public');
         $valid = [];
         foreach ($imagePaths as $p) {
-            if ($disk->exists($p)) $valid[] = $p;
+            $clean = preg_replace('#^.*/storage/#', '', $p);
+            if ($disk->exists($clean)) $valid[] = $clean;
+            elseif ($disk->exists($p)) $valid[] = $p;
             if (count($valid) >= 4) break;
         }
         if (empty($valid)) return null;
 
         $size = 600;
-        $canvas = $this->manager->create($size * 2, $size * 2)->fill('ffffff');
-
         $positions = [[0, 0], [$size, 0], [0, $size], [$size, $size]];
-
-        foreach ($valid as $i => $path) {
-            $tile = $this->manager->decodePath($disk->path($path));
-            $tile->cover($size, $size);
-            $canvas->place($tile, 'top-left', $positions[$i][0], $positions[$i][1]);
-        }
 
         if (count($valid) === 1) {
             $canvas = $this->manager->decodePath($disk->path($valid[0]));
             $canvas->cover($size * 2, $size * 2);
         } elseif (count($valid) === 2) {
-            $canvas = $this->manager->create($size * 2, $size)->fill('ffffff');
+            $canvas = $this->manager->createImage($size * 2, $size)->fill('ffffff');
             foreach ($valid as $i => $path) {
                 $tile = $this->manager->decodePath($disk->path($path));
                 $tile->cover($size, $size);
-                $canvas->place($tile, 'top-left', $i * $size, 0);
+                $canvas->insert($tile, $i * $size, 0);
             }
-        } elseif (count($valid) === 3) {
-            $canvas = $this->manager->create($size * 2, $size * 2)->fill('ffffff');
+        } else {
+            $canvas = $this->manager->createImage($size * 2, $size * 2)->fill('ffffff');
             foreach ($valid as $i => $path) {
                 $tile = $this->manager->decodePath($disk->path($path));
                 $tile->cover($size, $size);
-                $canvas->place($tile, 'top-left', $positions[$i][0], $positions[$i][1]);
+                $canvas->insert($tile, $positions[$i][0], $positions[$i][1]);
             }
         }
 

@@ -57,7 +57,9 @@
 
     @yield('content')
 
+    @unless(View::hasSection('hide_nav'))
     @include('partials.nav')
+    @endunless
 </div>
 @stack('scripts')
 <script>
