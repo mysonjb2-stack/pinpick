@@ -469,6 +469,12 @@
                 </div>
                 @endforeach
             </div>
+            @elseif($place->latitude && $place->longitude)
+            <div class="pp-cur-card__photos">
+                <div class="pp-cur-card__photo">
+                    <img src="/api/static-map?lat={{ $place->latitude }}&lng={{ $place->longitude }}&overseas={{ $place->is_overseas ? 1 : 0 }}&w=320&h=320" alt="{{ $place->place_name }} 위치 지도" loading="lazy">
+                </div>
+            </div>
             @endif
             @if($place->editor_note)
                 <p class="pp-cur-card__note">"{{ $place->editor_note }}"</p>
@@ -570,6 +576,12 @@
     </div>
 </div>
 
+{{-- Reselect bar --}}
+<div class="pp-share__reselect-bar" id="curReselectBar" style="display:none">
+    <span id="curReselectCount"></span>
+    <button type="button" class="pp-share__reselect-cancel" id="curReselectCancel">취소</button>
+</div>
+
 {{-- Category sheet --}}
 <div class="pp-share__cat-sheet" id="curCatSheet">
     <div class="pp-share__select-backdrop" data-role="close"></div>
@@ -619,6 +631,9 @@
             'is_overseas' => (bool) $p->is_overseas,
             'day_number' => $p->day_number,
             'source_channel' => $p->source_channel,
+            'original_name' => $p->original_name ?? '',
+            'detail_location' => $p->detail_location ?? '',
+            'themes' => $p->themes ?? [],
         ];
     });
 
@@ -683,6 +698,9 @@
     const userCats = @json($userCategories);
     const totalCount = places.length;
     const selected = new Set();
+    let reselectMode = false;
+    let reselectLimit = 0;
+    let savedSelection = null;
     let activeMarkerIdx = -1;
     let activeDay = 'all';
     let fullBounds = null;
@@ -1126,7 +1144,13 @@
             const id = parseInt(btn.dataset.placeId);
             const card = btn.closest('.pp-cur-card');
             if (selected.has(id)) { selected.delete(id); card.classList.remove('is-selected'); }
-            else { selected.add(id); card.classList.add('is-selected'); }
+            else {
+                if (reselectMode && selected.size >= reselectLimit) {
+                    showToast('비로그인은 ' + reselectLimit + '개까지만 선택할 수 있어요');
+                    return;
+                }
+                selected.add(id); card.classList.add('is-selected');
+            }
             updateCtaText();
             updateSelectAllBtn();
         });
@@ -1145,10 +1169,22 @@
     });
 
     function updateSelectAllBtn() { selectAllBtn.textContent = selected.size === totalCount ? '선택해제' : '전체선택'; }
-    function updateCtaText() { saveBtn.textContent = selected.size > 0 ? selected.size + '개 장소 담기' : '이 장소들 내 핀픽에 담기'; }
+    function updateCtaText() {
+        if (reselectMode) {
+            saveBtn.textContent = selected.size > 0 ? selected.size + '개 저장하기' : '저장할 장소를 골라주세요';
+            saveBtn.disabled = selected.size === 0;
+            updateReselectCounter();
+            return;
+        }
+        saveBtn.disabled = false;
+        saveBtn.textContent = selected.size > 0 ? selected.size + '개 장소 담기' : '이 장소들 내 핀픽에 담기';
+    }
     function getSelectedIds() { return selected.size > 0 ? Array.from(selected) : places.map(p => p.id); }
 
-    saveBtn.addEventListener('click', () => { if (isAuth) openCategorySheet(); else handleGuestSave(); });
+    saveBtn.addEventListener('click', () => {
+        if (reselectMode) { doReselectSave(); return; }
+        if (isAuth) openCategorySheet(); else handleGuestSave();
+    });
 
     // ── Guest save ──
     const GUEST_KEY = 'pinpick_guest_places';
@@ -1171,40 +1207,140 @@
         hint.style.display = '';
     }
 
+    function countNewPlaces(toSave, guestPlaces) {
+        return toSave.filter(p => !guestPlaces.some(g =>
+            (p.external_place_id && g.kakao_place_id === p.external_place_id) ||
+            (g.name === p.name && g.road_address === p.address)
+        )).length;
+    }
+
     function handleGuestSave() {
-        const remaining = getGuestRemaining();
+        const guestPlaces = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
+        const remaining = 5 - guestPlaces.length;
         const toSave = places.filter(p => getSelectedIds().includes(p.id));
+        const newCount = countNewPlaces(toSave, guestPlaces);
+
         if (remaining <= 0) {
             document.getElementById('curGuestInfo').textContent = '비로그인 저장 5개를 모두 사용했어요.\n로그인하면 전부 저장돼요';
             document.getElementById('curGuestPick').style.display = 'none';
+            const loginBtn = document.getElementById('curGuestLogin');
+            loginBtn.textContent = '로그인하고 저장';
+            loginBtn.className = 'pp-btn';
             guestSheet.classList.add('is-open');
             return;
         }
-        if (toSave.length > remaining) {
+        if (newCount > remaining) {
             document.getElementById('curGuestInfo').textContent = '비로그인은 ' + remaining + '개까지 더 저장할 수 있어요';
-            document.getElementById('curGuestPick').textContent = '저장할 ' + remaining + '개 직접 고르기';
-            document.getElementById('curGuestPick').style.display = '';
+            const pickBtn = document.getElementById('curGuestPick');
+            pickBtn.textContent = '저장할 ' + remaining + '개 직접 고르기';
+            pickBtn.style.display = '';
+            pickBtn.dataset.limit = remaining;
+            const loginBtn = document.getElementById('curGuestLogin');
+            loginBtn.textContent = '로그인하고 전부 저장';
+            loginBtn.className = 'pp-btn pp-btn--ghost';
             guestSheet.classList.add('is-open');
             return;
         }
-        doGuestSave(toSave);
+        doGuestSave(toSave, guestPlaces);
     }
 
-    function doGuestSave(toSave) {
-        const list = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
-        toSave.forEach(p => {
-            list.unshift({
-                id: 'g' + Date.now() + Math.random().toString(36).slice(2,6),
-                name: p.name, category_id: null, category_name: curTitle, category_icon: '📌',
-                phone: p.phone || '', road_address: p.address || '', address: p.jibeon_address || '',
-                building_name: p.building_name || '',
-                opening_hours: p.opening_hours || null,
-                lat: p.lat, lng: p.lng, memo: curationType === 'course' && p.day_number ? 'Day ' + p.day_number : '',
-                status: 'planned', visited_at: '', is_overseas: p.is_overseas, created_at: Date.now(),
+    document.getElementById('curGuestPick').addEventListener('click', function() {
+        const limit = parseInt(this.dataset.limit) || getGuestRemaining();
+        guestSheet.classList.remove('is-open');
+        enterReselectMode(limit);
+    });
+
+    function enterReselectMode(limit) {
+        reselectMode = true;
+        reselectLimit = limit;
+        savedSelection = new Set(selected);
+        selected.clear();
+        allCards.forEach(c => c.classList.remove('is-selected'));
+        document.getElementById('curReselectBar').style.display = '';
+        selectAllBtn.style.display = 'none';
+        document.querySelectorAll('.pp-cur-card__add').forEach(b => { b.style.display = ''; });
+        updateReselectCounter();
+        updateCtaText();
+    }
+
+    function exitReselectMode(restore) {
+        reselectMode = false;
+        reselectLimit = 0;
+        document.getElementById('curReselectBar').style.display = 'none';
+        selectAllBtn.style.display = '';
+        saveBtn.disabled = false;
+        if (restore && savedSelection) {
+            selected.clear();
+            allCards.forEach(c => c.classList.remove('is-selected'));
+            savedSelection.forEach(id => {
+                selected.add(id);
+                const card = document.querySelector('.pp-cur-card[data-id="' + id + '"]');
+                if (card) card.classList.add('is-selected');
             });
+        }
+        savedSelection = null;
+        updateCtaText();
+        updateSelectAllBtn();
+    }
+
+    function updateReselectCounter() {
+        const el = document.getElementById('curReselectCount');
+        if (el) el.textContent = '저장할 장소를 골라주세요 (' + selected.size + '/' + reselectLimit + ')';
+    }
+
+    document.getElementById('curReselectCancel').addEventListener('click', () => {
+        exitReselectMode(true);
+    });
+
+    function doReselectSave() {
+        const guestPlaces = JSON.parse(localStorage.getItem(GUEST_KEY) || '[]');
+        const ids = Array.from(selected);
+        const toSave = places.filter(p => ids.includes(p.id));
+        exitReselectMode(false);
+        doGuestSave(toSave, guestPlaces);
+    }
+
+    function doGuestSave(toSave, guestPlaces) {
+        let added = 0, skipped = 0;
+        toSave.forEach((p, i) => {
+            const exists = guestPlaces.some(g =>
+                (p.external_place_id && g.kakao_place_id === p.external_place_id) ||
+                (g.name === p.name && g.road_address === p.address)
+            );
+            if (exists) { skipped++; return; }
+            guestPlaces.push({
+                id: 'g_' + Date.now() + '_' + added,
+                name: p.name, category_id: '', category_name: p.category_label || '', category_icon: '📌',
+                category_label: curTitle,
+                phone: p.phone || '', opening_hours: p.opening_hours || [],
+                address: p.jibeon_address || '', road_address: p.address || '',
+                building_name: p.building_name || '', detail_location: p.detail_location || '',
+                lat: p.lat, lng: p.lng,
+                memo: curationType === 'course' && p.day_number ? 'Day ' + p.day_number : '',
+                status: 'planned', visited_at: '', is_overseas: !!p.is_overseas,
+                original_name: p.original_name || '', kakao_place_id: p.external_place_id || '',
+                naver_place_id: p.naver_place_id || '', google_place_id: p.google_place_id || '',
+                thumbnail_url: p.thumbnail_url || '', themes: p.themes || [],
+                created_at: Date.now(),
+            });
+            added++;
         });
-        localStorage.setItem(GUEST_KEY, JSON.stringify(list));
-        showToast(toSave.length + '개 장소가 저장됐어요!');
+        localStorage.setItem(GUEST_KEY, JSON.stringify(guestPlaces));
+        let msg;
+        if (added === 0 && skipped > 0) msg = '이미 저장된 장소에요';
+        else if (added > 0 && skipped > 0) msg = added + '개 저장 완료! (' + skipped + '개는 이미 저장됨)';
+        else msg = added + '개 장소가 저장됐어요!';
+        updateGuestHint();
+        showDone(msg);
+    }
+
+    function showDone(msg) {
+        showToast(msg);
+        saveBtn.textContent = '핀픽에서 보기';
+        saveBtn.className = 'pp-btn pp-cur-cta__btn pp-share__cta-btn--done';
+        saveBtn.onclick = function() { location.href = '/'; };
+        document.querySelectorAll('.pp-cur-card__add').forEach(b => { b.style.display = 'none'; });
+        selectAllBtn.style.display = 'none';
     }
 
     document.getElementById('curGuestLogin').addEventListener('click', () => {
@@ -1258,7 +1394,7 @@
                 catSheet.classList.remove('is-open');
                 let msg = data.saved + '개 장소가 저장됐어요!';
                 if (data.skipped > 0) msg += ' (' + data.skipped + '개 중복 제외)';
-                showToast(msg);
+                showDone(msg);
             } else { alert(data.error || '저장에 실패했어요'); }
         } catch(e) { alert('저장에 실패했어요'); }
         finally { btn.disabled = false; btn.textContent = '저장하기'; }

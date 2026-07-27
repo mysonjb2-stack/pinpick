@@ -257,6 +257,9 @@ class CurationController extends Controller
                     'category_label' => $p->category_label,
                     'thumb_url' => $thumb,
                     'region' => $p->address ? mb_substr(explode(' ', $p->address)[0] ?? '', 0, 10) : '',
+                    'lat' => $p->latitude,
+                    'lng' => $p->longitude,
+                    'is_overseas' => (bool) $p->is_overseas,
                 ];
             });
             $c->is_saved = $hasSaved;

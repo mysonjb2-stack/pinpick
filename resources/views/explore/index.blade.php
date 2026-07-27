@@ -127,8 +127,13 @@
         const catLabel = c.category_label || '';
 
         let cardsHtml = places.slice(0, PLACE_MAX).map((p, i) => {
-            const hasBg = !!p.thumb_url;
-            const bgStyle = hasBg ? 'background-image:url(' + esc(p.thumb_url) + ')' : GRADIENTS[i % GRADIENTS.length];
+            let hasBg = !!p.thumb_url;
+            let imgSrc = p.thumb_url;
+            if (!hasBg && p.lat && p.lng) {
+                imgSrc = '/api/static-map?lat=' + encodeURIComponent(p.lat) + '&lng=' + encodeURIComponent(p.lng) + '&overseas=' + (p.is_overseas ? 1 : 0) + '&w=320&h=320';
+                hasBg = true;
+            }
+            const bgStyle = hasBg ? 'background-image:url(' + esc(imgSrc) + ')' : GRADIENTS[i % GRADIENTS.length];
             const styleAttr = hasBg ? bgStyle : 'background:' + bgStyle;
             const placeholderClass = hasBg ? '' : ' pp-expl-pcard--ph';
             const regionCat = [p.region, p.category_label].filter(Boolean).join(' · ');

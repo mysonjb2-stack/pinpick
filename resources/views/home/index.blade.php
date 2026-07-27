@@ -106,7 +106,7 @@
         <div class="pp-hero2__tabs" id="ppHeroTabs">
             <button type="button" class="pp-hero2__tab is-active" data-cat="all">전체</button>
             @foreach($categories as $c)
-                <button type="button" class="pp-hero2__tab" data-cat="{{ $c->id }}">{{ $c->name }}</button>
+                <button type="button" class="pp-hero2__tab" data-cat="{{ $c->id }}">{{ $c->name }}@if($c->created_at && $c->created_at->gt(now()->subDays(3)))<span class="pp-hero2__tab-new">N</span>@endif</button>
             @endforeach
         </div>
 
@@ -1374,6 +1374,10 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
                 btn.className = 'pp-hero2__tab';
                 btn.dataset.cat = newId;
                 btn.textContent = trimmed;
+                const nBadge = document.createElement('span');
+                nBadge.className = 'pp-hero2__tab-new';
+                nBadge.textContent = 'N';
+                btn.appendChild(nBadge);
                 const allBtn = heroTabs.querySelector('.pp-hero2__tab[data-cat="all"]');
                 if (allBtn && allBtn.nextSibling) heroTabs.insertBefore(btn, allBtn.nextSibling);
                 else heroTabs.appendChild(btn);
