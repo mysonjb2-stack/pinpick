@@ -208,6 +208,13 @@ class MyCurationController extends Controller
             }
         }
 
+        $firstPhotos = $curation->places->first()?->photos;
+        if ($firstPhotos && !empty($firstPhotos)) {
+            $proc->generateOgImage($firstPhotos[0]);
+        } else {
+            \App\Services\OgImageResolver::mapOgForCuration($curation);
+        }
+
         return response()->json([
             'success' => true,
             'id' => $curation->id,
@@ -380,6 +387,13 @@ class MyCurationController extends Controller
             if ($cover) {
                 $curation->update(['cover_image' => $cover]);
             }
+        }
+
+        $firstPhotos = $curation->places->first()?->photos;
+        if ($firstPhotos && !empty($firstPhotos)) {
+            $proc->generateOgImage($firstPhotos[0]);
+        } else {
+            \App\Services\OgImageResolver::mapOgForCuration($curation);
         }
 
         return response()->json([

@@ -81,6 +81,10 @@ class SharedCollectionController extends Controller
                     if ($webpPath) $destPath = $webpPath;
                 }
                 $thumbnailUrl = asset('storage/' . $destPath);
+
+                if ($i === 0) {
+                    app(ImageProcessor::class)->generateOgImage($destPath);
+                }
             }
 
             SharedPlace::create([
@@ -107,6 +111,12 @@ class SharedCollectionController extends Controller
             ]);
         }
 
+        $collection->load('places');
+        $firstThumb = $collection->places->first()?->thumbnail_url;
+        if (!$firstThumb) {
+            \App\Services\OgImageResolver::mapOgForShared($collection);
+        }
+
         $shareUrl = url("/s/{$token}");
 
         return response()->json([
@@ -115,7 +125,7 @@ class SharedCollectionController extends Controller
             'url' => $shareUrl,
             'place_count' => $places->count(),
             'title' => $collection->title,
-            'thumbnail_url' => $collection->places()->first()?->thumbnail_url,
+            'thumbnail_url' => $firstThumb,
         ]);
     }
 

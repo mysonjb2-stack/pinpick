@@ -19,6 +19,8 @@
     <meta property="og:description" content="@yield('og_description', '가고싶은 곳을 핀으로 저장하고 쉽게 꺼내쓰는 나만의 지도')">
     <meta property="og:url" content="{{ $canonicalUrl }}">
     <meta property="og:image" content="@yield('og_image', asset('images/og-image.png'))">
+    <meta property="og:image:width" content="@yield('og_image_width', '1200')">
+    <meta property="og:image:height" content="@yield('og_image_height', '630')">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="dns-prefetch" href="//www.googletagmanager.com">

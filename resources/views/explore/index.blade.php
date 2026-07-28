@@ -63,7 +63,6 @@
                 chip.classList.add('is-active');
                 activeCat = chip.dataset.cat;
                 renderFeed();
-                document.getElementById('curFeed').scrollIntoView({behavior: 'smooth', block: 'start'});
             });
 
             renderFeed();
