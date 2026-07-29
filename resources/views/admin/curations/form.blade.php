@@ -69,6 +69,14 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
 .tour-btn:hover { background:var(--ad-primary); color:#fff; }
 .tour-btn:disabled { opacity:.4; cursor:default; }
 
+/* Google Place ID */
+.cur-place__gid { display:flex; align-items:center; gap:4px; margin-top:3px; }
+.cur-place__gid-tag { font-size:11px; padding:1px 6px; border-radius:3px; background:#e8f5e9; color:#2e7d32; font-family:monospace; }
+.cur-place__gid-btn { font-size:11px; padding:1px 6px; border:1px solid #ccc; border-radius:3px; background:#fff; cursor:pointer; color:var(--ad-text-sub); }
+.cur-place__gid-btn:hover { border-color:var(--ad-primary); color:var(--ad-primary); }
+.cur-place__gid-btn--del { color:#c00; border-color:#e0b0b0; }
+.cur-place__gid-btn--del:hover { background:#fee; }
+
 /* Opening hours display */
 .cur-hours { font-size:12px; color:var(--ad-text-sub); line-height:1.6; max-width:220px; }
 .cur-hours__line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -112,8 +120,8 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                 @if(in_array($curation->status, ['approved', 'pending']))
                     <a href="{{ route('curation.show', $curation->id) }}" target="_blank" class="ad-btn cur-preview-link">미리보기 ↗</a>
                 @endif
-                @if($curation->author_type === 'user')
-                    <span class="ad-badge ad-badge--blue" style="margin-left:8px">작성자: {{ $curation->author?->name ?? '탈퇴' }}</span>
+                @if($curation->author_type === 'user' && $curation->author && !$curation->author->is_operator_persona)
+                    <span class="ad-badge ad-badge--blue" style="margin-left:8px">UGC: {{ $curation->author->name }}</span>
                 @endif
             @endif
         </div>
@@ -148,6 +156,21 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                             <option value="{{ $slug }}" {{ old('category', $curation?->category) === $slug ? 'selected' : '' }}>
                                 {{ $cat['icon'] }} {{ $cat['label'] }}
                             </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="ad-form-group">
+                    <label>작성자</label>
+                    @php
+                        $currentAuthor = 'official';
+                        if ($curation && $curation->author_type === 'user' && $curation->author_user_id) {
+                            $currentAuthor = $curation->author_user_id;
+                        }
+                    @endphp
+                    <select class="ad-input" name="author_select">
+                        <option value="official" {{ $currentAuthor === 'official' ? 'selected' : '' }}>핀픽 공식</option>
+                        @foreach($personas as $p)
+                            <option value="{{ $p->id }}" {{ $currentAuthor == $p->id ? 'selected' : '' }}>{{ $p->name }}{{ $p->bio ? " — {$p->bio}" : '' }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -201,6 +224,15 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                         <div class="cur-place__body">
                             <div class="cur-place__name">{{ $p->place_name }}</div>
                             <div class="cur-place__addr">{{ $p->address }}</div>
+                            <div class="cur-place__gid" data-gid-row>
+                                @if($p->google_place_id)
+                                <span class="cur-place__gid-tag" title="{{ $p->google_place_id }}">G {{ \Illuminate\Support\Str::limit($p->google_place_id, 20) }}</span>
+                                <button type="button" class="cur-place__gid-btn" onclick="matchGoogle({{ $p->id }}, this)" title="재검색">🔄</button>
+                                <button type="button" class="cur-place__gid-btn cur-place__gid-btn--del" onclick="clearGoogle({{ $p->id }}, this)" title="해제">✕</button>
+                                @else
+                                <button type="button" class="cur-place__gid-btn" onclick="matchGoogle({{ $p->id }}, this)">G 매칭</button>
+                                @endif
+                            </div>
                             @if($p->source_channel)
                             <div class="cur-place__source">{{ $p->source_channel }}@if($p->source_date) ({{ $p->source_date->format('Y.m.d') }})@endif</div>
                             @endif
@@ -512,6 +544,13 @@ function appendPlaceCard(p) {
         + '<div class="cur-place__body">'
         + '<div class="cur-place__name">' + esc(p.place_name) + '</div>'
         + '<div class="cur-place__addr">' + esc(p.address || '') + '</div>'
+        + '<div class="cur-place__gid" data-gid-row>'
+        + (p.google_place_id
+            ? '<span class="cur-place__gid-tag" title="' + esc(p.google_place_id) + '">G ' + esc(p.google_place_id.substring(0,20)) + '</span>'
+              + '<button type="button" class="cur-place__gid-btn" onclick="matchGoogle(' + p.id + ',this)" title="재검색">🔄</button>'
+              + '<button type="button" class="cur-place__gid-btn cur-place__gid-btn--del" onclick="clearGoogle(' + p.id + ',this)" title="해제">✕</button>'
+            : '<button type="button" class="cur-place__gid-btn" onclick="matchGoogle(' + p.id + ',this)">G 매칭</button>')
+        + '</div>'
         + '<div class="cur-place__photos" data-pid="' + p.id + '" tabindex="0">'
         + '<label class="cur-place__photo-add">+<input type="file" accept="image/*" multiple hidden onchange="uploadPhotos(' + p.id + ',this)"></label>'
         + '<div class="cur-place__url-row"><textarea rows="3" placeholder="이미지 URL (여러 줄 가능)" class="cur-url-input"></textarea><button type="button" class="ad-btn ad-btn--sm cur-url-btn" onclick="uploadFromUrl(' + p.id + ',this)">URL</button></div>'
@@ -573,6 +612,44 @@ async function removePlace(placeId, btn) {
             renumber();
         }
     } catch(e) { alert('삭제 실패'); }
+}
+
+async function matchGoogle(placeId, btn) {
+    const orig = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
+    try {
+        const r = await fetch('/admin/curations/places/' + placeId + '/match-google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            body: '{}',
+        });
+        const data = await r.json();
+        const row = btn.closest('[data-gid-row]');
+        if (data.success && data.google_place_id) {
+            const short = data.google_place_id.length > 20 ? data.google_place_id.substring(0, 20) + '…' : data.google_place_id;
+            const info = data.review_count ? ' (' + data.rating + '점/' + data.review_count + '개)' : '';
+            row.innerHTML = '<span class="cur-place__gid-tag" title="' + esc(data.google_place_id) + '">G ' + esc(short) + info + '</span>'
+                + '<button type="button" class="cur-place__gid-btn" onclick="matchGoogle(' + placeId + ',this)" title="재검색">🔄</button>'
+                + '<button type="button" class="cur-place__gid-btn cur-place__gid-btn--del" onclick="clearGoogle(' + placeId + ',this)" title="해제">✕</button>';
+        } else {
+            btn.textContent = '매칭 실패';
+            setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+        }
+    } catch(e) { btn.textContent = '오류'; setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500); }
+}
+
+async function clearGoogle(placeId, btn) {
+    try {
+        const r = await fetch('/admin/curations/places/' + placeId + '/clear-google', {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+        });
+        if ((await r.json()).success) {
+            const row = btn.closest('[data-gid-row]');
+            row.innerHTML = '<button type="button" class="cur-place__gid-btn" onclick="matchGoogle(' + placeId + ',this)">G 매칭</button>';
+        }
+    } catch(e) { alert('해제 실패'); }
 }
 
 function renumber() {

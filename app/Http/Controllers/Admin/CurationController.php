@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Curation;
 use App\Models\CurationPlace;
+use App\Models\User;
 use App\Models\PlaceImage;
+use App\Services\GoogleReviewService;
 use App\Services\ImageProcessor;
 use App\Services\NaverPlaceMatcher;
 use Illuminate\Http\Request;
@@ -21,12 +23,28 @@ class CurationController extends Controller
         return rtrim(config('app.url'), '/') . '/storage/' . $path;
     }
 
+    private function applyAuthor(array &$data, ?string $authorSelect): void
+    {
+        if ($authorSelect === null) return;
+
+        if ($authorSelect === 'official' || $authorSelect === '') {
+            $data['author_type'] = 'admin';
+            $data['author_user_id'] = null;
+        } elseif (is_numeric($authorSelect)) {
+            $persona = User::where('id', $authorSelect)->where('is_operator_persona', true)->first();
+            if ($persona) {
+                $data['author_type'] = 'user';
+                $data['author_user_id'] = $persona->id;
+            }
+        }
+    }
+
     public function index(Request $request)
     {
         $q = $request->get('q');
         $status = $request->get('status');
         $curations = Curation::withCount(['places', 'reports'])
-            ->with('author:id,name')
+            ->with(['author:id,name', 'places' => fn($q) => $q->select('id', 'curation_id', 'photos', 'thumbnail_url', 'latitude', 'longitude', 'is_overseas', 'sort_order')->orderBy('sort_order')])
             ->when($q, fn($query) => $query->where('title', 'like', "%{$q}%"))
             ->when($status, fn($query) => $query->where('status', $status))
             ->orderByRaw("FIELD(status, 'pending') DESC")
@@ -40,7 +58,8 @@ class CurationController extends Controller
 
     public function create()
     {
-        return view('admin.curations.form', ['curation' => null]);
+        $personas = User::personas()->orderBy('name')->get();
+        return view('admin.curations.form', ['curation' => null, 'personas' => $personas]);
     }
 
     public function store(Request $request)
@@ -57,6 +76,8 @@ class CurationController extends Controller
         $data['slug'] = Curation::generateSlug($data['title']);
         $data['status'] = 'draft';
 
+        $this->applyAuthor($data, $request->input('author_select'));
+
         $curation = Curation::create($data);
 
         return redirect()->route('admin.curations.edit', $curation)
@@ -66,7 +87,8 @@ class CurationController extends Controller
     public function edit(Curation $curation)
     {
         $curation->load('places');
-        return view('admin.curations.form', compact('curation'));
+        $personas = User::personas()->orderBy('name')->get();
+        return view('admin.curations.form', compact('curation', 'personas'));
     }
 
     public function update(Request $request, Curation $curation)
@@ -79,6 +101,8 @@ class CurationController extends Controller
             'description' => 'nullable|string|max:2000',
             'region_label' => 'nullable|string|max:255',
         ]);
+
+        $this->applyAuthor($data, $request->input('author_select'));
 
         $curation->update($data);
 
@@ -499,6 +523,17 @@ class CurationController extends Controller
             $result['detail_address'] = $googleInfo['detail_address'];
         }
 
+        // 3) Google Place ID 매칭 + 리뷰 캐싱
+        if (!$place->google_place_id) {
+            $gService = app(GoogleReviewService::class);
+            $gPlaceId = $gService->matchPlaceId($name, $lat, $lng, $address);
+            if ($gPlaceId) {
+                $update['google_place_id'] = $gPlaceId;
+                $result['google_place_id'] = $gPlaceId;
+                $gService->fetchAndCache($gPlaceId);
+            }
+        }
+
         if (!empty($update)) {
             $place->update($update);
         }
@@ -624,6 +659,36 @@ class CurationController extends Controller
         $dLng = deg2rad($lng2 - $lng1);
         $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
         return 2 * $R * asin(min(1.0, sqrt($a)));
+    }
+
+    public function matchGooglePlace(Request $request, CurationPlace $place)
+    {
+        $service = app(GoogleReviewService::class);
+        $name = trim($request->input('name', $place->place_name));
+        $lat = (float) ($request->input('lat') ?: $place->latitude);
+        $lng = (float) ($request->input('lng') ?: $place->longitude);
+        $address = $request->input('address', $place->address);
+
+        $placeId = $service->matchPlaceId($name, $lat, $lng, $address);
+        if (!$placeId) {
+            return response()->json(['success' => false, 'error' => '매칭 결과 없음']);
+        }
+
+        $place->update(['google_place_id' => $placeId]);
+        $cache = $service->fetchAndCache($placeId);
+
+        return response()->json([
+            'success' => true,
+            'google_place_id' => $placeId,
+            'rating' => $cache?->rating,
+            'review_count' => $cache?->review_count,
+        ]);
+    }
+
+    public function clearGooglePlace(CurationPlace $place)
+    {
+        $place->update(['google_place_id' => null]);
+        return response()->json(['success' => true]);
     }
 
     public function searchTourImages(Request $request, CurationPlace $place)

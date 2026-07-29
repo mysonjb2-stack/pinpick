@@ -8,6 +8,7 @@ use App\Models\CurationPlace;
 use App\Models\Place;
 use App\Models\PlaceImage;
 use App\Models\Theme;
+use App\Services\GoogleReviewService;
 use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -56,7 +57,13 @@ class CurationController extends Controller
                 ->get(['id', 'name', 'icon']);
         }
 
-        return view('curations.show', compact('curation', 'userCategories'));
+        $googlePlaceIds = $curation->places
+            ->pluck('google_place_id')
+            ->filter()
+            ->toArray();
+        $googleReviews = GoogleReviewService::getReviewDataBulk($googlePlaceIds);
+
+        return view('curations.show', compact('curation', 'userCategories', 'googleReviews'));
     }
 
     public function saveToMyPinpick(Request $request, int $id)
@@ -268,6 +275,7 @@ class CurationController extends Controller
             $c->author_avatar = $c->author_type === 'user' && $c->author && $c->author->profile_image
                 ? $c->author->profile_image : null;
             $c->is_official = $c->author_type === 'admin';
+            $c->author_hue = $c->author_name ? crc32($c->author_name) % 360 : 0;
             unset($c->places, $c->author, $c->status, $c->approved_snapshot);
         });
 

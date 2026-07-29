@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use App\Models\PlaceImage;
+use App\Services\GoogleReviewService;
 use App\Services\ImageProcessor;
 use Illuminate\Support\Str;
 
@@ -151,7 +152,13 @@ class SharedCollectionController extends Controller
                 ->get(['id', 'name', 'icon']);
         }
 
-        return view('shared.show', compact('collection', 'userCategories'));
+        $googlePlaceIds = $collection->places
+            ->pluck('google_place_id')
+            ->filter()
+            ->toArray();
+        $googleReviews = GoogleReviewService::getReviewDataBulk($googlePlaceIds);
+
+        return view('shared.show', compact('collection', 'userCategories', 'googleReviews'));
     }
 
     public function myLinks()

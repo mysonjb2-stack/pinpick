@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::withCount('places');
+        $query = User::realUsers()->withCount('places');
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

@@ -1,0 +1,343 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Curation;
+use App\Models\CurationPlace;
+use App\Services\GoogleReviewService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+class CollectorController extends Controller
+{
+    public function index()
+    {
+        return view('admin.collector.index');
+    }
+
+    public function extractFromYoutube(Request $request)
+    {
+        $request->validate(['url' => 'required|string']);
+
+        $videoId = $this->parseYoutubeId($request->url);
+        if (!$videoId) {
+            return response()->json(['error' => '유효한 유튜브 URL이 아닙니다.'], 422);
+        }
+
+        $apiKey = config('services.youtube.api_key');
+        if (!$apiKey) {
+            return response()->json(['error' => 'YouTube API 키가 설정되지 않았습니다.'], 500);
+        }
+
+        $resp = Http::timeout(8)->get('https://www.googleapis.com/youtube/v3/videos', [
+            'part' => 'snippet',
+            'id' => $videoId,
+            'key' => $apiKey,
+        ]);
+
+        if (!$resp->successful() || empty($resp->json()['items'])) {
+            return response()->json(['error' => '영상 정보를 가져올 수 없습니다.'], 422);
+        }
+
+        $snippet = $resp->json()['items'][0]['snippet'];
+        $text = $snippet['title'] . "\n\n" . ($snippet['description'] ?? '');
+
+        $places = $this->extractPlaces($text);
+        if ($places === null) {
+            return response()->json(['error' => '장소 추출에 실패했습니다.'], 500);
+        }
+
+        $matched = $this->matchPlacesKakao($places);
+
+        return response()->json([
+            'source' => [
+                'type' => 'youtube',
+                'channel' => $snippet['channelTitle'] ?? '',
+                'date' => substr($snippet['publishedAt'] ?? '', 0, 10),
+                'url' => 'https://www.youtube.com/watch?v=' . $videoId,
+                'title' => $snippet['title'] ?? '',
+            ],
+            'places' => $matched,
+        ]);
+    }
+
+    public function extractFromText(Request $request)
+    {
+        $request->validate(['text' => 'required|string|min:10']);
+
+        $places = $this->extractPlaces($request->text);
+        if ($places === null) {
+            return response()->json(['error' => '장소 추출에 실패했습니다.'], 500);
+        }
+
+        $matched = $this->matchPlacesKakao($places);
+
+        return response()->json([
+            'source' => ['type' => 'text'],
+            'places' => $matched,
+        ]);
+    }
+
+    public function searchKakao(Request $request)
+    {
+        $request->validate(['query' => 'required|string']);
+
+        $results = $this->kakaoKeywordSearch($request->query('query'));
+
+        return response()->json(['results' => $results]);
+    }
+
+    public function createDraft(Request $request)
+    {
+        $request->validate([
+            'places' => 'required|array|min:1',
+            'places.*.place_name' => 'required|string',
+            'places.*.address' => 'nullable|string',
+            'places.*.latitude' => 'required|numeric',
+            'places.*.longitude' => 'required|numeric',
+            'places.*.category_label' => 'nullable|string',
+            'places.*.external_place_id' => 'nullable|string',
+            'places.*.source_channel' => 'nullable|string',
+            'places.*.source_url' => 'nullable|string',
+            'places.*.source_date' => 'nullable|date',
+            'places.*.editor_note' => 'nullable|string',
+            'places.*.phone' => 'nullable|string',
+            'source_title' => 'nullable|string',
+            'category' => 'nullable|string',
+        ]);
+
+        $cats = array_keys(config('curation_categories'));
+        $category = in_array($request->category, $cats) ? $request->category : ($cats[0] ?? 'food');
+
+        $title = $request->source_title ?: '수집 도우미 초안 ' . now()->format('m/d H:i');
+
+        $regionLabel = $this->buildRegionLabel($request->places);
+
+        $placeNames = collect($request->places)->pluck('place_name')->filter()->toArray();
+        $description = '';
+        if (!empty($placeNames)) {
+            $listed = array_slice($placeNames, 0, 5);
+            $description = implode(', ', $listed);
+            if (count($placeNames) > 5) {
+                $description .= ' 외 ' . (count($placeNames) - 5) . '곳';
+            }
+        }
+
+        $curation = Curation::create([
+            'title' => $title,
+            'slug' => Curation::generateSlug($title),
+            'status' => 'draft',
+            'type' => 'list',
+            'category' => $category,
+            'description' => $description,
+            'region_label' => $regionLabel,
+        ]);
+
+        $googleService = app(GoogleReviewService::class);
+
+        foreach ($request->places as $i => $p) {
+            $isOverseas = ($p['latitude'] ?? 0) < 30 || ($p['latitude'] ?? 0) > 44
+                || ($p['longitude'] ?? 0) < 124 || ($p['longitude'] ?? 0) > 132;
+
+            $placeData = [
+                'curation_id' => $curation->id,
+                'place_name' => $p['place_name'],
+                'address' => $p['address'] ?? null,
+                'latitude' => $p['latitude'],
+                'longitude' => $p['longitude'],
+                'category_label' => $p['category_label'] ?? null,
+                'external_place_id' => $p['external_place_id'] ?? null,
+                'is_overseas' => $isOverseas,
+                'source_channel' => $p['source_channel'] ?? null,
+                'source_url' => $p['source_url'] ?? null,
+                'source_date' => $p['source_date'] ?? null,
+                'editor_note' => $p['editor_note'] ?? null,
+                'phone' => $p['phone'] ?? null,
+                'sort_order' => $i,
+            ];
+
+            $place = CurationPlace::create($placeData);
+
+            try {
+                $gid = $googleService->matchPlaceId(
+                    $p['place_name'],
+                    (float) $p['latitude'],
+                    (float) $p['longitude'],
+                    $p['address'] ?? null
+                );
+                if ($gid) {
+                    $place->update(['google_place_id' => $gid]);
+                    $googleService->fetchAndCache($gid);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Collector: Google match failed', ['place' => $p['place_name'], 'error' => $e->getMessage()]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'redirect' => route('admin.curations.edit', $curation),
+        ]);
+    }
+
+    private function parseYoutubeId(string $url): ?string
+    {
+        if (preg_match('/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/', $url, $m)) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    private function extractPlaces(string $text): ?array
+    {
+        $apiKey = config('services.anthropic.api_key');
+        if (!$apiKey) {
+            Log::error('Collector: ANTHROPIC_API_KEY not set');
+            return null;
+        }
+
+        $prompt = <<<'PROMPT'
+아래 텍스트에서 실제 방문 가능한 장소(식당, 카페, 관광지, 숙소 등)의 상호명만 추출해주세요.
+
+규칙:
+- 실제 상호명만 추출 (메뉴명, 브랜드 일반명, 지역명 단독은 제외)
+- 지점명이 있으면 포함 (예: "스타벅스 강남점")
+- 확실하지 않은 건 제외
+- JSON 배열만 출력, 다른 텍스트 없이
+
+출력 형식:
+[{"name":"상호명","region_hint":"지역힌트(있으면)","mention_context":"언급 맥락 한 줄"}]
+
+장소가 없으면 빈 배열 []을 반환.
+PROMPT;
+
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            try {
+                $resp = Http::withHeaders([
+                    'x-api-key' => $apiKey,
+                    'anthropic-version' => '2023-06-01',
+                    'content-type' => 'application/json',
+                ])->timeout(30)->post('https://api.anthropic.com/v1/messages', [
+                    'model' => 'claude-haiku-4-5-20251001',
+                    'max_tokens' => 2048,
+                    'messages' => [
+                        ['role' => 'user', 'content' => $prompt . "\n\n---\n\n" . mb_substr($text, 0, 8000)],
+                    ],
+                ]);
+
+                if (!$resp->successful()) {
+                    Log::warning('Collector: Claude API error', ['status' => $resp->status(), 'body' => $resp->body()]);
+                    continue;
+                }
+
+                $content = $resp->json()['content'][0]['text'] ?? '';
+                if (preg_match('/\[.*\]/s', $content, $m)) {
+                    $parsed = json_decode($m[0], true);
+                    if (is_array($parsed)) {
+                        return $parsed;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Collector: Claude API exception', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return null;
+    }
+
+    private function matchPlacesKakao(array $places): array
+    {
+        $results = [];
+        foreach ($places as $p) {
+            $name = $p['name'] ?? '';
+            $hint = $p['region_hint'] ?? '';
+            $query = trim($hint . ' ' . $name);
+
+            $kakaoResults = $this->kakaoKeywordSearch($query);
+
+            $results[] = [
+                'extracted_name' => $name,
+                'region_hint' => $hint,
+                'mention_context' => $p['mention_context'] ?? '',
+                'matches' => array_slice($kakaoResults, 0, 3),
+            ];
+        }
+
+        return $results;
+    }
+
+    private function kakaoKeywordSearch(string $query): array
+    {
+        $apiKey = config('services.kakao_local.rest_api_key');
+        if (!$apiKey || !$query) return [];
+
+        try {
+            $resp = Http::withHeaders([
+                'Authorization' => 'KakaoAK ' . $apiKey,
+            ])->timeout(5)->get('https://dapi.kakao.com/v2/local/search/keyword.json', [
+                'query' => $query,
+                'size' => 5,
+            ]);
+
+            if (!$resp->successful()) return [];
+
+            return collect($resp->json()['documents'] ?? [])
+                ->map(fn($d) => [
+                    'place_name' => $d['place_name'],
+                    'address' => $d['road_address_name'] ?: $d['address_name'],
+                    'latitude' => (float) $d['y'],
+                    'longitude' => (float) $d['x'],
+                    'category_label' => $this->shortenCategory($d['category_name'] ?? ''),
+                    'external_place_id' => $d['id'] ?? null,
+                    'phone' => $d['phone'] ?? null,
+                ])
+                ->toArray();
+        } catch (\Throwable $e) {
+            Log::warning('Collector: Kakao search error', ['error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    private function shortenCategory(string $cat): string
+    {
+        $parts = explode(' > ', $cat);
+        return end($parts) ?: $cat;
+    }
+
+    private function buildRegionLabel(array $places): string
+    {
+        $regions = [];
+        foreach ($places as $p) {
+            $addr = $p['address'] ?? '';
+            if (!$addr) continue;
+            $parts = preg_split('/\s+/', $addr);
+            $sido = $parts[0] ?? '';
+            $sigungu = $parts[1] ?? '';
+            $short = $this->shortenSido($sido);
+            $key = $short . ' ' . $sigungu;
+            if ($short && $sigungu && !in_array($key, $regions)) {
+                $regions[] = $key;
+            }
+        }
+
+        return implode(', ', array_slice($regions, 0, 4));
+    }
+
+    private function shortenSido(string $sido): string
+    {
+        $map = [
+            '서울특별시' => '서울', '부산광역시' => '부산', '대구광역시' => '대구',
+            '인천광역시' => '인천', '광주광역시' => '광주', '대전광역시' => '대전',
+            '울산광역시' => '울산', '세종특별자치시' => '세종',
+            '경기도' => '경기', '경기' => '경기',
+            '강원특별자치도' => '강원', '강원도' => '강원',
+            '충청북도' => '충북', '충청남도' => '충남',
+            '전라북도' => '전북', '전북특별자치도' => '전북',
+            '전라남도' => '전남', '경상북도' => '경북', '경상남도' => '경남',
+            '제주특별자치도' => '제주',
+        ];
+        return $map[$sido] ?? $sido;
+    }
+}

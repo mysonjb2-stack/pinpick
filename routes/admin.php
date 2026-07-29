@@ -6,6 +6,8 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\PlaceController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\CurationController;
+use App\Http\Controllers\Admin\CollectorController;
+use App\Http\Controllers\Admin\PersonaController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('login', [AuthController::class, 'showLogin'])->name('admin.login');
@@ -39,10 +41,24 @@ Route::middleware('admin.auth')->group(function () {
     Route::put('curations/places/{place}/photos/reorder', [CurationController::class, 'reorderPlacePhotos'])->name('admin.curations.reorder-photos');
     Route::delete('curations/places/{place}/photos', [CurationController::class, 'deletePlacePhoto'])->name('admin.curations.delete-photo');
     Route::post('curations/places/{place}/enrich-naver', [CurationController::class, 'enrichNaver'])->name('admin.curations.enrich-naver');
+    Route::post('curations/places/{place}/match-google', [CurationController::class, 'matchGooglePlace'])->name('admin.curations.match-google');
+    Route::delete('curations/places/{place}/clear-google', [CurationController::class, 'clearGooglePlace'])->name('admin.curations.clear-google');
     Route::post('curations/{curation}/approve', [CurationController::class, 'approve'])->name('admin.curations.approve');
     Route::post('curations/{curation}/reject', [CurationController::class, 'reject'])->name('admin.curations.reject');
     Route::post('curations/{curation}/suspend', [CurationController::class, 'suspend'])->name('admin.curations.suspend');
     Route::get('curations/places/{place}/tour-images', [CurationController::class, 'searchTourImages'])->name('admin.curations.tour-images');
+
+    Route::get('collector', [CollectorController::class, 'index'])->name('admin.collector.index');
+    Route::post('collector/extract-youtube', [CollectorController::class, 'extractFromYoutube'])->name('admin.collector.extract-youtube');
+    Route::post('collector/extract-text', [CollectorController::class, 'extractFromText'])->name('admin.collector.extract-text');
+    Route::get('collector/search-kakao', [CollectorController::class, 'searchKakao'])->name('admin.collector.search-kakao');
+    Route::post('collector/create-draft', [CollectorController::class, 'createDraft'])->name('admin.collector.create-draft');
+
+    Route::get('personas', [PersonaController::class, 'index'])->name('admin.personas.index');
+    Route::post('personas', [PersonaController::class, 'store'])->name('admin.personas.store');
+    Route::put('personas/{persona}', [PersonaController::class, 'update'])->name('admin.personas.update');
+    Route::delete('personas/{persona}', [PersonaController::class, 'destroy'])->name('admin.personas.destroy');
+    Route::post('personas/seed', [PersonaController::class, 'seed'])->name('admin.personas.seed');
 
     Route::get('admins', [AdminUserController::class, 'index'])->name('admin.admins.index');
     Route::post('admins', [AdminUserController::class, 'store'])->name('admin.admins.store');

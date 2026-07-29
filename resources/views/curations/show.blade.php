@@ -72,16 +72,17 @@
                     @if($curation->author->profile_image)
                         <img class="pp-cur-author__avatar" src="{{ $curation->author->profile_image }}" alt="">
                     @else
-                        <span class="pp-cur-author__avatar pp-cur-author__avatar--initial">{{ mb_substr($curation->author->name, 0, 1) }}</span>
+                        @php $authorHue = crc32($curation->author->name) % 360; @endphp
+                        <span class="pp-cur-author__avatar pp-cur-author__avatar--initial" style="background:hsl({{ $authorHue }},45%,55%)">{{ mb_substr($curation->author->name, 0, 1) }}</span>
                     @endif
                     <span class="pp-cur-author__name">{{ $curation->author->name }}</span>
                     <span class="pp-cur-author__dot">·</span>
-                    <span class="pp-cur-author__count">{{ $curation->places->count() }}개 매장</span>
+                    <span class="pp-cur-author__count">{{ $curation->places->count() }}개 장소</span>
                 @else
                     <img class="pp-cur-author__avatar" src="{{ asset('icon-192.png') }}" alt="">
                     <span class="pp-cur-author__name">핀픽</span>
                     <span class="pp-cur-author__dot">·</span>
-                    <span class="pp-cur-author__count">{{ $curation->places->count() }}개 매장</span>
+                    <span class="pp-cur-author__count">{{ $curation->places->count() }}개 장소</span>
                 @endif
             </div>
         </div>
@@ -126,6 +127,13 @@
                     $mapLabel = '네이버 지도';
                 }
             @endphp
+            @php
+                $gRevData = null;
+                if ($place->google_place_id && isset($googleReviews[$place->google_place_id])) {
+                    $gRevData = $googleReviews[$place->google_place_id];
+                    $gRevData['place_id'] = $place->google_place_id;
+                }
+            @endphp
             @include('partials.cur-place-card', [
                 'cardIdx' => $i,
                 'placeId' => $place->id,
@@ -146,6 +154,7 @@
                 'memo' => null,
                 'dayNumber' => $place->day_number,
                 'isCourse' => $curation->type === 'course',
+                'googleReviewData' => $gRevData,
             ])
         @endforeach
 
@@ -774,6 +783,9 @@
             if (e.target.closest('.pp-cur-card__photo[data-full]')) return;
             if (e.target.closest('.pp-cur-card__map-chip')) return;
             if (e.target.closest('.pp-cur-card__source a')) return;
+            if (e.target.closest('.pp-cur-card__grev')) return;
+            if (e.target.closest('.pp-cur-card__grev-feat')) return;
+            if (e.target.closest('.pp-cur-card__grev-body')) return;
             toggleCardSelection(parseInt(card.dataset.idx));
         });
     });

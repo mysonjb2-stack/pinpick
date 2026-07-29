@@ -6351,6 +6351,7 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 .pp-expl-sec__head {
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 18px 18px 0; gap: 12px;
+  text-decoration: none; color: inherit; cursor: pointer;
 }
 .pp-expl-sec__left { flex: 1; min-width: 0; }
 .pp-expl-author {

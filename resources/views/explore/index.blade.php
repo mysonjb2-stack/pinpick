@@ -103,7 +103,7 @@
         const href = IS_LOGGED_IN ? '{{ route("my.curations.create") }}' : '{{ route("login") }}';
         return '<div class="pp-expl-cta">'
             + '<div class="pp-expl-cta__text">나만 알던 장소, 같이 볼까요?</div>'
-            + '<a href="' + href + '" class="pp-expl-cta__btn">내 리스트 만들기</a>'
+            + '<a href="' + href + '" class="pp-expl-cta__btn">내 장소 공유하기</a>'
             + '</div>';
     }
 
@@ -121,7 +121,7 @@
             ? '<img class="pp-expl-author__avatar" src="{{ asset("icon-192.png") }}" alt="">'
             : (c.author_avatar
                 ? '<img class="pp-expl-author__avatar" src="' + esc(c.author_avatar) + '" alt="">'
-                : '<span class="pp-expl-author__avatar pp-expl-author__avatar--initial">' + esc((c.author_name || '?').charAt(0)) + '</span>');
+                : '<span class="pp-expl-author__avatar pp-expl-author__avatar--initial" style="background:hsl(' + (c.author_hue || 0) + ',45%,55%)">' + esc((c.author_name || '?').charAt(0)) + '</span>');
         const authorName = c.is_official ? '핀픽' : esc(c.author_name || '');
         const catLabel = c.category_label || '';
 
@@ -151,22 +151,23 @@
                 + '<span class="pp-expl-pcard__more-arrow">→</span></a>';
         }
 
+        const secHref = '/c/' + c.id;
         return '<div class="pp-expl-sec">'
-            + '<div class="pp-expl-sec__head">'
+            + '<a href="' + secHref + '" class="pp-expl-sec__head">'
             + '<div class="pp-expl-sec__left">'
             + '<div class="pp-expl-author">'
             + authorAvatar
             + '<span class="pp-expl-author__name">' + authorName + '</span>'
             + '<span class="pp-expl-author__dot">·</span>'
-            + '<span class="pp-expl-author__count">' + (c.places_count || 0) + '개 매장</span>'
+            + '<span class="pp-expl-author__count">' + (c.places_count || 0) + '개 장소</span>'
             + '</div>'
-            + '<a href="/c/' + c.id + '" class="pp-expl-sec__title">' + esc(c.title) + '</a>'
+            + '<div class="pp-expl-sec__title">' + esc(c.title) + '</div>'
             + (c.description ? '<p class="pp-expl-sec__desc">' + esc(c.description) + '</p>' : '')
             + savesMeta
             + '</div>'
-            + '<a href="/c/' + c.id + '?action=save" class="pp-expl-sec__save-btn' + savedClass + '" onclick="event.stopPropagation()">'
-            + '<span>' + savedIcon + ' ' + savedLabel + '</span></a>'
-            + '</div>'
+            + '<button type="button" class="pp-expl-sec__save-btn' + savedClass + '" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/c/' + c.id + '?action=save\'">'
+            + '<span>' + savedIcon + ' ' + savedLabel + '</span></button>'
+            + '</a>'
             + '<div class="pp-expl-scroll"><div class="pp-expl-scroll__track">' + cardsHtml + '</div></div>'
             + '</div>';
     }

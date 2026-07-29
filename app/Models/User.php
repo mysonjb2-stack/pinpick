@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'profile_image', 'provider', 'provider_id'])]
+#[Fillable(['name', 'email', 'password', 'profile_image', 'provider', 'provider_id', 'is_operator_persona', 'bio'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -37,6 +37,16 @@ class User extends Authenticatable
             get: fn ($value) => $value ? str_replace('http://', 'https://', $value) : null,
             set: fn ($value) => $value ? str_replace('http://', 'https://', $value) : null,
         );
+    }
+
+    public function scopeRealUsers($query)
+    {
+        return $query->where('is_operator_persona', false);
+    }
+
+    public function scopePersonas($query)
+    {
+        return $query->where('is_operator_persona', true);
     }
 
     public function places()

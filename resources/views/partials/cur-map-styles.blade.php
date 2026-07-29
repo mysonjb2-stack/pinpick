@@ -177,7 +177,7 @@
 
 /* ── Place Card ── */
 .pp-cur-card {
-  margin: 0 14px 12px; padding: 14px;
+  margin: 0 14px 12px; padding: 16px;
   border: 1px solid var(--pp-line); border-radius: 14px;
   transition: border-color .15s, background .15s;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -200,7 +200,7 @@
   font-size: 11px; font-weight: 700; flex-shrink: 0;
 }
 .pp-cur-card__sub {
-  font-size: 12px; color: var(--pp-text-sub); margin: 2px 0 0;
+  font-size: 12px; color: var(--pp-text-sub); margin: 4px 0 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pp-cur-card__sub .pp-cur-card__cat { margin-right: 4px; }
@@ -234,7 +234,7 @@
 /* Bottom action line */
 .pp-cur-card__actions {
   display: flex; align-items: center; justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 .pp-cur-card__map-chip {
   display: inline-flex; align-items: center; gap: 3px;
@@ -248,7 +248,7 @@
 
 /* Photo strip */
 .pp-cur-card__photos {
-  display: flex; gap: 6px; margin-top: 10px;
+  display: flex; gap: 6px; margin-top: 14px;
   overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
 .pp-cur-card__photos::-webkit-scrollbar { display: none; }
@@ -270,19 +270,87 @@
 
 /* Editor note */
 .pp-cur-card__note {
-  font-size: 13px; color: var(--pp-text-sub); margin: 8px 0 0;
+  font-size: 13px; color: var(--pp-text-sub); margin: 12px 0 0;
   padding: 8px 12px; border-left: 3px solid var(--pp-primary, #e67e22);
   background: var(--pp-bg-soft, #faf7f5); border-radius: 0 6px 6px 0;
   font-style: italic; line-height: 1.5;
 }
 .pp-cur-card__source {
-  font-size: 11.5px; color: var(--pp-text-sub); margin-top: 6px;
+  font-size: 11.5px; color: var(--pp-text-sub); margin-top: 8px;
 }
 .pp-cur-card__source a { color: var(--pp-accent, #2f6fed); text-decoration: underline; text-underline-offset: 2px; }
 .pp-cur-card__day {
   display: inline-block; padding: 2px 8px; border-radius: 4px;
   background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 600;
 }
+
+/* ── Google Review line ── */
+.pp-cur-card__grev {
+  display: flex; align-items: center; gap: 4px; cursor: pointer;
+  padding: 0; margin-top: 8px; font-size: 12.5px; color: var(--pp-text-sub);
+  -webkit-tap-highlight-color: transparent;
+}
+.pp-cur-card__grev:active { opacity: .7; }
+.pp-cur-card__grev-stars { display: flex; gap: 1px; align-items: center; flex-shrink: 0; }
+.pp-cur-card__grev-stars svg { display: block; }
+.pp-cur-card__grev-rating { font-weight: 700; color: var(--pp-text); margin-left: 2px; }
+.pp-cur-card__grev-sep { color: #ccc; }
+.pp-cur-card__grev-label { color: var(--pp-text-sub); }
+.pp-cur-card__grev-arrow {
+  flex-shrink: 0; margin-left: 1px;
+  transition: transform .2s;
+}
+.pp-cur-card__grev.is-open .pp-cur-card__grev-arrow { transform: rotate(90deg); }
+
+/* ── Featured review (always visible) ── */
+.pp-cur-card__grev-feat {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px;
+  padding: 8px 10px; margin: 8px 0 0;
+  background: #f8f8f8; border-radius: 8px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.pp-cur-card__grev-feat:active { opacity: .7; }
+.pp-cur-card__grev-feat-icon { flex-shrink: 0; margin-top: 1px; }
+.pp-cur-card__grev-feat-text {
+  flex: 1; min-width: 0; margin: 0;
+  font-size: 12px; line-height: 1.5; color: var(--pp-text-sub, #777);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pp-cur-card__grev-feat-meta {
+  width: 100%; display: flex; align-items: center; gap: 2px;
+  font-size: 11px; color: #aaa; padding-left: 20px;
+}
+.pp-cur-card__grev-feat-meta svg { display: block; }
+
+.pp-cur-card__grev-body {
+  display: none; padding: 4px 0 4px; margin-top: 8px; border-top: 1px solid #f0ede9;
+}
+.pp-cur-card__grev-body.is-open { display: block; }
+.pp-cur-card__grev-item {
+  padding: 10px 0; border-bottom: 1px solid #f5f3f0;
+}
+.pp-cur-card__grev-item:last-of-type { border-bottom: none; }
+.pp-cur-card__grev-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 3px;
+}
+.pp-cur-card__grev-author { font-size: 12px; font-weight: 600; color: var(--pp-text); }
+.pp-cur-card__grev-date { font-size: 11px; color: var(--pp-text-sub); }
+.pp-cur-card__grev-score {
+  display: flex; align-items: center; gap: 1px; margin-bottom: 4px;
+}
+.pp-cur-card__grev-score span { font-size: 11px; font-weight: 600; color: var(--pp-text-sub); margin-left: 3px; }
+.pp-cur-card__grev-text {
+  font-size: 12.5px; line-height: 1.55; color: var(--pp-text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pp-cur-card__grev-more {
+  display: inline-block; margin-top: 6px; font-size: 11.5px;
+  color: var(--pp-accent, #2f6fed); text-decoration: none;
+}
+.pp-cur-card__grev-more:hover { text-decoration: underline; }
 
 /* ── CTA bar: inside container ── */
 .pp-cur-cta {

@@ -82,6 +82,13 @@
                     $mapLabel = '네이버 지도';
                 }
             @endphp
+            @php
+                $gRevData = null;
+                if ($place->google_place_id && isset($googleReviews[$place->google_place_id])) {
+                    $gRevData = $googleReviews[$place->google_place_id];
+                    $gRevData['place_id'] = $place->google_place_id;
+                }
+            @endphp
             @include('partials.cur-place-card', [
                 'cardIdx' => $i,
                 'placeId' => $place->id,
@@ -102,6 +109,7 @@
                 'memo' => $place->memo,
                 'dayNumber' => null,
                 'isCourse' => false,
+                'googleReviewData' => $gRevData,
             ])
         @endforeach
 
@@ -616,6 +624,9 @@
             if (e.target.closest('.pp-cur-card__photo[data-full]')) return;
             if (e.target.closest('.pp-cur-card__map-chip')) return;
             if (e.target.closest('.pp-cur-card__source a')) return;
+            if (e.target.closest('.pp-cur-card__grev')) return;
+            if (e.target.closest('.pp-cur-card__grev-feat')) return;
+            if (e.target.closest('.pp-cur-card__grev-body')) return;
             toggleCardSelection(parseInt(card.dataset.idx));
         });
     });

@@ -33,6 +33,7 @@
             <thead>
                 <tr>
                     <th>ID</th>
+                    <th style="width:56px"></th>
                     <th>제목</th>
                     <th>작성자</th>
                     <th>카테고리</th>
@@ -60,8 +61,29 @@
                     $catConfig = config("curation_categories.{$c->category}");
                     $catLabel = $catConfig['label'] ?? $c->category ?? '-';
                 @endphp
+                @php
+                    $fp = $c->places->first();
+                    $thumbUrl = null;
+                    if ($fp) {
+                        $thumbUrl = $fp->thumb_url;
+                        if (!$thumbUrl && $fp->latitude && $fp->longitude) {
+                            $thumbUrl = '/api/static-map?lat=' . $fp->latitude . '&lng=' . $fp->longitude . '&overseas=' . ($fp->is_overseas ? 1 : 0) . '&w=112&h=112';
+                        }
+                    }
+                    $thumbUrl = $thumbUrl ?: asset('images/og-image.png');
+                @endphp
                 <tr style="{{ $c->status === 'pending' ? 'background:#FFFDE7' : '' }}">
                     <td>{{ $c->id }}</td>
+                    <td style="padding:6px 4px">
+                        <a href="{{ route('admin.curations.edit', $c) }}" style="display:block;width:48px;height:48px;border-radius:8px;overflow:hidden;background:#f0ede9;position:relative">
+                            @if($thumbUrl !== asset('images/og-image.png'))
+                            <img src="{{ $thumbUrl }}" alt="" style="width:48px;height:48px;object-fit:cover;display:block" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                            @endif
+                            <span style="display:{{ $thumbUrl === asset('images/og-image.png') ? 'flex' : 'none' }};width:48px;height:48px;align-items:center;justify-content:center">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="#c5bdb5"/></svg>
+                            </span>
+                        </a>
+                    </td>
                     <td><a href="{{ route('admin.curations.edit', $c) }}">{{ $c->title }}</a></td>
                     <td>
                         @if($c->author_type === 'user')
@@ -94,7 +116,7 @@
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--ad-text-sub)">큐레이션이 없습니다</td></tr>
+                <tr><td colspan="12" style="text-align:center;padding:40px;color:var(--ad-text-sub)">큐레이션이 없습니다</td></tr>
                 @endforelse
             </tbody>
         </table>
