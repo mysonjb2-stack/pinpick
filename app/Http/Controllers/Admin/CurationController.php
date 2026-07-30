@@ -117,6 +117,13 @@ class CurationController extends Controller
             ->with('success', '삭제되었습니다.');
     }
 
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer'])['ids'];
+        $count = Curation::whereIn('id', $ids)->delete();
+        return back()->with('success', "{$count}개 큐레이션 삭제 완료");
+    }
+
     public function togglePublish(Curation $curation)
     {
         if ($curation->status === 'approved') {

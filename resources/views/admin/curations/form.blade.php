@@ -105,7 +105,7 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button type="submit" class="ad-btn ad-btn--primary">저장</button>
             @if($curation)
-                @if($curation->author_type === 'admin')
+                @if($curation->author_type === 'admin' || ($curation->author && $curation->author->is_operator_persona))
                     <button type="button" class="ad-btn {{ $curation->status === 'approved' ? 'ad-btn--danger' : '' }}" id="togglePublishBtn">
                         {{ $curation->status === 'approved' ? '발행 취소' : '발행하기' }}
                     </button>
@@ -963,6 +963,38 @@ document.addEventListener('keydown', function(e) {
         const btn = wrap.querySelector('.cur-url-btn');
         uploadFromUrl(parseInt(wrap.dataset.pid), btn);
     }
+});
+
+// 통합 저장: 메인 폼 제출 시 모든 장소 변경사항도 함께 저장
+document.getElementById('curForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const form = this;
+    const cards = document.querySelectorAll('.cur-place');
+    const promises = [];
+
+    cards.forEach(card => {
+        const placeId = card.dataset.placeId;
+        if (!placeId) return;
+
+        const fields = {};
+        let hasField = false;
+        card.querySelectorAll('[data-field]').forEach(inp => {
+            fields[inp.dataset.field] = inp.value;
+            hasField = true;
+        });
+        if (!hasField) return;
+
+        promises.push(
+            fetch('/admin/curations/places/' + placeId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify(fields),
+            }).catch(() => null)
+        );
+    });
+
+    if (promises.length) await Promise.all(promises);
+    form.submit();
 });
 
 // 발행 토글

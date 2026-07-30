@@ -31,6 +31,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::get('curations/{curation}/edit', [CurationController::class, 'edit'])->name('admin.curations.edit');
     Route::put('curations/{curation}', [CurationController::class, 'update'])->name('admin.curations.update');
     Route::delete('curations/{curation}', [CurationController::class, 'destroy'])->name('admin.curations.destroy');
+    Route::post('curations/bulk-destroy', [CurationController::class, 'bulkDestroy'])->name('admin.curations.bulk-destroy');
     Route::post('curations/{curation}/toggle-publish', [CurationController::class, 'togglePublish'])->name('admin.curations.toggle-publish');
     Route::post('curations/{curation}/places', [CurationController::class, 'addPlace'])->name('admin.curations.add-place');
     Route::put('curations/places/{place}', [CurationController::class, 'updatePlace'])->name('admin.curations.update-place');
@@ -59,6 +60,8 @@ Route::middleware('admin.auth')->group(function () {
     Route::put('personas/{persona}', [PersonaController::class, 'update'])->name('admin.personas.update');
     Route::delete('personas/{persona}', [PersonaController::class, 'destroy'])->name('admin.personas.destroy');
     Route::post('personas/seed', [PersonaController::class, 'seed'])->name('admin.personas.seed');
+    Route::post('personas/{persona}/regenerate-avatar', [PersonaController::class, 'regenerateAvatar'])->name('admin.personas.regenerate-avatar');
+    Route::post('personas/regenerate-all-avatars', [PersonaController::class, 'regenerateAllAvatars'])->name('admin.personas.regenerate-all-avatars');
 
     Route::get('admins', [AdminUserController::class, 'index'])->name('admin.admins.index');
     Route::post('admins', [AdminUserController::class, 'store'])->name('admin.admins.store');

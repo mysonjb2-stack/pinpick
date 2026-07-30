@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Services\ImageProcessor;
+use App\Services\AvatarService;
 use Illuminate\Http\Request;
 
 class PersonaController extends Controller
 {
+    public function __construct(private AvatarService $avatarService) {}
+
     public function index()
     {
         $personas = User::personas()->latest()->get();
@@ -32,6 +34,11 @@ class PersonaController extends Controller
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->store('personas', 'public');
             $user->update(['profile_image' => asset('storage/' . $path)]);
+        } else {
+            $url = $this->avatarService->generateForPersona($data['name']);
+            if ($url) {
+                $user->update(['profile_image' => $url]);
+            }
         }
 
         return back()->with('success', "페르소나 '{$data['name']}' 생성 완료");
@@ -53,6 +60,7 @@ class PersonaController extends Controller
         ]);
 
         if ($request->hasFile('avatar')) {
+            $this->avatarService->deleteOldAvatar($persona->profile_image);
             $path = $request->file('avatar')->store('personas', 'public');
             $persona->update(['profile_image' => asset('storage/' . $path)]);
         }
@@ -63,8 +71,50 @@ class PersonaController extends Controller
     public function destroy(User $persona)
     {
         if (!$persona->is_operator_persona) abort(404);
+        $this->avatarService->deleteOldAvatar($persona->profile_image);
         $persona->delete();
         return back()->with('success', '삭제 완료');
+    }
+
+    public function regenerateAvatar(User $persona)
+    {
+        if (!$persona->is_operator_persona) abort(404);
+
+        $this->avatarService->deleteOldAvatar($persona->profile_image);
+        $suffix = substr(md5(microtime(true)), 0, 6);
+        $url = $this->avatarService->generateForPersona($persona->name, $suffix);
+
+        if ($url) {
+            $persona->update(['profile_image' => $url]);
+            return back()->with('success', "'{$persona->name}' 아바타 재생성 완료");
+        }
+
+        return back()->with('error', '아바타 생성 실패 — DiceBear API 응답 오류');
+    }
+
+    public function regenerateAllAvatars()
+    {
+        $personas = User::personas()->get();
+        $success = 0;
+        $failed = 0;
+
+        foreach ($personas as $persona) {
+            $this->avatarService->deleteOldAvatar($persona->profile_image);
+            $suffix = substr(md5($persona->id . microtime(true)), 0, 6);
+            $url = $this->avatarService->generateForPersona($persona->name, $suffix);
+
+            if ($url) {
+                $persona->update(['profile_image' => $url]);
+                $success++;
+            } else {
+                $failed++;
+            }
+        }
+
+        $msg = "{$success}개 아바타 재생성 완료";
+        if ($failed) $msg .= ", {$failed}개 실패";
+
+        return back()->with('success', $msg);
     }
 
     public function seed()
@@ -93,11 +143,17 @@ class PersonaController extends Controller
                 $skipped++;
                 continue;
             }
-            User::create([
+            $user = User::create([
                 'name' => $name,
                 'bio' => $bio,
                 'is_operator_persona' => true,
             ]);
+
+            $url = $this->avatarService->generateForPersona($name);
+            if ($url) {
+                $user->update(['profile_image' => $url]);
+            }
+
             $created++;
         }
 

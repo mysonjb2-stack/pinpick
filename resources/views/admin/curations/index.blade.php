@@ -32,6 +32,7 @@
         <table class="ad-table">
             <thead>
                 <tr>
+                    <th style="width:36px"><input type="checkbox" id="checkAll"></th>
                     <th>ID</th>
                     <th style="width:56px"></th>
                     <th>제목</th>
@@ -73,6 +74,7 @@
                     $thumbUrl = $thumbUrl ?: asset('images/og-image.png');
                 @endphp
                 <tr style="{{ $c->status === 'pending' ? 'background:#FFFDE7' : '' }}">
+                    <td><input type="checkbox" class="bulk-check" value="{{ $c->id }}"></td>
                     <td>{{ $c->id }}</td>
                     <td style="padding:6px 4px">
                         <a href="{{ route('admin.curations.edit', $c) }}" style="display:block;width:48px;height:48px;border-radius:8px;overflow:hidden;background:#f0ede9;position:relative">
@@ -116,7 +118,7 @@
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="12" style="text-align:center;padding:40px;color:var(--ad-text-sub)">큐레이션이 없습니다</td></tr>
+                <tr><td colspan="13" style="text-align:center;padding:40px;color:var(--ad-text-sub)">큐레이션이 없습니다</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -128,6 +130,16 @@
     @endif
 </div>
 
+{{-- 선택 삭제 바 --}}
+<div id="bulkBar" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100;background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 20px;box-shadow:0 4px 16px rgba(0,0,0,.12);display:none;align-items:center;gap:12px">
+    <span style="font-size:14px;font-weight:600"><span id="bulkCount">0</span>개 선택</span>
+    <button type="button" class="ad-btn ad-btn--sm" style="color:#C62828;font-weight:600" onclick="bulkDelete()">선택 삭제</button>
+    <button type="button" class="ad-btn ad-btn--sm" onclick="clearSelection()">취소</button>
+</div>
+<form id="bulkForm" method="POST" action="{{ route('admin.curations.bulk-destroy') }}" style="display:none">
+    @csrf
+</form>
+
 <script>
 function rejectCuration(id) {
     const reason = prompt('반려 사유를 입력해주세요:');
@@ -138,6 +150,48 @@ function rejectCuration(id) {
     form.innerHTML = '<input type="hidden" name="_token" value="{{ csrf_token() }}">'
         + '<input type="hidden" name="reason" value="' + reason.replace(/"/g, '&quot;') + '">';
     document.body.appendChild(form);
+    form.submit();
+}
+
+const checkAll = document.getElementById('checkAll');
+const bulkBar = document.getElementById('bulkBar');
+const bulkCount = document.getElementById('bulkCount');
+const checks = () => document.querySelectorAll('.bulk-check');
+
+function updateBar() {
+    const selected = document.querySelectorAll('.bulk-check:checked');
+    const n = selected.length;
+    bulkBar.style.display = n > 0 ? 'flex' : 'none';
+    bulkCount.textContent = n;
+    checkAll.checked = n > 0 && n === checks().length;
+}
+
+checkAll.addEventListener('change', function() {
+    checks().forEach(c => c.checked = this.checked);
+    updateBar();
+});
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('bulk-check')) updateBar();
+});
+
+function clearSelection() {
+    checkAll.checked = false;
+    checks().forEach(c => c.checked = false);
+    updateBar();
+}
+
+function bulkDelete() {
+    const selected = document.querySelectorAll('.bulk-check:checked');
+    if (!selected.length) return;
+    if (!confirm(selected.length + '개 큐레이션을 삭제합니다.\n이 작업은 되돌릴 수 없습니다.')) return;
+
+    const form = document.getElementById('bulkForm');
+    form.querySelectorAll('input[name="ids[]"]').forEach(el => el.remove());
+    selected.forEach(c => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = c.value;
+        form.appendChild(inp);
+    });
     form.submit();
 }
 </script>

@@ -19,7 +19,7 @@
             <div class="ad-form-group">
                 <label>아바타 이미지</label>
                 <input type="file" name="avatar" accept="image/*" class="ad-input" style="padding:6px">
-                <small style="color:var(--ad-text-sub);font-size:11px">미업로드 시 이니셜 자동 표시</small>
+                <small style="color:var(--ad-text-sub);font-size:11px">미업로드 시 DiceBear 일러스트 자동 생성</small>
             </div>
             <button type="submit" class="ad-btn ad-btn--primary" style="width:100%;margin-top:8px">생성</button>
         </form>
@@ -27,12 +27,18 @@
 
     {{-- 목록 --}}
     <div class="ad-card" style="flex:1;min-width:400px;padding:20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
             <h3 style="margin:0;font-size:15px">페르소나 목록 ({{ $personas->count() }})</h3>
-            <form method="POST" action="{{ route('admin.personas.seed') }}" style="display:inline">
-                @csrf
-                <button class="ad-btn ad-btn--sm" onclick="return confirm('기본 페르소나 12개를 생성합니다.')">기본 페르소나 12개 생성</button>
-            </form>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <form method="POST" action="{{ route('admin.personas.regenerate-all-avatars') }}" style="display:inline">
+                    @csrf
+                    <button class="ad-btn ad-btn--sm" style="color:#1565C0" onclick="return confirm('전체 {{ $personas->count() }}개 아바타를 재생성합니다.\n기존 아바타가 새 일러스트로 교체됩니다.')">🎨 전체 아바타 재생성</button>
+                </form>
+                <form method="POST" action="{{ route('admin.personas.seed') }}" style="display:inline">
+                    @csrf
+                    <button class="ad-btn ad-btn--sm" onclick="return confirm('기본 페르소나 12개를 생성합니다.')">기본 페르소나 12개 생성</button>
+                </form>
+            </div>
         </div>
         @if($personas->isEmpty())
             <p style="color:var(--ad-text-sub);text-align:center;padding:30px 0">등록된 페르소나가 없습니다.</p>
@@ -56,6 +62,10 @@
                         <td style="color:var(--ad-text-sub);font-size:13px">{{ $p->bio ?: '-' }}</td>
                         <td style="font-size:12px;color:var(--ad-text-sub)">{{ $p->created_at->format('Y-m-d') }}</td>
                         <td style="white-space:nowrap">
+                            <form method="POST" action="{{ route('admin.personas.regenerate-avatar', $p) }}" style="display:inline">
+                                @csrf
+                                <button class="ad-btn ad-btn--sm" style="color:#1565C0" title="아바타 재생성">🎨</button>
+                            </form>
                             <button class="ad-btn ad-btn--sm" onclick="editPersona({{ $p->id }}, '{{ e($p->name) }}', '{{ e($p->bio) }}')">수정</button>
                             <form method="POST" action="{{ route('admin.personas.destroy', $p) }}" style="display:inline" onsubmit="return confirm('삭제하시겠습니까?')">
                                 @csrf @method('DELETE')
@@ -67,6 +77,10 @@
                 </tbody>
             </table>
         @endif
+        <p style="margin:12px 0 0;font-size:11px;color:var(--ad-text-sub)">
+            아바타: <a href="https://www.dicebear.com" target="_blank" rel="noopener">DiceBear</a> —
+            Adventurer by Lisa Wischofsky, Fun Emoji by Davis Uche (CC BY 4.0)
+        </p>
     </div>
 </div>
 
@@ -85,8 +99,9 @@
                 <input class="ad-input" name="bio" id="editBio" maxlength="100">
             </div>
             <div class="ad-form-group">
-                <label>아바타 변경</label>
+                <label>아바타 변경 (수동 업로드)</label>
                 <input type="file" name="avatar" accept="image/*" class="ad-input" style="padding:6px">
+                <small style="color:var(--ad-text-sub);font-size:11px">수동 업로드 시 자동 생성 아바타를 대체합니다</small>
             </div>
             <div style="display:flex;gap:8px;margin-top:12px">
                 <button type="submit" class="ad-btn ad-btn--primary" style="flex:1">저장</button>

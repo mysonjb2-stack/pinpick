@@ -13,6 +13,8 @@ use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 class CurationController extends Controller
@@ -218,11 +220,11 @@ class CurationController extends Controller
 
         $savedIds = [];
         if (Auth::check()) {
-            $savedIds = \App\Models\Place::where('user_id', Auth::id())
+            $savedIds = Place::where('user_id', Auth::id())
                 ->whereNotNull('kakao_place_id')
                 ->pluck('kakao_place_id')
                 ->merge(
-                    \App\Models\Place::where('user_id', Auth::id())
+                    Place::where('user_id', Auth::id())
                         ->whereNotNull('naver_place_id')
                         ->pluck('naver_place_id')
                 )
@@ -280,6 +282,282 @@ class CurationController extends Controller
         });
 
         return response()->json($curations);
+    }
+
+    public function apiNearby(Request $request)
+    {
+        $lat = (float) $request->query('lat');
+        $lng = (float) $request->query('lng');
+        $isLocationless = !$lat && !$lng;
+
+        $cacheKey = $isLocationless ? 'cur_nearby:fallback' : ('cur_nearby:' . round($lat, 2) . ':' . round($lng, 2));
+
+        $savedExtIds = [];
+        if (Auth::check()) {
+            $savedExtIds = Place::where('user_id', Auth::id())
+                ->whereNotNull('kakao_place_id')
+                ->pluck('kakao_place_id')
+                ->merge(
+                    Place::where('user_id', Auth::id())
+                        ->whereNotNull('naver_place_id')
+                        ->pluck('naver_place_id')
+                )
+                ->toArray();
+        }
+
+        $isFallback = false;
+        $pool = collect();
+
+        if (!$isLocationless) {
+            $pool = Cache::remember($cacheKey . ':pool', 600, function () use ($lat, $lng) {
+                $found = collect();
+                foreach ([5000, 10000] as $radius) {
+                    $rows = DB::select("
+                        SELECT cp.id, cp.curation_id, cp.place_name, cp.thumbnail_url,
+                               cp.latitude, cp.longitude, cp.is_overseas,
+                               cp.external_place_id, cp.naver_place_id,
+                               cp.dong_label,
+                               c.save_count AS cur_save_count,
+                               (6371000 * acos(LEAST(1, cos(radians(?)) * cos(radians(cp.latitude))
+                                * cos(radians(cp.longitude) - radians(?))
+                                + sin(radians(?)) * sin(radians(cp.latitude))))) AS dist
+                        FROM curation_places cp
+                        JOIN curations c ON c.id = cp.curation_id
+                        WHERE c.status = 'approved'
+                          AND cp.latitude != 0 AND cp.longitude != 0
+                        HAVING dist <= ?
+                        ORDER BY dist
+                    ", [$lat, $lng, $lat, $radius]);
+
+                    $found = collect($rows);
+                    if ($found->count() >= 3) break;
+                }
+                return $found->map(fn($r) => (array) $r)->values()->toArray();
+            });
+
+            $pool = collect($pool);
+
+            if (!empty($savedExtIds)) {
+                $pool = $pool->reject(function ($p) use ($savedExtIds) {
+                    return ($p['external_place_id'] && in_array($p['external_place_id'], $savedExtIds))
+                        || ($p['naver_place_id'] && in_array($p['naver_place_id'], $savedExtIds));
+                });
+            }
+
+            // 동일 장소 중복 제거 (external_place_id 기준, 담기 수 많은 리스트 소속 우선)
+            $deduped = collect();
+            $seenExt = [];
+            $pool->sortByDesc('cur_save_count')->each(function ($p) use (&$deduped, &$seenExt) {
+                $extId = $p['external_place_id'] ?: null;
+                if ($extId && isset($seenExt[$extId])) return;
+                if ($extId) $seenExt[$extId] = true;
+                $deduped->push($p);
+            });
+            $pool = $deduped;
+
+            if ($pool->count() < 3) {
+                $isFallback = true;
+                $pool = collect();
+            }
+        }
+
+        if ($isLocationless || $isFallback) {
+            $globalPool = Cache::remember('cur_nearby:global:pool', 600, function () {
+                $rows = DB::select("
+                    SELECT cp.id, cp.curation_id, cp.place_name, cp.thumbnail_url,
+                           cp.latitude, cp.longitude, cp.is_overseas,
+                           cp.external_place_id, cp.naver_place_id,
+                           cp.address,
+                           c.save_count AS cur_save_count
+                    FROM curation_places cp
+                    JOIN curations c ON c.id = cp.curation_id
+                    WHERE c.status = 'approved'
+                ");
+                return collect($rows)->map(fn($r) => (array) $r)->values()->toArray();
+            });
+
+            $globalPool = collect($globalPool);
+            if ($globalPool->isEmpty()) {
+                return response()->json(['data' => null]);
+            }
+
+            if (!empty($savedExtIds)) {
+                $globalPool = $globalPool->reject(fn($p) =>
+                    ($p['external_place_id'] && in_array($p['external_place_id'], $savedExtIds))
+                    || ($p['naver_place_id'] && in_array($p['naver_place_id'], $savedExtIds))
+                );
+            }
+
+            $deduped = collect();
+            $seenExt = [];
+            $globalPool->sortByDesc('cur_save_count')->each(function ($p) use (&$deduped, &$seenExt) {
+                $extId = $p['external_place_id'] ?: null;
+                if ($extId && isset($seenExt[$extId])) return;
+                if ($extId) $seenExt[$extId] = true;
+                $deduped->push($p);
+            });
+            $globalPool = $deduped;
+
+            $withPhoto = $globalPool->filter(fn($p) => !empty($p['thumbnail_url']))->values();
+            $noPhoto = $globalPool->filter(fn($p) => empty($p['thumbnail_url']))->values();
+            $maxPick = 30;
+            $pick = collect();
+            if ($withPhoto->count() >= $maxPick) {
+                $pick = $withPhoto->random($maxPick);
+            } else {
+                $pick = $withPhoto;
+                $need = $maxPick - $pick->count();
+                if ($noPhoto->count() > 0) {
+                    $pick = $pick->merge($noPhoto->random(min($need, $noPhoto->count())));
+                }
+            }
+
+            $toMap = fn($p) => [
+                'id' => $p['id'],
+                'curation_id' => $p['curation_id'],
+                'name' => $p['place_name'],
+                'thumb_url' => $p['thumbnail_url'],
+                'lat' => $p['latitude'],
+                'lng' => $p['longitude'],
+                'is_overseas' => (bool) $p['is_overseas'],
+                'distance' => null,
+                'region_label' => $this->parseRegionLabel($p['address'] ?? ''),
+            ];
+
+            $places = $pick->sortByDesc('cur_save_count')->values()->map($toMap)->values();
+
+            return response()->json([
+                'data' => [
+                    'places' => $places,
+                    'region' => '',
+                    'is_fallback' => false,
+                    'is_global' => true,
+                    'pool_size' => $globalPool->count(),
+                ]
+            ]);
+        }
+
+        // 사진 있는 장소 우선, 없는 장소는 뒤로
+        $withPhoto = $pool->filter(fn($p) => !empty($p['thumbnail_url']))->values();
+        $noPhoto = $pool->filter(fn($p) => empty($p['thumbnail_url']))->values();
+
+        $maxPick = 30;
+        $pick = collect();
+        if ($withPhoto->count() >= $maxPick) {
+            $pick = $withPhoto->random($maxPick);
+        } else {
+            $pick = $withPhoto;
+            $need = $maxPick - $pick->count();
+            if ($noPhoto->count() > 0) {
+                $pick = $pick->merge($noPhoto->random(min($need, $noPhoto->count())));
+            }
+        }
+
+        $toMap = fn($p) => [
+            'id' => $p['id'],
+            'curation_id' => $p['curation_id'],
+            'name' => $p['place_name'],
+            'thumb_url' => $p['thumbnail_url'],
+            'lat' => $p['latitude'],
+            'lng' => $p['longitude'],
+            'is_overseas' => (bool) $p['is_overseas'],
+            'distance' => round($p['dist'], 1),
+            'dong' => $p['dong_label'] ?? null,
+        ];
+
+        $places = $pick->sortBy('dist')->values()->map($toMap)->values();
+
+        $region = Cache::remember(
+            $cacheKey . ':region', 600,
+            function () use ($lat, $lng) {
+                $key = config('services.kakao_local.rest_api_key');
+                if (!$key) return '';
+                $res = Http::withHeaders(['Authorization' => 'KakaoAK ' . $key])
+                    ->get('https://dapi.kakao.com/v2/local/geo/coord2regioncode.json', ['x' => $lng, 'y' => $lat]);
+                $doc = collect($res->json('documents', []))->firstWhere('region_type', 'H');
+                if (!$doc) return '';
+                $parts = explode(' ', $doc['address_name']);
+                $dong = end($parts);
+                $dong = preg_replace('/\d+(동)$/', '$1', $dong);
+                $name = preg_replace('/(동|읍|면)$/', '', $dong);
+                if ($name !== '') return $name;
+                $gu = count($parts) >= 2 ? $parts[count($parts) - 2] : '';
+                return preg_replace('/(구|시|군)$/', '', $gu) ?: $dong;
+            }
+        );
+
+        return response()->json([
+            'data' => [
+                'places' => $places->values(),
+                'region' => $region,
+                'is_fallback' => false,
+                'pool_size' => $pool->count(),
+            ]
+        ]);
+    }
+
+    private function parseRegionLabel(string $address): ?string
+    {
+        if (!$address) return null;
+
+        $parts = preg_split('/\s+/', trim($address));
+        if (count($parts) < 2) return null;
+
+        $provinceMap = [
+            '서울특별시' => '서울', '서울' => '서울',
+            '부산광역시' => '부산', '부산' => '부산',
+            '대구광역시' => '대구', '대구' => '대구',
+            '인천광역시' => '인천', '인천' => '인천',
+            '광주광역시' => '광주', '광주' => '광주',
+            '대전광역시' => '대전', '대전' => '대전',
+            '울산광역시' => '울산', '울산' => '울산',
+            '세종특별자치시' => '세종', '세종' => '세종',
+            '경기도' => '경기', '경기' => '경기',
+            '강원특별자치도' => '강원', '강원도' => '강원', '강원' => '강원',
+            '충청북도' => '충북', '충북' => '충북',
+            '충청남도' => '충남', '충남' => '충남',
+            '전북특별자치도' => '전북', '전라북도' => '전북', '전북' => '전북',
+            '전라남도' => '전남', '전남' => '전남',
+            '경상북도' => '경북', '경북' => '경북',
+            '경상남도' => '경남', '경남' => '경남',
+            '제주특별자치도' => '제주', '제주도' => '제주', '제주' => '제주',
+        ];
+
+        $metro = ['서울', '부산', '대구', '인천', '광주', '대전', '울산'];
+
+        $prov = $provinceMap[$parts[0]] ?? null;
+        if (!$prov) return null;
+
+        if ($prov === '세종') return '세종';
+
+        $second = $parts[1] ?? '';
+        if (!$second) return $prov;
+
+        if (in_array($prov, $metro)) {
+            if (str_ends_with($second, '구')) return $prov . ' ' . $second;
+            return $prov;
+        }
+
+        if (str_ends_with($second, '시')) {
+            $city = mb_substr($second, 0, -1);
+            if ($city === $prov) return $prov;
+            return $prov . ' ' . $city;
+        }
+        if (str_ends_with($second, '군')) {
+            $county = mb_substr($second, 0, -1);
+            return $prov . ' ' . $county;
+        }
+
+        return $prov;
+    }
+
+    private function haversine($lat1, $lng1, $lat2, $lng2): float
+    {
+        $R = 6371000;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     public function apiCategories()

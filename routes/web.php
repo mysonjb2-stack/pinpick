@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/my/places', [MyCurationController::class, 'loadPlaces'])->name('api.my.places');
 });
 Route::get('/api/curations', [CurationController::class, 'apiList'])->name('api.curations.list');
+Route::get('/api/curations/nearby', [CurationController::class, 'apiNearby'])->name('api.curations.nearby');
 Route::get('/api/curations/categories', [CurationController::class, 'apiCategories'])->name('api.curations.categories');
 Route::get('/api/curations/regions', [CurationController::class, 'apiRegions'])->name('api.curations.regions');
 

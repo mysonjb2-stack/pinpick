@@ -345,6 +345,23 @@
     {{-- personal-only-v1: 내 장소 영역만 노출. is-active 기본 활성화 --}}
     <div class="yg-pane is-active" data-pane="mine">
         {{-- 카테고리 관리 버튼은 히어로 헤드로 이동됨. 패널은 그대로 사용 --}}
+        {{-- 내 주변 추천 모듈 --}}
+        <div class="pp-nearby" id="ppNearby" style="display:none">
+            <div class="pp-nearby__content" id="ppNearbyContent" style="display:none">
+                <div class="pp-nearby__head">
+                    <h3 class="pp-nearby__title" id="ppNearbyTitle"></h3>
+                    <p class="pp-nearby__sub" id="ppNearbySub"></p>
+                    <span class="pp-nearby__chip" id="ppNearbyChip" style="display:none">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                        내 주변으로 보기
+                    </span>
+                </div>
+                <div class="pp-nearby__scroll">
+                    <div class="pp-nearby__track" id="ppNearbyTrack"></div>
+                </div>
+            </div>
+        </div>
+
         @auth
         <div class="pp-mine-sechead">
             <h3 class="pp-mine-sechead__title">전체 장소</h3>
@@ -2380,5 +2397,189 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
 })();
 @endauth
+
+// ── 추천 장소 모듈 ──
+(function() {
+    const POOL_KEY = 'pp_nearby_pool';
+    const GEO_KEY = 'pp_nearby_geo';
+    const TTL = 10 * 60 * 1000;
+    const module = document.getElementById('ppNearby');
+    const content = document.getElementById('ppNearbyContent');
+    const track = document.getElementById('ppNearbyTrack');
+    const titleEl = document.getElementById('ppNearbyTitle');
+    const subEl = document.getElementById('ppNearbySub');
+    const chip = document.getElementById('ppNearbyChip');
+    if (!module) return;
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function formatDist(m) {
+        if (m == null) return '';
+        return m < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(1) + 'km';
+    }
+    function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }
+
+    function render(data) {
+        if (!data || !data.places || !data.places.length) { module.style.display = 'none'; return; }
+        module.style.display = '';
+        content.style.display = '';
+
+        const isGlobal = !!data.is_global;
+        if (isGlobal) {
+            titleEl.textContent = '요즘 저장할 만한 곳들이에요';
+            subEl.textContent = '다른 사람들이 담은 장소를 구경해보세요';
+        } else {
+            titleEl.textContent = '지금 ' + (data.region || '여기') + '에 계시네요?';
+            subEl.textContent = '주변에 가볼 만한 맛집·핫플이 있어요';
+            if (chip) chip.style.display = 'none';
+        }
+
+        let places = data.places.slice();
+        if (isGlobal && places.length > 1) {
+            places = shuffle(places);
+        } else if (!isGlobal && places.length > 1) {
+            const closest = places[0];
+            const rest = shuffle(places.slice(1));
+            places = [closest].concat(rest);
+        }
+
+        let html = '';
+        places.forEach(p => {
+            const hasBg = !!p.thumb_url;
+            let imgSrc = p.thumb_url;
+            if (!hasBg && p.lat && p.lng) {
+                imgSrc = '/api/static-map?lat=' + p.lat + '&lng=' + p.lng + '&overseas=' + (p.is_overseas ? 1 : 0) + '&w=240&h=320';
+            }
+            const bg = (hasBg || imgSrc) ? 'background-image:url(' + esc(imgSrc) + ')' : '';
+            const phClass = (!hasBg && !imgSrc) ? ' pp-nearby__card--ph' : '';
+            let subLine = '';
+            if (isGlobal) {
+                subLine = p.region_label ? '<div class="pp-nearby__card-region">' + esc(p.region_label) + '</div>' : '';
+            } else if (p.distance != null) {
+                const dist = formatDist(p.distance);
+                subLine = p.dong
+                    ? '<div class="pp-nearby__card-dist">' + esc(p.dong) + ' · ' + dist + '</div>'
+                    : '<div class="pp-nearby__card-dist">' + dist + '</div>';
+            }
+            const cid = p.curation_id || '';
+            html += '<a href="/c/' + cid + '?place=' + p.id + '" class="pp-nearby__card' + phClass + '" style="' + bg + '">'
+                + '<div class="pp-nearby__card-overlay">'
+                + '<div class="pp-nearby__card-name">' + esc(p.name) + '</div>'
+                + subLine
+                + '</div></a>';
+        });
+
+        html += '<a href="/explore" class="pp-nearby__card pp-nearby__card--more">'
+            + '<span class="pp-nearby__card--more-label">장소 더보기</span>'
+            + '<span class="pp-nearby__card--more-arrow">→</span></a>';
+
+        track.innerHTML = html;
+    }
+
+    function savePool(data, lat, lng) {
+        sessionStorage.setItem(POOL_KEY, JSON.stringify({ data, lat: lat || 0, lng: lng || 0, ts: Date.now() }));
+    }
+
+    function loadPool(currentLat, currentLng) {
+        try {
+            const raw = sessionStorage.getItem(POOL_KEY);
+            if (!raw) return null;
+            const cached = JSON.parse(raw);
+            if (Date.now() - cached.ts > TTL) return null;
+            const reqNearby = !!(currentLat && currentLng);
+            const cachedNearby = !!(cached.lat && cached.lng);
+            if (reqNearby !== cachedNearby) return null;
+            if (reqNearby && cachedNearby) {
+                if (Math.abs(currentLat - cached.lat) > 0.01 || Math.abs(currentLng - cached.lng) > 0.01) return null;
+            }
+            return cached.data;
+        } catch(e) { return null; }
+    }
+
+    async function fetchPool(lat, lng) {
+        try {
+            const r = await fetch('/api/curations/nearby?lat=' + (lat || 0) + '&lng=' + (lng || 0));
+            const json = await r.json();
+            if (json.data) { savePool(json.data, lat, lng); render(json.data); }
+            else module.style.display = 'none';
+        } catch(e) { module.style.display = 'none'; }
+    }
+
+    function showGlobal() {
+        const pool = loadPool(0, 0);
+        if (pool) { render(pool); return; }
+        fetchPool(0, 0);
+    }
+
+    function switchToNearby() {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                sessionStorage.setItem(GEO_KEY, JSON.stringify({ lat, lng }));
+                sessionStorage.removeItem(POOL_KEY);
+                fetchPool(lat, lng);
+            },
+            () => { if (chip) chip.style.display = 'none'; },
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+        );
+    }
+
+    function requestGeo() {
+        if (!navigator.geolocation) { showGlobal(); return; }
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                sessionStorage.setItem(GEO_KEY, JSON.stringify({ lat, lng }));
+                const pool = loadPool(lat, lng);
+                if (pool) { render(pool); return; }
+                fetchPool(lat, lng);
+            },
+            () => showGlobal(),
+            { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+        );
+    }
+
+    if (chip) {
+        chip.addEventListener('click', switchToNearby);
+    }
+
+    const geo = (() => { try { return JSON.parse(sessionStorage.getItem(GEO_KEY)); } catch(e) { return null; } })();
+    if (geo && geo.lat) {
+        const pool = loadPool(geo.lat, geo.lng);
+        if (pool) { module.style.display = ''; render(pool); return; }
+    }
+
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(result => {
+            module.style.display = '';
+            if (result.state === 'granted') {
+                requestGeo();
+            } else if (result.state === 'prompt') {
+                if (chip) chip.style.display = '';
+                showGlobal();
+            } else {
+                showGlobal();
+            }
+        }).catch(() => {
+            module.style.display = '';
+            if (chip) chip.style.display = '';
+            showGlobal();
+        });
+    } else if (navigator.geolocation) {
+        module.style.display = '';
+        if (chip) chip.style.display = '';
+        showGlobal();
+    } else {
+        module.style.display = '';
+        showGlobal();
+    }
+})();
 </script>
 @endpush
