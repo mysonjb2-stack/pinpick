@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#ffa51a">
+    <meta name="theme-color" content="#FF6B00">
     <meta name="naver-site-verification" content="8fc3a513aca43a1416d55813adba83f8baf6a28a" />
     <meta name="google-site-verification" content="2mqKDLK12Nw5E2pimrdTIryzolgiC_A-icMVU0FZSzk" />
     <title>@yield('page_title', '나만의 장소, 나만의 지도 | 핀픽')</title>

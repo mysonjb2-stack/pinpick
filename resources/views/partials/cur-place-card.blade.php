@@ -110,7 +110,7 @@
         </p>
     @endif
     <div class="pp-cur-card__actions">
-        @if(!empty($isCourse) && !empty($dayNumber))
+        @if(!empty($isCourse) && !empty($dayNumber) && ($durationDays ?? 0) > 1)
             <span class="pp-cur-card__day">Day {{ $dayNumber }}</span>
         @endif
         <a href="{{ $mapUrl }}" target="_blank" rel="noopener" class="pp-cur-card__map-chip" onclick="event.stopPropagation()">

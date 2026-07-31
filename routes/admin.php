@@ -35,6 +35,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('curations/{curation}/toggle-publish', [CurationController::class, 'togglePublish'])->name('admin.curations.toggle-publish');
     Route::post('curations/{curation}/places', [CurationController::class, 'addPlace'])->name('admin.curations.add-place');
     Route::put('curations/places/{place}', [CurationController::class, 'updatePlace'])->name('admin.curations.update-place');
+    Route::post('curations/places/{place}/replace', [CurationController::class, 'replacePlace'])->name('admin.curations.replace-place');
     Route::delete('curations/places/{place}', [CurationController::class, 'removePlace'])->name('admin.curations.remove-place');
     Route::post('curations/{curation}/reorder', [CurationController::class, 'reorderPlaces'])->name('admin.curations.reorder');
     Route::post('curations/places/{place}/photos', [CurationController::class, 'uploadPlacePhotos'])->name('admin.curations.upload-photos');

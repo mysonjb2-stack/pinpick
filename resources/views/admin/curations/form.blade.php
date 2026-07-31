@@ -93,6 +93,39 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
 .cur-place__order-btn { width: 22px; height: 22px; border: 1px solid var(--ad-border); border-radius: 4px; background: var(--ad-card); font-size: 13px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ad-text-sub); padding: 0; }
 .cur-place__order-btn:hover:not(:disabled) { border-color: var(--ad-primary); color: var(--ad-primary); }
 .cur-place__order-btn:disabled { opacity: .3; cursor: default; }
+.cur-day-divider { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; background:#f0f4f8; border-radius:6px; font-size:13px; font-weight:600; color:#475569; margin:6px 0 2px; }
+.cur-day-divider__count { font-weight:400; font-size:11px; color:var(--ad-text-sub); }
+.cur-duration-wrap { display:none; }
+.cur-duration-wrap.is-visible { display:block; }
+.cur-duration-row { display:flex; align-items:center; gap:6px; }
+.cur-duration-row input[type="number"] { width:60px; padding:6px 8px; font-size:13px; text-align:center; }
+.cur-duration-row span.unit { font-size:13px; color:var(--ad-text-sub); }
+.cur-duration-label { font-size:12px; color:var(--ad-primary); font-weight:600; margin-left:4px; white-space:nowrap; }
+.cur-duration-err { font-size:11px; color:#C62828; margin-top:4px; }
+.cur-place__name-input { font-weight:600; font-size:14px; border:none; background:transparent; padding:0; width:100%; outline:none; }
+.cur-place__name-input:hover, .cur-place__name-input:focus { background:#f8fafc; border-radius:4px; padding:2px 4px; margin:-2px -4px; }
+.cur-place__addr-input { font-size:12px; color:var(--ad-text-sub); border:none; background:transparent; padding:0; width:100%; outline:none; margin-top:2px; }
+.cur-place__addr-input:hover, .cur-place__addr-input:focus { background:#f8fafc; border-radius:4px; padding:2px 4px; margin:-2px -4px; }
+.cur-replace-btn { font-size:11px; padding:2px 8px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; color:#1d4ed8; cursor:pointer; white-space:nowrap; }
+.cur-replace-btn:hover { background:#dbeafe; border-color:#60a5fa; }
+.cur-replace-modal { display:none; position:fixed; inset:0; z-index:9000; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }
+.cur-replace-modal.is-open { display:flex; }
+.cur-replace-modal__panel { background:#fff; border-radius:12px; width:90%; max-width:560px; max-height:80vh; display:flex; flex-direction:column; }
+.cur-replace-modal__head { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--ad-border); }
+.cur-replace-modal__head h3 { margin:0; font-size:15px; }
+.cur-replace-modal__close { border:none; background:none; font-size:20px; cursor:pointer; color:var(--ad-text-sub); }
+.cur-replace-modal__body { flex:1; overflow-y:auto; padding:14px 18px; }
+.cur-replace-modal__foot { padding:12px 18px; border-top:1px solid var(--ad-border); text-align:right; }
+.cur-replace-cmp { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:start; font-size:13px; margin-bottom:12px; }
+.cur-replace-cmp__arrow { font-size:18px; color:var(--ad-text-sub); padding-top:8px; }
+.cur-replace-cmp__col { padding:10px; border-radius:8px; }
+.cur-replace-cmp__col--old { background:#fef2f2; border:1px solid #fecaca; }
+.cur-replace-cmp__col--new { background:#f0fdf4; border:1px solid #bbf7d0; }
+.cur-replace-cmp__label { font-size:11px; color:var(--ad-text-sub); margin-bottom:4px; }
+.cur-replace-cmp__name { font-weight:600; }
+.cur-replace-cmp__addr { font-size:12px; color:var(--ad-text-sub); margin-top:2px; }
+.cur-manual-badge { display:inline-block; font-size:10px; padding:1px 5px; border-radius:3px; background:#fef3c7; color:#92400e; margin-left:4px; vertical-align:middle; }
+.cur-day-select { width:80px; font-size:12px; padding:3px 4px; border:1px solid var(--ad-border); border-radius:4px; background:var(--ad-card); }
 </style>
 @endpush
 
@@ -147,6 +180,17 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                         <option value="list" {{ old('type', $curation?->type) === 'list' ? 'selected' : '' }}>리스트 (맛지도형)</option>
                         <option value="course" {{ old('type', $curation?->type) === 'course' ? 'selected' : '' }}>코스 (여행코스형)</option>
                     </select>
+                </div>
+                <div class="ad-form-group cur-duration-wrap{{ old('type', $curation?->type) === 'course' ? ' is-visible' : '' }}" id="durationWrap">
+                    <label>코스 기간</label>
+                    <div class="cur-duration-row">
+                        <input type="number" class="ad-input" name="nights" id="curNights" min="0" max="30" value="{{ old('nights', $curation?->nights) }}" placeholder="-">
+                        <span class="unit">박</span>
+                        <input type="number" class="ad-input" name="days" id="curDaysField" min="1" max="31" value="{{ old('days', $curation?->days) }}" placeholder="-">
+                        <span class="unit">일</span>
+                        <span class="cur-duration-label" id="durationLabel"></span>
+                    </div>
+                    <div class="cur-duration-err" id="durationErr" style="display:none"></div>
                 </div>
                 <div class="ad-form-group">
                     <label>카테고리 *</label>
@@ -222,8 +266,9 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                         <div class="cur-place__handle" title="드래그하여 순서 변경">≡</div>
                         <div class="cur-place__num">{{ $i + 1 }}</div>
                         <div class="cur-place__body">
-                            <div class="cur-place__name">{{ $p->place_name }}</div>
-                            <div class="cur-place__addr">{{ $p->address }}</div>
+                            <input class="cur-place__name-input" data-field="place_name" value="{{ $p->place_name }}">
+                            <input class="cur-place__addr-input" data-field="address" value="{{ $p->address }}">
+                            @if($p->is_manual)<span class="cur-manual-badge">수동 수정</span>@endif
                             <div class="cur-place__gid" data-gid-row>
                                 @if($p->google_place_id)
                                 <span class="cur-place__gid-tag" title="{{ $p->google_place_id }}">G {{ \Illuminate\Support\Str::limit($p->google_place_id, 20) }}</span>
@@ -287,7 +332,12 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                                 <input class="url" data-field="source_url" value="{{ $p->source_url }}" placeholder="출처 URL">
                                 <input class="short" data-field="source_date" type="date" value="{{ $p->source_date?->format('Y-m-d') }}">
                                 @if($curation->type === 'course')
-                                <input style="width:60px" data-field="day_number" type="number" min="1" value="{{ $p->day_number }}" placeholder="Day">
+                                <select class="cur-day-select" data-field="day_number">
+                                    <option value="">미지정</option>
+                                    @for($d = 1; $d <= ($curation->days ?? 7); $d++)
+                                    <option value="{{ $d }}" {{ $p->day_number == $d ? 'selected' : '' }}>{{ $d }}일차</option>
+                                    @endfor
+                                </select>
                                 @endif
                                 <input class="short" data-field="editor_note" value="{{ $p->editor_note }}" placeholder="코멘트">
                             </div>
@@ -297,6 +347,7 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                             <button type="button" class="cur-place__order-btn" onclick="movePlaceDown(this)" title="아래로">↓</button>
                         </div>
                         <div class="cur-place__actions">
+                            <button type="button" class="cur-replace-btn" onclick="openReplace({{ $p->id }}, this)">교체</button>
                             <button type="button" class="ad-btn ad-btn--sm" onclick="savePlace({{ $p->id }}, this)">저장</button>
                             <button type="button" class="ad-btn ad-btn--sm ad-btn--danger" onclick="removePlace({{ $p->id }}, this)">삭제</button>
                         </div>
@@ -330,6 +381,35 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
     </div>
 </div>
 
+<!-- 장소 교체 모달 -->
+<div class="cur-replace-modal" id="replaceModal">
+    <div class="cur-replace-modal__panel">
+        <div class="cur-replace-modal__head">
+            <h3>장소 교체</h3>
+            <button type="button" class="cur-replace-modal__close" onclick="closeReplace()">✕</button>
+        </div>
+        <div class="cur-replace-modal__body" id="replaceBody">
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+                <input class="ad-input" id="replaceSearch" placeholder="장소명 검색" autocomplete="off" style="flex:1">
+                <button type="button" class="ad-btn ad-btn--sm" id="replaceSearchBtn" onclick="doReplaceSearch()">검색</button>
+            </div>
+            <div style="margin-bottom:12px"><button type="button" class="ad-btn ad-btn--sm" style="font-size:12px;color:var(--ad-text-sub)" onclick="showManualReplace()">검색 결과가 없나요? 수동 입력</button></div>
+            <div id="replaceResults"></div>
+            <div id="replaceManual" style="display:none">
+                <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--ad-text)">수동 입력</div>
+                <input class="ad-input" id="manualPlaceName" placeholder="장소명" style="margin-bottom:6px">
+                <input class="ad-input" id="manualAddress" placeholder="주소" style="margin-bottom:6px">
+                <input class="ad-input" id="manualPhone" placeholder="전화번호 (선택)" style="margin-bottom:6px">
+            </div>
+            <div id="replaceCompare" style="display:none"></div>
+        </div>
+        <div class="cur-replace-modal__foot" id="replaceFoot" style="display:none">
+            <button type="button" class="ad-btn" onclick="closeReplace()" style="margin-right:8px">취소</button>
+            <button type="button" class="ad-btn ad-btn--primary" id="replaceConfirmBtn" onclick="confirmReplace()">교체 확정</button>
+        </div>
+    </div>
+</div>
+
 @if($curation)
     @if($curation->status === 'pending')
         <form id="approveForm" method="POST" action="{{ route('admin.curations.approve', $curation) }}" style="display:none">@csrf</form>
@@ -348,6 +428,153 @@ const curationId = {{ $curation->id }};
 const cType = '{{ $curation->type }}';
 let searchTimer;
 let searchMode = 'domestic';
+let curDaysVal = {{ $curation->days ?? 0 }};
+let daysAutoFill = true;
+
+function getCurDays() { return parseInt(document.getElementById('curDaysField')?.value) || 0; }
+function getCurNights() { const v = document.getElementById('curNights')?.value; return v === '' ? null : parseInt(v); }
+
+function buildDaySelect(val) {
+    const dur = getCurDays() || curDaysVal || 7;
+    let h = '<select class="cur-day-select" data-field="day_number"><option value="">미지정</option>';
+    for (let d = 1; d <= dur; d++) h += '<option value="' + d + '"' + (val == d ? ' selected' : '') + '>' + d + '일차</option>';
+    return h + '</select>';
+}
+
+function updateDurationLabel() {
+    const el = document.getElementById('durationLabel');
+    const err = document.getElementById('durationErr');
+    if (!el) return;
+    const n = getCurNights(), d = getCurDays();
+    if (d === 0 && n === null) { el.textContent = ''; err.style.display = 'none'; return; }
+    const nn = n ?? 0;
+    if (nn === 0 && d === 1) el.textContent = '당일치기';
+    else if (nn === 0 && d > 1) el.textContent = '무박 ' + d + '일';
+    else if (d > 0) el.textContent = nn + '박 ' + d + '일';
+    else el.textContent = '';
+    if (d > 0 && nn >= d) {
+        err.textContent = nn + '박이면 일수는 ' + (nn + 1) + '일 이상이어야 합니다';
+        err.style.display = 'block';
+    } else {
+        err.style.display = 'none';
+    }
+}
+
+document.getElementById('curNights')?.addEventListener('input', function() {
+    const n = parseInt(this.value);
+    if (!isNaN(n) && daysAutoFill) {
+        document.getElementById('curDaysField').value = n + 1;
+        curDaysVal = n + 1;
+        rebuildDaySelects();
+        rebuildDayGroups();
+    }
+    updateDurationLabel();
+});
+
+document.getElementById('curDaysField')?.addEventListener('input', function() {
+    daysAutoFill = false;
+    const newDays = parseInt(this.value) || 0;
+    if (newDays > 0 && newDays < curDaysVal) {
+        const stranded = {};
+        document.querySelectorAll('.cur-place').forEach(card => {
+            const sel = card.querySelector('[data-field="day_number"]');
+            const val = sel ? parseInt(sel.value) : 0;
+            if (val > newDays) {
+                if (!stranded[val]) stranded[val] = 0;
+                stranded[val]++;
+            }
+        });
+        const msgs = Object.entries(stranded).map(([d, c]) => d + '일차에 장소 ' + c + '곳');
+        if (msgs.length) {
+            alert('아래 일차에 장소가 남아있어 축소할 수 없습니다:\n' + msgs.join('\n') + '\n\n해당 장소의 일차를 먼저 변경해주세요.');
+            this.value = curDaysVal;
+            return;
+        }
+    }
+    curDaysVal = newDays;
+    rebuildDaySelects();
+    rebuildDayGroups();
+    updateDurationLabel();
+});
+
+document.getElementById('curType').addEventListener('change', function() {
+    const wrap = document.getElementById('durationWrap');
+    const isCourse = this.value === 'course';
+    if (isCourse) {
+        wrap.classList.add('is-visible');
+        if (!document.querySelector('.cur-day-select')) {
+            document.querySelectorAll('.cur-place').forEach(card => {
+                const metas = card.querySelectorAll('.cur-place__meta');
+                const meta = metas[1] || metas[0];
+                if (meta && !meta.querySelector('.cur-day-select')) {
+                    const noteInput = meta.querySelector('[data-field="editor_note"]');
+                    if (noteInput) noteInput.insertAdjacentHTML('beforebegin', buildDaySelect(''));
+                }
+            });
+        } else {
+            document.querySelectorAll('.cur-day-select').forEach(s => s.style.display = '');
+        }
+        rebuildDayGroups();
+    } else {
+        wrap.classList.remove('is-visible');
+        document.querySelectorAll('.cur-day-divider').forEach(d => d.remove());
+        document.querySelectorAll('.cur-day-select').forEach(s => s.style.display = 'none');
+        renumber();
+    }
+});
+
+function rebuildDaySelects() {
+    const dur = getCurDays();
+    document.querySelectorAll('.cur-day-select').forEach(sel => {
+        const curVal = sel.value;
+        let html = '<option value="">미지정</option>';
+        for (let d = 1; d <= dur; d++) {
+            html += '<option value="' + d + '"' + (curVal == d ? ' selected' : '') + '>' + d + '일차</option>';
+        }
+        sel.innerHTML = html;
+        if (curVal && parseInt(curVal) > dur) sel.value = '';
+        sel.disabled = dur === 0;
+    });
+}
+
+function rebuildDayGroups() {
+    const list = document.getElementById('placeList');
+    if (!list || document.getElementById('curType').value !== 'course') return;
+    const dur = getCurDays();
+    list.querySelectorAll('.cur-day-divider').forEach(d => d.remove());
+    if (!dur) { renumber(); return; }
+    const cards = Array.from(list.querySelectorAll('.cur-place'));
+    const groups = {};
+    cards.forEach(card => {
+        const sel = card.querySelector('[data-field="day_number"]');
+        const day = sel ? (sel.value || '0') : '0';
+        if (!groups[day]) groups[day] = [];
+        groups[day].push(card);
+    });
+    const keys = Object.keys(groups).sort((a, b) => {
+        if (a === '0') return -1;
+        if (b === '0') return 1;
+        return parseInt(a) - parseInt(b);
+    });
+    keys.forEach(day => {
+        const label = day === '0' ? '미지정' : day + '일차';
+        const count = groups[day].length;
+        const div = document.createElement('div');
+        div.className = 'cur-day-divider';
+        div.dataset.day = day;
+        div.innerHTML = '<span>' + label + '</span><span class="cur-day-divider__count">' + count + '곳</span>';
+        list.appendChild(div);
+        groups[day].forEach(card => list.appendChild(card));
+    });
+    renumber();
+}
+
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('cur-day-select')) {
+        rebuildDayGroups();
+        saveOrder();
+    }
+});
 
 const searchInput = document.getElementById('placeSearch');
 const searchResults = document.getElementById('searchResults');
@@ -535,15 +762,13 @@ async function enrichNaverData(placeId, name, lat, lng, address) {
 function appendPlaceCard(p) {
     const list = document.getElementById('placeList');
     const idx = list.querySelectorAll('.cur-place').length;
-    const dayInput = cType === 'course'
-        ? '<input style="width:60px" data-field="day_number" type="number" min="1" value="" placeholder="Day">'
-        : '';
+    const dayInput = cType === 'course' ? buildDaySelect('') : '';
     const html = '<div class="cur-place" data-place-id="' + p.id + '">'
         + '<div class="cur-place__handle" title="드래그하여 순서 변경">≡</div>'
         + '<div class="cur-place__num">' + (idx + 1) + '</div>'
         + '<div class="cur-place__body">'
-        + '<div class="cur-place__name">' + esc(p.place_name) + '</div>'
-        + '<div class="cur-place__addr">' + esc(p.address || '') + '</div>'
+        + '<input class="cur-place__name-input" data-field="place_name" value="' + esc(p.place_name) + '">'
+        + '<input class="cur-place__addr-input" data-field="address" value="' + esc(p.address || '') + '">'
         + '<div class="cur-place__gid" data-gid-row>'
         + (p.google_place_id
             ? '<span class="cur-place__gid-tag" title="' + esc(p.google_place_id) + '">G ' + esc(p.google_place_id.substring(0,20)) + '</span>'
@@ -574,11 +799,13 @@ function appendPlaceCard(p) {
         + '<button type="button" class="cur-place__order-btn" onclick="movePlaceDown(this)" title="아래로">↓</button>'
         + '</div>'
         + '<div class="cur-place__actions">'
+        + '<button type="button" class="cur-replace-btn" onclick="openReplace(' + p.id + ', this)">교체</button>'
         + '<button type="button" class="ad-btn ad-btn--sm" onclick="savePlace(' + p.id + ', this)">저장</button>'
         + '<button type="button" class="ad-btn ad-btn--sm ad-btn--danger" onclick="removePlace(' + p.id + ', this)">삭제</button>'
         + '</div></div>';
     list.insertAdjacentHTML('beforeend', html);
-    renumber();
+    if (cType === 'course' && curDaysVal) rebuildDayGroups();
+    else renumber();
 }
 
 async function savePlace(placeId, btn) {
@@ -609,7 +836,8 @@ async function removePlace(placeId, btn) {
         });
         if ((await r.json()).success) {
             btn.closest('.cur-place').remove();
-            renumber();
+            if (document.getElementById('curType').value === 'course' && curDaysVal) rebuildDayGroups();
+            else renumber();
         }
     } catch(e) { alert('삭제 실패'); }
 }
@@ -652,13 +880,280 @@ async function clearGoogle(placeId, btn) {
     } catch(e) { alert('해제 실패'); }
 }
 
+// ── 장소 교체 모달 ──
+let replaceTargetId = null;
+let replaceTargetCard = null;
+let replaceIsOverseas = false;
+let replaceSearchResults = [];
+let replaceSelectedData = null;
+let replaceManualMode = false;
+
+function showManualReplace() {
+    document.getElementById('replaceResults').innerHTML = '';
+    document.getElementById('replaceCompare').style.display = 'none';
+    document.getElementById('replaceManual').style.display = '';
+    replaceManualMode = true;
+    replaceSelectedData = null;
+
+    const card = replaceTargetCard;
+    const searchVal = document.getElementById('replaceSearch').value.trim();
+    const manualName = document.getElementById('manualPlaceName');
+    const manualAddr = document.getElementById('manualAddress');
+    const manualPhone = document.getElementById('manualPhone');
+    if (!manualName.value) manualName.value = searchVal || (card.querySelector('[data-field="place_name"]')?.value || '');
+    if (!manualAddr.value) manualAddr.value = card.querySelector('[data-field="address"]')?.value || '';
+    if (!manualPhone.value) manualPhone.value = card.querySelector('[data-field="phone"]')?.value || '';
+    manualName.focus();
+
+    document.getElementById('replaceFoot').style.display = 'flex';
+    document.getElementById('replaceConfirmBtn').textContent = '수동 교체 확정';
+}
+
+function openReplace(placeId, btn) {
+    replaceTargetId = placeId;
+    replaceTargetCard = btn.closest('.cur-place');
+    const nameInp = replaceTargetCard.querySelector('[data-field="place_name"]');
+    replaceIsOverseas = false;
+    const card = replaceTargetCard;
+    const addrInp = card.querySelector('[data-field="address"]');
+    const addr = addrInp ? addrInp.value : '';
+    if (addr && !/[가-힣]/.test(addr)) replaceIsOverseas = true;
+
+    document.getElementById('replaceSearch').value = nameInp ? nameInp.value : '';
+    document.getElementById('replaceResults').innerHTML = '';
+    document.getElementById('replaceManual').style.display = 'none';
+    document.getElementById('manualPlaceName').value = '';
+    document.getElementById('manualAddress').value = '';
+    document.getElementById('manualPhone').value = '';
+    document.getElementById('replaceCompare').style.display = 'none';
+    document.getElementById('replaceFoot').style.display = 'none';
+    replaceSelectedData = null;
+    replaceManualMode = false;
+
+    document.getElementById('replaceModal').classList.add('is-open');
+    document.getElementById('replaceSearch').focus();
+}
+
+async function doReplaceSearch() {
+    const q = document.getElementById('replaceSearch').value.trim();
+    if (!q) return;
+    const resultsEl = document.getElementById('replaceResults');
+    const compareEl = document.getElementById('replaceCompare');
+    compareEl.style.display = 'none';
+    document.getElementById('replaceManual').style.display = 'none';
+    document.getElementById('replaceFoot').style.display = 'none';
+    replaceManualMode = false;
+    replaceSelectedData = null;
+
+    resultsEl.innerHTML = '<div style="padding:8px;color:var(--ad-text-sub)">검색 중...</div>';
+
+    const endpoint = replaceIsOverseas
+        ? '/api/search/overseas?q=' + encodeURIComponent(q)
+        : '/api/search?q=' + encodeURIComponent(q);
+
+    try {
+        const r = await fetch(endpoint);
+        const data = await r.json();
+        const docs = data.documents || [];
+        if (!docs.length) {
+            resultsEl.innerHTML = '<div style="padding:8px;color:var(--ad-text-sub)">검색 결과가 없습니다.</div>';
+            return;
+        }
+        replaceSearchResults = docs.slice(0, 10);
+        resultsEl.innerHTML = replaceSearchResults.map((d, i) =>
+            '<div class="cur-sr" data-ridx="' + i + '" style="cursor:pointer">'
+            + '<div class="cur-sr__name">' + esc(d.place_name) + ' <small>' + esc(d.category_group_name || '') + '</small></div>'
+            + '<div class="cur-sr__addr">' + esc(d.road_address_name || d.address_name || '') + '</div>'
+            + '</div>'
+        ).join('');
+        resultsEl.querySelectorAll('.cur-sr').forEach(el => {
+            el.addEventListener('click', () => selectReplaceResult(parseInt(el.dataset.ridx)));
+        });
+    } catch(e) {
+        resultsEl.innerHTML = '<div style="padding:8px;color:#c00">검색 오류: ' + esc(e.message) + '</div>';
+    }
+}
+
+document.getElementById('replaceSearch')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); doReplaceSearch(); }
+});
+
+function selectReplaceResult(idx) {
+    const d = replaceSearchResults[idx];
+    if (!d) return;
+    replaceSelectedData = d;
+
+    const oldCard = replaceTargetCard;
+    const oldName = oldCard.querySelector('[data-field="place_name"]')?.value || '';
+    const oldAddr = oldCard.querySelector('[data-field="address"]')?.value || '';
+    const oldPhone = oldCard.querySelector('[data-field="phone"]')?.value || '';
+
+    const newAddr = d.road_address_name || d.address_name || '';
+    const newPhone = d.phone || '';
+
+    const compareEl = document.getElementById('replaceCompare');
+    compareEl.innerHTML = '<table class="cur-replace-cmp">'
+        + '<thead><tr><th></th><th>기존</th><th>신규</th></tr></thead>'
+        + '<tbody>'
+        + '<tr><td>장소명</td><td>' + esc(oldName) + '</td><td>' + esc(d.place_name) + '</td></tr>'
+        + '<tr><td>주소</td><td>' + esc(oldAddr) + '</td><td>' + esc(newAddr) + '</td></tr>'
+        + '<tr><td>전화번호</td><td>' + esc(oldPhone) + '</td><td>' + esc(newPhone) + '</td></tr>'
+        + '</tbody></table>';
+    compareEl.style.display = '';
+
+    document.getElementById('replaceResults').innerHTML = '';
+    document.getElementById('replaceFoot').style.display = 'flex';
+}
+
+async function confirmReplace() {
+    if (!replaceTargetId) return;
+    const btn = document.getElementById('replaceConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = '교체 중...';
+
+    if (replaceManualMode) {
+        const name = document.getElementById('manualPlaceName').value.trim();
+        const addr = document.getElementById('manualAddress').value.trim();
+        const phone = document.getElementById('manualPhone').value.trim();
+        if (!name) { alert('장소명을 입력해주세요.'); btn.disabled = false; btn.textContent = '수동 교체 확정'; return; }
+
+        const fields = { place_name: name, address: addr, phone: phone };
+        try {
+            const r = await fetch('/admin/curations/places/' + replaceTargetId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify(fields),
+            });
+            const data = await r.json();
+            if (data.success) {
+                const card = replaceTargetCard;
+                const nameInp = card.querySelector('[data-field="place_name"]');
+                const addrInp = card.querySelector('[data-field="address"]');
+                const phoneInp = card.querySelector('[data-field="phone"]');
+                if (nameInp) nameInp.value = name;
+                if (addrInp) addrInp.value = addr;
+                if (phoneInp) phoneInp.value = phone;
+
+                if (!card.querySelector('.cur-manual-badge')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'cur-manual-badge';
+                    badge.textContent = '수동 수정';
+                    const addrEl = card.querySelector('[data-field="address"]');
+                    if (addrEl) addrEl.after(badge);
+                }
+
+                closeReplace();
+            } else {
+                alert(data.message || '저장 실패');
+                btn.disabled = false; btn.textContent = '수동 교체 확정';
+            }
+        } catch(e) {
+            alert('저장 실패: ' + e.message);
+            btn.disabled = false; btn.textContent = '수동 교체 확정';
+        }
+        return;
+    }
+
+    if (!replaceSelectedData) return;
+    const d = replaceSelectedData;
+
+    const body = {
+        place_name: d.place_name,
+        address: d.road_address_name || d.address_name || '',
+        jibeon_address: d.address_name || '',
+        latitude: d.y,
+        longitude: d.x,
+        phone: d.phone || '',
+        building_name: '',
+        external_place_id: d.id || '',
+        is_overseas: replaceIsOverseas,
+    };
+
+    try {
+        const r = await fetch('/admin/curations/places/' + replaceTargetId + '/replace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        if (data.success && data.place) {
+            const p = data.place;
+            const card = replaceTargetCard;
+            const nameInp = card.querySelector('[data-field="place_name"]');
+            const addrInp = card.querySelector('[data-field="address"]');
+            const phoneInp = card.querySelector('[data-field="phone"]');
+            const bnInp = card.querySelector('[data-field="building_name"]');
+            if (nameInp) nameInp.value = p.place_name || '';
+            if (addrInp) addrInp.value = p.address || '';
+            if (phoneInp) phoneInp.value = p.phone || '';
+            if (bnInp) bnInp.value = p.building_name || '';
+
+            card.querySelector('.cur-manual-badge')?.remove();
+
+            const gidRow = card.querySelector('[data-gid-row]');
+            if (gidRow) {
+                if (data.google?.google_place_id) {
+                    const short = data.google.google_place_id.length > 20 ? data.google.google_place_id.substring(0, 20) + '…' : data.google.google_place_id;
+                    const info = data.google.review_count ? ' (' + data.google.rating + '점/' + data.google.review_count + '개)' : '';
+                    gidRow.innerHTML = '<span class="cur-place__gid-tag" title="' + esc(data.google.google_place_id) + '">G ' + esc(short) + info + '</span>'
+                        + '<button type="button" class="cur-place__gid-btn" onclick="matchGoogle(' + replaceTargetId + ',this)" title="재검색">🔄</button>'
+                        + '<button type="button" class="cur-place__gid-btn cur-place__gid-btn--del" onclick="clearGoogle(' + replaceTargetId + ',this)" title="해제">✕</button>';
+                } else {
+                    gidRow.innerHTML = '<button type="button" class="cur-place__gid-btn" onclick="matchGoogle(' + replaceTargetId + ',this)">G 매칭</button>';
+                }
+            }
+
+            if (!replaceIsOverseas) {
+                enrichNaverData(replaceTargetId, p.place_name, p.latitude, p.longitude, p.address);
+            }
+
+            closeReplace();
+        } else {
+            alert(data.message || '교체 실패');
+            btn.disabled = false;
+            btn.textContent = '교체 확정';
+        }
+    } catch(e) {
+        alert('교체 실패: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '교체 확정';
+    }
+}
+
+function closeReplace() {
+    document.getElementById('replaceModal').classList.remove('is-open');
+    document.getElementById('replaceConfirmBtn').textContent = '교체 확정';
+    document.getElementById('replaceConfirmBtn').disabled = false;
+    replaceTargetId = null;
+    replaceTargetCard = null;
+    replaceSelectedData = null;
+    replaceSearchResults = [];
+}
+
+document.getElementById('replaceModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeReplace();
+});
+
 function renumber() {
     const cards = document.querySelectorAll('.cur-place');
+    const isCourse = document.getElementById('curType').value === 'course';
     cards.forEach((card, i) => {
         card.querySelector('.cur-place__num').textContent = i + 1;
         const btns = card.querySelectorAll('.cur-place__order-btn');
-        if (btns[0]) btns[0].disabled = i === 0;
-        if (btns[1]) btns[1].disabled = i === cards.length - 1;
+        if (isCourse) {
+            const myDay = card.querySelector('[data-field="day_number"]')?.value || '';
+            let prev = card.previousElementSibling;
+            while (prev && prev.classList.contains('cur-day-divider')) prev = prev.previousElementSibling;
+            const canUp = prev && prev.classList.contains('cur-place') && (prev.querySelector('[data-field="day_number"]')?.value || '') === myDay;
+            let next = card.nextElementSibling;
+            while (next && next.classList.contains('cur-day-divider')) next = next.nextElementSibling;
+            const canDown = next && next.classList.contains('cur-place') && (next.querySelector('[data-field="day_number"]')?.value || '') === myDay;
+            if (btns[0]) btns[0].disabled = !canUp;
+            if (btns[1]) btns[1].disabled = !canDown;
+        } else {
+            if (btns[0]) btns[0].disabled = i === 0;
+            if (btns[1]) btns[1].disabled = i === cards.length - 1;
+        }
     });
     document.getElementById('placeCount').textContent = cards.length + '개';
 }
@@ -681,8 +1176,13 @@ async function saveOrder() {
 
 function movePlaceUp(btn) {
     const card = btn.closest('.cur-place');
-    const prev = card.previousElementSibling;
+    let prev = card.previousElementSibling;
+    while (prev && prev.classList.contains('cur-day-divider')) prev = prev.previousElementSibling;
     if (!prev || !prev.classList.contains('cur-place')) return;
+    if (document.getElementById('curType').value === 'course') {
+        const myDay = card.querySelector('[data-field="day_number"]')?.value || '';
+        if ((prev.querySelector('[data-field="day_number"]')?.value || '') !== myDay) return;
+    }
     card.parentNode.insertBefore(card, prev);
     renumber();
     saveOrder();
@@ -690,8 +1190,13 @@ function movePlaceUp(btn) {
 
 function movePlaceDown(btn) {
     const card = btn.closest('.cur-place');
-    const next = card.nextElementSibling;
+    let next = card.nextElementSibling;
+    while (next && next.classList.contains('cur-day-divider')) next = next.nextElementSibling;
     if (!next || !next.classList.contains('cur-place')) return;
+    if (document.getElementById('curType').value === 'course') {
+        const myDay = card.querySelector('[data-field="day_number"]')?.value || '';
+        if ((next.querySelector('[data-field="day_number"]')?.value || '') !== myDay) return;
+    }
     card.parentNode.insertBefore(next, card);
     renumber();
     saveOrder();
@@ -723,6 +1228,11 @@ function movePlaceDown(btn) {
         if (!dragEl || e.dataTransfer.types.includes('text/x-photo-reorder')) return;
         const target = e.target.closest('.cur-place');
         if (!target || target === dragEl) return;
+        if (document.getElementById('curType').value === 'course') {
+            const dragDay = dragEl.querySelector('[data-field="day_number"]')?.value || '';
+            const targetDay = target.querySelector('[data-field="day_number"]')?.value || '';
+            if (dragDay !== targetDay) return;
+        }
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         list.querySelectorAll('.cur-place').forEach(c => c.classList.remove('is-place-over'));
@@ -739,6 +1249,11 @@ function movePlaceDown(btn) {
         e.preventDefault();
         const target = e.target.closest('.cur-place');
         if (!target || target === dragEl) return;
+        if (document.getElementById('curType').value === 'course') {
+            const dragDay = dragEl.querySelector('[data-field="day_number"]')?.value || '';
+            const targetDay = target.querySelector('[data-field="day_number"]')?.value || '';
+            if (dragDay !== targetDay) return;
+        }
         const cards = Array.from(list.querySelectorAll('.cur-place'));
         const fromIdx = cards.indexOf(dragEl);
         const toIdx = cards.indexOf(target);
@@ -969,6 +1484,27 @@ document.addEventListener('keydown', function(e) {
 document.getElementById('curForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const form = this;
+
+    if (document.getElementById('curType').value === 'course') {
+        const n = getCurNights(), d = getCurDays();
+        if (n !== null && d > 0 && n >= d) {
+            alert(n + '박이면 일수는 ' + (n + 1) + '일 이상이어야 합니다.');
+            return;
+        }
+        if (d > 0) {
+            const overflow = [];
+            document.querySelectorAll('.cur-place').forEach(card => {
+                const sel = card.querySelector('[data-field="day_number"]');
+                const val = sel ? parseInt(sel.value) : 0;
+                if (val > d) overflow.push(card.querySelector('[data-field="place_name"]').value);
+            });
+            if (overflow.length) {
+                alert(d + '일차를 초과하는 장소:\n' + overflow.join(', ') + '\n\n일차를 재지정해주세요.');
+                return;
+            }
+        }
+    }
+
     const cards = document.querySelectorAll('.cur-place');
     const promises = [];
 
@@ -1002,6 +1538,28 @@ const toggleBtn = document.getElementById('togglePublishBtn');
 if (toggleBtn) {
     toggleBtn.addEventListener('click', async () => {
         toggleBtn.disabled = true;
+        if (document.getElementById('curType').value === 'course' && toggleBtn.textContent.includes('발행하기')) {
+            const dur = getCurDays();
+            const cards = document.querySelectorAll('.cur-place');
+            let unassigned = 0;
+            const dayUsed = new Set();
+            cards.forEach(card => {
+                const sel = card.querySelector('[data-field="day_number"]');
+                if (!sel || !sel.value) unassigned++;
+                else dayUsed.add(parseInt(sel.value));
+            });
+            const warnings = [];
+            if (unassigned > 0) warnings.push('일차 미지정 장소 ' + unassigned + '곳');
+            if (dur) {
+                const empty = [];
+                for (let d = 1; d <= dur; d++) { if (!dayUsed.has(d)) empty.push(d + '일차'); }
+                if (empty.length) warnings.push('장소 없는 일차: ' + empty.join(', '));
+            }
+            if (warnings.length && !confirm('코스 확인사항:\n- ' + warnings.join('\n- ') + '\n\n그래도 발행할까요?')) {
+                toggleBtn.disabled = false;
+                return;
+            }
+        }
         try {
             const r = await fetch('/admin/curations/' + curationId + '/toggle-publish', {
                 method: 'POST',
@@ -1154,6 +1712,9 @@ document.getElementById('tourModal').addEventListener('click', function(e) {
 });
 
 renumber();
+if (cType === 'course' && curDaysVal) rebuildDayGroups();
+updateDurationLabel();
+if (document.getElementById('curNights')?.value !== '' && document.getElementById('curDaysField')?.value !== '') daysAutoFill = false;
 </script>
 @endpush
 @endif

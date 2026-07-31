@@ -430,7 +430,9 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
             draggable: true, pinchZoom: true, scrollWheel: false, disableDoubleTapZoom: false,
             mapTypeControl: false, zoomControl: false, scaleControl: false, mapDataControl: false, logoControl: false
         });
-        new naver.maps.Marker({ position: pos, map: map, title: name });
+        new naver.maps.Marker({ position: pos, map: map, title: name,
+            icon: { content: '<div style="width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;border:2px solid #FF6B00;box-shadow:0 2px 6px rgba(0,0,0,.2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2.5" stroke-linecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>', anchor: new naver.maps.Point(14, 14) }
+        });
     }
     function initGoogle(){
         if (typeof google === 'undefined' || !google.maps) return;
@@ -439,7 +441,9 @@ window.ppOpenRoute = function(provider, lat, lng, name) {
             center: pos, zoom: 16,
             disableDefaultUI: true, zoomControl: false, gestureHandling: 'greedy'
         });
-        new google.maps.Marker({ position: pos, map, title: name });
+        new google.maps.Marker({ position: pos, map, title: name,
+            icon: { url: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="#fff" stroke="#FF6B00" stroke-width="2"/><g transform="translate(7,7)" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round"><path d="M7 1C4.79 1 3 2.79 3 5c0 3 4 7.5 4 7.5S11 8 11 5c0-2.21-1.79-4-4-4z"/><circle cx="7" cy="5" r="1.5"/></g></svg>'), scaledSize: new google.maps.Size(28, 28), anchor: new google.maps.Point(14, 14) }
+        });
     }
 
     if (overseas) {

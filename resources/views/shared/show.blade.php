@@ -317,9 +317,11 @@
     const HEADER_H = 66;
 
     function pinHtml(num, hl) {
-        const bg = hl ? '#e67e22' : 'var(--pp-primary,#2b211e)';
-        const sc = hl ? 'transform:scale(1.25);' : '';
-        return '<div style="background:'+bg+';color:#fff;width:'+pinSize+'px;height:'+pinSize+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .15s;'+sc+'">'+num+'</div>';
+        const bg = hl ? '#FF6B00' : '#fff';
+        const clr = hl ? '#fff' : '#C2410C';
+        const bdr = hl ? '2px solid #fff' : '2px solid #FF6B00';
+        const sc = hl ? 'transform:scale(1.15);box-shadow:0 4px 12px rgba(0,0,0,.35);' : '';
+        return '<div style="background:'+bg+';color:'+clr+';width:'+pinSize+'px;height:'+pinSize+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:'+bdr+';box-shadow:0 2px 6px rgba(0,0,0,.2);transition:transform .15s;'+sc+'">'+num+'</div>';
     }
 
     function getSheetTopPx() {

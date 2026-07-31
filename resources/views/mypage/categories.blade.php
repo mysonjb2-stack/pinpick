@@ -58,7 +58,7 @@
     function toast(msg, err){
         const t = document.createElement('div');
         t.textContent = msg;
-        t.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:' + (err?'#b4443a':'#2b211e') + ';color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22);';
+        t.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:' + (err?'#B91C1C':'#1A1A1A') + ';color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22);';
         document.body.appendChild(t);
         setTimeout(()=>t.remove(), 2000);
     }

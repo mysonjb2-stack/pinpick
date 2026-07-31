@@ -17,7 +17,7 @@
 }
 .pp-cur-map__skel::after {
   content: ''; width: 28px; height: 28px; border-radius: 50%;
-  border: 3px solid var(--pp-line, #e0d8d0); border-top-color: var(--pp-primary, #2b211e);
+  border: 3px solid var(--pp-line, #E5E7EB); border-top-color: var(--pp-primary, #1A1A1A);
   animation: curMapSpin .8s linear infinite;
 }
 @keyframes curMapSpin { to { transform: rotate(360deg); } }
@@ -183,7 +183,7 @@
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .pp-cur-card.is-selected { border-color: var(--pp-primary); background: rgba(43,33,30,.04); }
-.pp-cur-card.is-focused { border-color: var(--pp-primary, #e67e22); background: #fef9f4; }
+.pp-cur-card.is-focused { border-color: #FF6B00; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 
 .pp-cur-card__top {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
@@ -196,7 +196,7 @@
 .pp-cur-card__num {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; border-radius: 50%;
-  background: var(--pp-primary, #2b211e); color: #fff;
+  background: var(--pp-primary, #1A1A1A); color: #fff;
   font-size: 11px; font-weight: 700; flex-shrink: 0;
 }
 .pp-cur-card__sub {
@@ -271,14 +271,14 @@
 /* Editor note */
 .pp-cur-card__note {
   font-size: 13px; color: var(--pp-text-sub); margin: 12px 0 0;
-  padding: 8px 12px; border-left: 3px solid var(--pp-primary, #e67e22);
+  padding: 8px 12px; border-left: 3px solid var(--pp-primary, #FF6B00);
   background: var(--pp-bg-soft, #faf7f5); border-radius: 0 6px 6px 0;
   font-style: italic; line-height: 1.5;
 }
 .pp-cur-card__source {
   font-size: 11.5px; color: var(--pp-text-sub); margin-top: 8px;
 }
-.pp-cur-card__source a { color: var(--pp-accent, #2f6fed); text-decoration: underline; text-underline-offset: 2px; }
+.pp-cur-card__source a { color: var(--pp-accent-text); text-decoration: underline; text-underline-offset: 2px; }
 .pp-cur-card__day {
   display: inline-block; padding: 2px 8px; border-radius: 4px;
   background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 600;
@@ -348,7 +348,7 @@
 }
 .pp-cur-card__grev-more {
   display: inline-block; margin-top: 6px; font-size: 11.5px;
-  color: var(--pp-accent, #2f6fed); text-decoration: none;
+  color: var(--pp-accent-text); text-decoration: none;
 }
 .pp-cur-card__grev-more:hover { text-decoration: underline; }
 

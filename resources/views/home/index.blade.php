@@ -610,8 +610,8 @@
     <div class="pp-sel-move-sheet__backdrop" data-role="close-move"></div>
     <div class="pp-sel-move-sheet__panel">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <h3 style="font-size:16px;font-weight:700;color:var(--pp-text,#2b211e);margin:0">이동할 카테고리 선택</h3>
-            <button type="button" style="border:none;background:none;font-size:20px;color:var(--pp-text-sub,#6b5e52);cursor:pointer;padding:4px" data-role="close-move">✕</button>
+            <h3 style="font-size:16px;font-weight:700;color:var(--pp-text,#1A1A1A);margin:0">이동할 카테고리 선택</h3>
+            <button type="button" style="border:none;background:none;font-size:20px;color:var(--pp-text-sub,#6B7280);cursor:pointer;padding:4px" data-role="close-move">✕</button>
         </div>
         <div class="pp-sel-move-sheet__list" id="ppSelMoveList"></div>
     </div>
@@ -673,21 +673,21 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
     overlay.innerHTML = `
         <div id="ppSyncPanel" style="background:#fff;border-radius:18px 18px 0 0;padding:24px 22px calc(20px + env(safe-area-inset-bottom,0px));max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 -4px 30px rgba(0,0,0,.15)">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-                <h3 style="font-size:16px;font-weight:700;color:#2b211e;margin:0">비회원 장소 동기화</h3>
-                <button id="ppSyncClose" style="border:none;background:none;font-size:20px;color:#6b5e52;cursor:pointer;padding:4px">✕</button>
+                <h3 style="font-size:16px;font-weight:700;color:#1A1A1A;margin:0">비회원 장소 동기화</h3>
+                <button id="ppSyncClose" style="border:none;background:none;font-size:20px;color:#6B7280;cursor:pointer;padding:4px">✕</button>
             </div>
             <div id="ppSyncStep1">
-                <div style="font-size:13.5px;color:#6b5e52;line-height:1.5;margin-bottom:20px">비회원으로 등록된 장소 <b>${list.length}개</b>를 내 계정으로 가져올까요?</div>
+                <div style="font-size:13.5px;color:#6B7280;line-height:1.5;margin-bottom:20px">비회원으로 등록된 장소 <b>${list.length}개</b>를 내 계정으로 가져올까요?</div>
                 <div style="display:flex;gap:8px">
-                    <button id="ppGuestSkip" style="flex:1;padding:12px 0;border:1px solid #e0d6cc;border-radius:10px;background:#fff;color:#6b5e52;font-size:14px;font-weight:600;cursor:pointer">안할래요</button>
-                    <button id="ppGuestNext" style="flex:1;padding:12px 0;border:none;border-radius:10px;background:#2b211e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">동기화</button>
+                    <button id="ppGuestSkip" style="flex:1;padding:12px 0;border:1px solid #E5E7EB;border-radius:10px;background:#fff;color:#6B7280;font-size:14px;font-weight:600;cursor:pointer">안할래요</button>
+                    <button id="ppGuestNext" style="flex:1;padding:12px 0;border:none;border-radius:10px;background:#1A1A1A;color:#fff;font-size:14px;font-weight:600;cursor:pointer">동기화</button>
                 </div>
             </div>
             <div id="ppSyncStep2" style="display:none;flex:1;overflow-y:auto">
-                <div style="font-size:13px;color:#6b5e52;margin-bottom:14px">카테고리를 선택해주세요</div>
+                <div style="font-size:13px;color:#6B7280;margin-bottom:14px">카테고리를 선택해주세요</div>
                 <div id="ppSyncGroups"></div>
                 <div style="margin-top:16px">
-                    <button id="ppSyncImport" style="width:100%;padding:13px 0;border:none;border-radius:10px;background:#2b211e;color:#fff;font-size:14px;font-weight:600;cursor:pointer">가져오기</button>
+                    <button id="ppSyncImport" style="width:100%;padding:13px 0;border:none;border-radius:10px;background:#1A1A1A;color:#fff;font-size:14px;font-weight:600;cursor:pointer">가져오기</button>
                 </div>
             </div>
         </div>`;
@@ -726,12 +726,12 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
             const defaultInputVal = isLabeled ? escHtml(g.label.slice(0, 30)) : '';
 
             const div = document.createElement('div');
-            div.style.cssText = 'margin-bottom:14px;padding:14px;border:1px solid #e0d6cc;border-radius:12px';
+            div.style.cssText = 'margin-bottom:14px;padding:14px;border:1px solid #E5E7EB;border-radius:12px';
             div.innerHTML = `
-                <div style="font-size:14px;font-weight:600;color:#2b211e;margin-bottom:4px">${title} <span style="color:#6b5e52;font-weight:400">(${g.places.length}개)</span></div>
-                <select data-group="${gi}" style="width:100%;padding:9px 10px;border:1px solid #e0d6cc;border-radius:8px;font-size:13.5px;color:#2b211e;background:#fff;margin-top:8px">${optionsHtml}</select>
+                <div style="font-size:14px;font-weight:600;color:#1A1A1A;margin-bottom:4px">${title} <span style="color:#6B7280;font-weight:400">(${g.places.length}개)</span></div>
+                <select data-group="${gi}" style="width:100%;padding:9px 10px;border:1px solid #E5E7EB;border-radius:8px;font-size:13.5px;color:#1A1A1A;background:#fff;margin-top:8px">${optionsHtml}</select>
                 <div data-input-wrap="${gi}" style="margin-top:8px">
-                    <input data-cat-input="${gi}" type="text" maxlength="30" value="${defaultInputVal}" placeholder="카테고리 이름" style="width:100%;padding:9px 10px;border:1px solid #e0d6cc;border-radius:8px;font-size:13.5px;color:#2b211e;background:#fff;box-sizing:border-box;outline:none">
+                    <input data-cat-input="${gi}" type="text" maxlength="30" value="${defaultInputVal}" placeholder="카테고리 이름" style="width:100%;padding:9px 10px;border:1px solid #E5E7EB;border-radius:8px;font-size:13.5px;color:#1A1A1A;background:#fff;box-sizing:border-box;outline:none">
                     <div data-cat-hint="${gi}" style="font-size:12px;margin-top:4px;display:none"></div>
                 </div>
             `;
@@ -750,7 +750,7 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
                 const m = findMatchCat(val);
                 if (m) {
                     hint.textContent = "기존 '" + m.name + "' 카테고리에 추가돼요";
-                    hint.style.cssText = 'font-size:12px;margin-top:4px;color:var(--pp-primary,#2b211e)';
+                    hint.style.cssText = 'font-size:12px;margin-top:4px;color:var(--pp-primary,#1A1A1A)';
                 } else if (!val && sel.value === '__new__') {
                     hint.textContent = '';
                     hint.style.display = 'none';
@@ -771,8 +771,8 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
                 }
             });
             input.addEventListener('input', checkHint);
-            input.addEventListener('focus', () => { input.style.borderColor = 'var(--pp-primary,#2b211e)'; });
-            input.addEventListener('blur', () => { input.style.borderColor = '#e0d6cc'; });
+            input.addEventListener('focus', () => { input.style.borderColor = 'var(--pp-primary,#1A1A1A)'; });
+            input.addEventListener('blur', () => { input.style.borderColor = '#E5E7EB'; });
             checkHint();
         });
     }
@@ -836,7 +836,7 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
                 overlay.remove();
                 const toast = document.createElement('div');
                 toast.textContent = `장소 ${j.imported || list.length}개를 내 지도로 옮겼어요`;
-                toast.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#2b211e;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22)';
+                toast.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1A1A1A;color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.22)';
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 2400);
                 setTimeout(() => location.reload(), 600);

@@ -42,14 +42,26 @@ class CollectorController extends Controller
         }
 
         $snippet = $resp->json()['items'][0]['snippet'];
-        $text = $snippet['title'] . "\n\n" . ($snippet['description'] ?? '');
+        $description = $snippet['description'] ?? '';
 
-        $places = $this->extractPlaces($text);
+        $chapters = $this->parseChapters($description);
+
+        $pinnedComment = $this->fetchPinnedComment($videoId, $apiKey);
+
+        $textParts = [$snippet['title'], $description];
+        if ($pinnedComment) {
+            $textParts[] = "--- 고정 댓글 ---\n" . $pinnedComment;
+        }
+        $text = implode("\n\n", $textParts);
+
+        $places = $this->extractPlaces($text, $chapters);
         if ($places === null) {
             return response()->json(['error' => '장소 추출에 실패했습니다.'], 500);
         }
 
         $matched = $this->matchPlacesKakao($places);
+
+        $hasCourse = collect($places)->contains(fn($p) => !empty($p['day']));
 
         return response()->json([
             'source' => [
@@ -59,6 +71,9 @@ class CollectorController extends Controller
                 'url' => 'https://www.youtube.com/watch?v=' . $videoId,
                 'title' => $snippet['title'] ?? '',
             ],
+            'has_chapters' => !empty($chapters),
+            'has_pinned_comment' => !empty($pinnedComment),
+            'detected_type' => $hasCourse ? 'course' : 'list',
             'places' => $matched,
         ]);
     }
@@ -74,8 +89,11 @@ class CollectorController extends Controller
 
         $matched = $this->matchPlacesKakao($places);
 
+        $hasCourse = collect($places)->contains(fn($p) => !empty($p['day']));
+
         return response()->json([
             'source' => ['type' => 'text'],
+            'detected_type' => $hasCourse ? 'course' : 'list',
             'places' => $matched,
         ]);
     }
@@ -104,14 +122,21 @@ class CollectorController extends Controller
             'places.*.source_date' => 'nullable|date',
             'places.*.editor_note' => 'nullable|string',
             'places.*.phone' => 'nullable|string',
+            'places.*.day_number' => 'nullable|integer',
+            'places.*.sort_order' => 'nullable|integer',
+            'places.*.transit_hint' => 'nullable|string|max:100',
             'source_title' => 'nullable|string',
             'category' => 'nullable|string',
+            'draft_type' => 'nullable|string|in:list,course',
+            'nights' => 'nullable|integer|min:0|max:30',
+            'days' => 'nullable|integer|min:1|max:31',
         ]);
 
         $cats = array_keys(config('curation_categories'));
         $category = in_array($request->category, $cats) ? $request->category : ($cats[0] ?? 'food');
 
         $title = $request->source_title ?: '수집 도우미 초안 ' . now()->format('m/d H:i');
+        $draftType = $request->draft_type ?: 'list';
 
         $regionLabel = $this->buildRegionLabel($request->places);
 
@@ -125,11 +150,27 @@ class CollectorController extends Controller
             }
         }
 
+        $daysVal = null;
+        $nightsVal = null;
+        if ($draftType === 'course') {
+            $daysVal = $request->days;
+            $nightsVal = $request->nights;
+            if ($daysVal === null) {
+                $maxDay = collect($request->places)->max('day_number');
+                if ($maxDay) $daysVal = (int) $maxDay;
+            }
+            if ($nightsVal === null && $daysVal) {
+                $nightsVal = max(0, $daysVal - 1);
+            }
+        }
+
         $curation = Curation::create([
             'title' => $title,
             'slug' => Curation::generateSlug($title),
             'status' => 'draft',
-            'type' => 'list',
+            'type' => $draftType,
+            'nights' => $nightsVal,
+            'days' => $daysVal,
             'category' => $category,
             'description' => $description,
             'region_label' => $regionLabel,
@@ -137,7 +178,14 @@ class CollectorController extends Controller
 
         $googleService = app(GoogleReviewService::class);
 
-        foreach ($request->places as $i => $p) {
+        $sortedPlaces = collect($request->places)->sort(function ($a, $b) {
+            $da = $a['day_number'] ?? PHP_INT_MAX;
+            $db = $b['day_number'] ?? PHP_INT_MAX;
+            if ($da !== $db) return $da <=> $db;
+            return ($a['sort_order'] ?? PHP_INT_MAX) <=> ($b['sort_order'] ?? PHP_INT_MAX);
+        })->values()->all();
+
+        foreach ($sortedPlaces as $i => $p) {
             $isOverseas = ($p['latitude'] ?? 0) < 30 || ($p['latitude'] ?? 0) > 44
                 || ($p['longitude'] ?? 0) < 124 || ($p['longitude'] ?? 0) > 132;
 
@@ -155,8 +203,14 @@ class CollectorController extends Controller
                 'source_date' => $p['source_date'] ?? null,
                 'editor_note' => $p['editor_note'] ?? null,
                 'phone' => $p['phone'] ?? null,
+                'day_number' => $p['day_number'] ?? null,
                 'sort_order' => $i,
+                'transit_hint' => $p['transit_hint'] ?? null,
             ];
+
+            if (!$isOverseas) {
+                $placeData['dong_label'] = $this->parseDongFromAddress($p['address'] ?? '');
+            }
 
             $place = CurationPlace::create($placeData);
 
@@ -190,7 +244,54 @@ class CollectorController extends Controller
         return null;
     }
 
-    private function extractPlaces(string $text): ?array
+    private function parseChapters(string $description): array
+    {
+        $chapters = [];
+        $lines = explode("\n", $description);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (preg_match('/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$/', $line, $m)) {
+                $chapters[] = [
+                    'timestamp' => $m[1],
+                    'title' => trim($m[2]),
+                ];
+            }
+        }
+
+        return $chapters;
+    }
+
+    private function fetchPinnedComment(string $videoId, string $apiKey): ?string
+    {
+        try {
+            $resp = Http::timeout(8)->get('https://www.googleapis.com/youtube/v3/commentThreads', [
+                'part' => 'snippet',
+                'videoId' => $videoId,
+                'order' => 'relevance',
+                'maxResults' => 5,
+                'key' => $apiKey,
+            ]);
+
+            if (!$resp->successful()) return null;
+
+            $items = $resp->json()['items'] ?? [];
+            if (empty($items)) return null;
+
+            foreach ($items as $item) {
+                $topLevel = $item['snippet']['topLevelComment']['snippet'] ?? [];
+                if (!empty($topLevel['textOriginal'])) {
+                    return mb_substr($topLevel['textOriginal'], 0, 4000);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::info('Collector: Comment fetch failed', ['error' => $e->getMessage()]);
+        }
+
+        return null;
+    }
+
+    private function extractPlaces(string $text, array $chapters = []): ?array
     {
         $apiKey = config('services.anthropic.api_key');
         if (!$apiKey) {
@@ -198,8 +299,17 @@ class CollectorController extends Controller
             return null;
         }
 
+        $chapterSection = '';
+        if (!empty($chapters)) {
+            $chapterLines = array_map(
+                fn($c) => $c['timestamp'] . ' ' . $c['title'],
+                $chapters
+            );
+            $chapterSection = "\n\n참고: 이 영상에는 챕터가 있습니다. 챕터 순서가 곧 방문 순서입니다.\n챕터 목록:\n" . implode("\n", $chapterLines);
+        }
+
         $prompt = <<<'PROMPT'
-아래 텍스트에서 실제 방문 가능한 장소(식당, 카페, 관광지, 숙소 등)의 상호명만 추출해주세요.
+아래 텍스트에서 실제 방문 가능한 장소(식당, 카페, 관광지, 숙소 등)를 추출해주세요.
 
 규칙:
 - 실제 상호명만 추출 (메뉴명, 브랜드 일반명, 지역명 단독은 제외)
@@ -207,11 +317,30 @@ class CollectorController extends Controller
 - 확실하지 않은 건 제외
 - JSON 배열만 출력, 다른 텍스트 없이
 
+일자(day) 인식 규칙:
+- "1일차", "Day 1", "DAY1", "첫째 날", "첫째날", "첫날" → day: 1
+- "2일차", "Day 2", "DAY2", "둘째 날", "둘째날" → day: 2
+- "3일차", "Day 3", "DAY3", "셋째 날", "셋째날" → day: 3
+- 이런 패턴으로 4일차 이상도 동일하게 처리
+- 일자 표현이 전혀 없으면 day: null (1로 추정하지 말 것)
+
+순서(order) 규칙:
+- 같은 day 내에서의 등장 순서 (1부터 시작)
+- 챕터가 있으면 챕터 순서를 따름
+- day가 null이면 전체 텍스트 내 등장 순서
+
+이동 정보(transit_hint) 규칙:
+- 이전 장소에서의 이동 방법/시간이 언급되면 기록
+- 예: "차로 20분", "도보 5분", "버스로 30분"
+- 없으면 null
+
 출력 형식:
-[{"name":"상호명","region_hint":"지역힌트(있으면)","mention_context":"언급 맥락 한 줄"}]
+[{"name":"상호명","region_hint":"지역힌트(있으면)","mention_context":"언급 맥락 한 줄","day":null,"order":1,"transit_hint":null}]
 
 장소가 없으면 빈 배열 []을 반환.
 PROMPT;
+
+        $fullPrompt = $prompt . $chapterSection;
 
         for ($attempt = 0; $attempt < 2; $attempt++) {
             try {
@@ -221,9 +350,9 @@ PROMPT;
                     'content-type' => 'application/json',
                 ])->timeout(30)->post('https://api.anthropic.com/v1/messages', [
                     'model' => 'claude-haiku-4-5-20251001',
-                    'max_tokens' => 2048,
+                    'max_tokens' => 4096,
                     'messages' => [
-                        ['role' => 'user', 'content' => $prompt . "\n\n---\n\n" . mb_substr($text, 0, 8000)],
+                        ['role' => 'user', 'content' => $fullPrompt . "\n\n---\n\n" . mb_substr($text, 0, 8000)],
                     ],
                 ]);
 
@@ -261,6 +390,9 @@ PROMPT;
                 'extracted_name' => $name,
                 'region_hint' => $hint,
                 'mention_context' => $p['mention_context'] ?? '',
+                'day' => $p['day'] ?? null,
+                'order' => $p['order'] ?? null,
+                'transit_hint' => $p['transit_hint'] ?? null,
                 'matches' => array_slice($kakaoResults, 0, 3),
             ];
         }
@@ -298,6 +430,19 @@ PROMPT;
             Log::warning('Collector: Kakao search error', ['error' => $e->getMessage()]);
             return [];
         }
+    }
+
+    private function parseDongFromAddress(string $address): ?string
+    {
+        $parts = preg_split('/\s+/', trim($address));
+        foreach ($parts as $part) {
+            if (preg_match('/(동|읍|면|리)$/', $part)) {
+                $cleaned = preg_replace('/\d+(동)$/', '$1', $part);
+                $name = preg_replace('/(동|읍|면|리)$/', '', $cleaned);
+                return ($name !== '' && mb_strlen($name) >= 2) ? $name : $cleaned;
+            }
+        }
+        return null;
     }
 
     private function shortenCategory(string $cat): string

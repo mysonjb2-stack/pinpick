@@ -89,10 +89,13 @@
 
         {{-- Detail: visible from mid --}}
         <div class="pp-cur-sheet__detail">
-            @if($curation->region_label)
+            @if($curation->region_label || $curation->duration_label)
                 <div class="pp-cur__regions">
-                    @foreach(array_map('trim', explode(',', $curation->region_label)) as $tag)
-                        <span class="pp-cur__region-chip">{{ $tag }}</span>
+                    @if($curation->duration_label)
+                        <span class="pp-cur__region-chip">{{ $curation->duration_label }}</span>
+                    @endif
+                    @foreach(array_map('trim', explode(',', $curation->region_label ?? '')) as $tag)
+                        @if($tag)<span class="pp-cur__region-chip">{{ $tag }}</span>@endif
                     @endforeach
                 </div>
             @endif
@@ -101,7 +104,7 @@
             @endif
         </div>
 
-        @if($curation->type === 'course')
+        @if($curation->type === 'course' && ($curation->days ?? 0) > 1)
         <div class="pp-cur__days" id="curDays">
             @php $days = $curation->places->pluck('day_number')->filter()->unique()->sort(); @endphp
             <button type="button" class="pp-cur__day-btn is-active" data-day="all">전체</button>
@@ -154,6 +157,7 @@
                 'memo' => null,
                 'dayNumber' => $place->day_number,
                 'isCourse' => $curation->type === 'course',
+                'durationDays' => $curation->days,
                 'googleReviewData' => $gRevData,
             ])
         @endforeach
@@ -430,9 +434,11 @@
     const DEBUG_FIT = false;
 
     function pinHtml(num, hl) {
-        const bg = hl ? '#e67e22' : 'var(--pp-primary,#2b211e)';
-        const sc = hl ? 'transform:scale(1.25);' : '';
-        return '<div style="background:'+bg+';color:#fff;width:'+pinSize+'px;height:'+pinSize+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .15s;'+sc+'">'+num+'</div>';
+        const bg = hl ? '#FF6B00' : '#fff';
+        const clr = hl ? '#fff' : '#C2410C';
+        const bdr = hl ? '2px solid #fff' : '2px solid #FF6B00';
+        const sc = hl ? 'transform:scale(1.15);box-shadow:0 4px 12px rgba(0,0,0,.35);' : '';
+        return '<div style="background:'+bg+';color:'+clr+';width:'+pinSize+'px;height:'+pinSize+'px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:'+bdr+';box-shadow:0 2px 6px rgba(0,0,0,.2);transition:transform .15s;'+sc+'">'+num+'</div>';
     }
 
     function visiblePlaces() {

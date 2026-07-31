@@ -11,8 +11,8 @@ class CurationPlace extends Model
         'curation_id', 'place_name', 'address', 'jibeon_address', 'latitude', 'longitude',
         'category_label', 'thumbnail_url', 'photos', 'external_place_id', 'is_overseas',
         'source_channel', 'source_url', 'source_date', 'day_number',
-        'sort_order', 'editor_note', 'phone', 'opening_hours',
-        'building_name', 'naver_place_id', 'google_place_id',
+        'sort_order', 'transit_hint', 'is_manual', 'editor_note', 'phone', 'opening_hours',
+        'building_name', 'naver_place_id', 'google_place_id', 'dong_label',
     ];
 
     protected $casts = [
@@ -21,6 +21,7 @@ class CurationPlace extends Model
         'sort_order' => 'integer',
         'day_number' => 'integer',
         'is_overseas' => 'boolean',
+        'is_manual' => 'boolean',
         'opening_hours' => 'array',
         'photos' => 'array',
         'source_date' => 'date',

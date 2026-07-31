@@ -23,6 +23,39 @@ class CurationController extends Controller
         return rtrim(config('app.url'), '/') . '/storage/' . $path;
     }
 
+    private function parseDongLabel(?string $jibeonAddress, ?float $lat = null, ?float $lng = null): ?string
+    {
+        if ($jibeonAddress) {
+            $parts = preg_split('/\s+/', trim($jibeonAddress));
+            foreach ($parts as $part) {
+                if (preg_match('/(동|읍|면|리)$/', $part)) {
+                    $cleaned = preg_replace('/\d+(동)$/', '$1', $part);
+                    $name = preg_replace('/(동|읍|면|리)$/', '', $cleaned);
+                    return ($name !== '' && mb_strlen($name) >= 2) ? $name : $cleaned;
+                }
+            }
+        }
+        if ($lat && $lng) {
+            $key = config('services.kakao_local.rest_api_key');
+            if (!$key) return null;
+            try {
+                $res = Http::withHeaders(['Authorization' => 'KakaoAK ' . $key])
+                    ->timeout(3)
+                    ->get('https://dapi.kakao.com/v2/local/geo/coord2regioncode.json', ['x' => $lng, 'y' => $lat]);
+                $doc = collect($res->json('documents', []))->firstWhere('region_type', 'H');
+                if (!$doc) return null;
+                $parts = explode(' ', $doc['address_name']);
+                $dong = end($parts);
+                $dong = preg_replace('/\d+(동)$/', '$1', $dong);
+                $name = preg_replace('/(동|읍|면)$/', '', $dong);
+                return ($name !== '' && mb_strlen($name) >= 2) ? $name : $dong;
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     private function applyAuthor(array &$data, ?string $authorSelect): void
     {
         if ($authorSelect === null) return;
@@ -97,10 +130,17 @@ class CurationController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'type' => 'required|in:list,course',
+            'nights' => 'nullable|integer|min:0|max:30',
+            'days' => 'nullable|integer|min:1|max:31',
             'category' => "required|in:{$cats}",
             'description' => 'nullable|string|max:2000',
             'region_label' => 'nullable|string|max:255',
         ]);
+
+        if ($data['type'] !== 'course') {
+            $data['nights'] = null;
+            $data['days'] = null;
+        }
 
         $this->applyAuthor($data, $request->input('author_select'));
 
@@ -220,6 +260,14 @@ class CurationController extends Controller
         $data['curation_id'] = $curation->id;
         $data['sort_order'] = ($curation->places()->max('sort_order') ?? -1) + 1;
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
+
+        if (!($data['is_overseas'])) {
+            $data['dong_label'] = $this->parseDongLabel(
+                $data['jibeon_address'] ?? null,
+                (float) ($data['latitude'] ?? 0),
+                (float) ($data['longitude'] ?? 0)
+            );
+        }
 
         $place = CurationPlace::create($data);
 
@@ -397,6 +445,7 @@ class CurationController extends Controller
             'day_number' => 'nullable|integer|min:1',
             'editor_note' => 'nullable|string|max:255',
             'place_name' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:500',
             'phone' => 'nullable|string|max:50',
             'building_name' => 'nullable|string|max:100',
             'opening_hours' => 'nullable|string|max:500',
@@ -408,6 +457,19 @@ class CurationController extends Controller
                 $update[$k] = $v;
             }
         }
+
+        $manualEdited = false;
+        if ($request->has('place_name') && $request->place_name !== $place->place_name) {
+            $manualEdited = true;
+        }
+        if ($request->has('address') && $request->address !== $place->address) {
+            $manualEdited = true;
+            if ($request->address === '') $update['address'] = null;
+        }
+        if ($manualEdited) {
+            $update['is_manual'] = true;
+        }
+
         if ($request->has('phone') && $request->phone === '') {
             $update['phone'] = null;
         }
@@ -429,6 +491,68 @@ class CurationController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function replacePlace(Request $request, CurationPlace $place)
+    {
+        $data = $request->validate([
+            'place_name' => 'required|string|max:255',
+            'address' => 'nullable|string|max:500',
+            'jibeon_address' => 'nullable|string|max:500',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'phone' => 'nullable|string|max:50',
+            'building_name' => 'nullable|string|max:100',
+            'external_place_id' => 'nullable|string|max:100',
+            'is_overseas' => 'boolean',
+        ]);
+
+        $isOverseas = (bool) ($data['is_overseas'] ?? false);
+        $dongLabel = !$isOverseas
+            ? $this->parseDongLabel($data['jibeon_address'] ?? null, (float) $data['latitude'], (float) $data['longitude'])
+            : null;
+
+        $place->update([
+            'place_name' => $data['place_name'],
+            'address' => $data['address'] ?? null,
+            'jibeon_address' => $data['jibeon_address'] ?? null,
+            'latitude' => $data['latitude'],
+            'longitude' => $data['longitude'],
+            'phone' => $data['phone'] ?? null,
+            'building_name' => $data['building_name'] ?? null,
+            'external_place_id' => $data['external_place_id'] ?? null,
+            'is_overseas' => $isOverseas,
+            'google_place_id' => null,
+            'naver_place_id' => null,
+            'is_manual' => false,
+            'dong_label' => $dongLabel,
+        ]);
+
+        $googleResult = null;
+        if (!($data['is_overseas'] ?? false)) {
+            $service = app(GoogleReviewService::class);
+            $placeId = $service->matchPlaceId(
+                $data['place_name'],
+                (float) $data['latitude'],
+                (float) $data['longitude'],
+                $data['address'] ?? ''
+            );
+            if ($placeId) {
+                $place->update(['google_place_id' => $placeId]);
+                $cache = $service->fetchAndCache($placeId);
+                $googleResult = [
+                    'google_place_id' => $placeId,
+                    'rating' => $cache?->rating,
+                    'review_count' => $cache?->review_count,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'place' => $place->fresh(),
+            'google' => $googleResult,
+        ]);
+    }
+
     public function enrichNaver(Request $request, CurationPlace $place)
     {
         $name = trim((string) $request->input('name', $place->place_name));
@@ -439,6 +563,7 @@ class CurationController extends Controller
         $result = ['success' => true, 'phone' => null, 'opening_hours' => null, 'naver_place_id' => null, 'detail_address' => null];
 
         $update = [];
+        $isManual = (bool) $place->is_manual;
 
         // 1) 네이버 검색 — 전화번호, 건물명, 지번주소, naver_place_id
         $clientId = config('services.naver_search.client_id');
@@ -495,12 +620,14 @@ class CurationController extends Controller
                         $jibeon = trim(strip_tags($best['address'] ?? ''));
                         if ($jibeon) $result['jibeon_address'] = $jibeon;
 
-                        if ($phone && !$place->phone) $update['phone'] = $phone;
-                        if (!empty($result['building_name']) && !$place->building_name) {
-                            $update['building_name'] = $result['building_name'];
-                        }
-                        if ($jibeon && !$place->jibeon_address) {
-                            $update['jibeon_address'] = $jibeon;
+                        if (!$isManual) {
+                            if ($phone && !$place->phone) $update['phone'] = $phone;
+                            if (!empty($result['building_name']) && !$place->building_name) {
+                                $update['building_name'] = $result['building_name'];
+                            }
+                            if ($jibeon && !$place->jibeon_address) {
+                                $update['jibeon_address'] = $jibeon;
+                            }
                         }
 
                         $matcher = app(NaverPlaceMatcher::class);

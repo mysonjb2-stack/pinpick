@@ -1082,7 +1082,7 @@ function renderGClusterMarkers() {
         const m = new google.maps.Marker({
             position: pos, map: resultMapGoogle,
             icon: { url: canvas.toDataURL(), scaledSize: new google.maps.Size(48, 48), anchor: new google.maps.Point(24, 24) },
-            label: { text: g.name, color: '#2b211e', fontSize: '10px', fontWeight: '700', className: 'pp-gmarker-label' },
+            label: { text: g.name, color: '#1A1A1A', fontSize: '10px', fontWeight: '700', className: 'pp-gmarker-label' },
             zIndex: 50,
         });
         m.addListener('click', () => {
@@ -1164,7 +1164,7 @@ function renderGRMarkers(docs) {
                 anchor: new google.maps.Point(16, 44),
                 labelOrigin: new google.maps.Point(16, -10),
             },
-            label: { text: d.place_name || '', color: '#2b211e', fontSize: '12px', fontWeight: '700', className: 'pp-gmarker-label' },
+            label: { text: d.place_name || '', color: '#1A1A1A', fontSize: '12px', fontWeight: '700', className: 'pp-gmarker-label' },
         });
         m._idx = i;
         m.addListener('click', () => selectResult(i));
@@ -1512,7 +1512,7 @@ function renderGMappinMarkers(docs) {
             },
             label: {
                 text: d.place_name || '',
-                color: '#2b211e',
+                color: '#1A1A1A',
                 fontSize: '12px',
                 fontWeight: '600',
                 className: 'pp-gmarker-label',

@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class Curation extends Model
 {
     protected $fillable = [
-        'title', 'slug', 'type', 'category', 'description', 'cover_image',
+        'title', 'slug', 'type', 'nights', 'days', 'category', 'description', 'cover_image',
         'region_label', 'status', 'published_at',
         'view_count', 'save_count',
         'author_type', 'author_user_id',
@@ -21,8 +21,19 @@ class Curation extends Model
         'published_at' => 'datetime',
         'view_count' => 'integer',
         'save_count' => 'integer',
+        'nights' => 'integer',
+        'days' => 'integer',
         'approved_snapshot' => 'array',
     ];
+
+    public function getDurationLabelAttribute(): ?string
+    {
+        if ($this->days === null) return null;
+        $n = $this->nights ?? 0;
+        if ($n === 0 && $this->days === 1) return '당일치기';
+        if ($n === 0) return "무박 {$this->days}일";
+        return "{$n}박 {$this->days}일";
+    }
 
     public function places(): HasMany
     {
