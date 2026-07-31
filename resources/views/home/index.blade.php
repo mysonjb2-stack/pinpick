@@ -345,22 +345,54 @@
     {{-- personal-only-v1: 내 장소 영역만 노출. is-active 기본 활성화 --}}
     <div class="yg-pane is-active" data-pane="mine">
         {{-- 카테고리 관리 버튼은 히어로 헤드로 이동됨. 패널은 그대로 사용 --}}
-        {{-- 내 주변 추천 모듈 --}}
+        {{-- 내 주변 추천 모듈 (SSR) --}}
+        @if(!empty($recPlaces))
+        <div class="pp-nearby" id="ppNearby">
+            <div class="pp-nearby__content" id="ppNearbyContent">
+                <div class="pp-nearby__head">
+                    <div class="pp-nearby__title-row">
+                        <h3 class="pp-nearby__title" id="ppNearbyTitle">요즘 다들 어디 가나 볼까요?</h3>
+                        <button type="button" class="pp-nearby__chip" id="ppNearbyChip" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2.2"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8Z" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>내 주변 장소</button>
+                    </div>
+                    <p class="pp-nearby__sub" id="ppNearbySub">사람들이 리스트에 담아둔 장소들이에요</p>
+                </div>
+                <div class="pp-nearby__scroll">
+                    <div class="pp-nearby__track" id="ppNearbyTrack">
+                        @php $shuffled = collect($recPlaces)->shuffle()->values(); @endphp
+                        @foreach($shuffled as $p)
+                        @php
+                            $hasBg = !empty($p['thumb_url']);
+                            $imgSrc = $p['thumb_url'];
+                            if (!$hasBg && $p['lat'] && $p['lng']) {
+                                $imgSrc = '/api/static-map?lat='.$p['lat'].'&lng='.$p['lng'].'&overseas='.($p['is_overseas']?1:0).'&w=240&h=320';
+                            }
+                            $bg = ($hasBg || $imgSrc) ? 'background-image:url('.e($imgSrc).')' : '';
+                            $phClass = (!$hasBg && !$imgSrc) ? ' pp-nearby__card--ph' : '';
+                            $regionHtml = !empty($p['region_label']) ? '<div class="pp-nearby__card-region">'.e($p['region_label']).'</div>' : '';
+                        @endphp
+                        <a href="/c/{{ $p['curation_id'] }}" class="pp-nearby__card{{ $phClass }}" style="{{ $bg }}"><div class="pp-nearby__card-overlay"><div class="pp-nearby__card-name">{{ $p['name'] }}</div>{!! $regionHtml !!}</div></a>
+                        @endforeach
+                        <a href="/explore" class="pp-nearby__card pp-nearby__card--more"><span class="pp-nearby__card--more-label">장소 더보기</span><span class="pp-nearby__card--more-arrow">→</span></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @else
         <div class="pp-nearby" id="ppNearby" style="display:none">
             <div class="pp-nearby__content" id="ppNearbyContent" style="display:none">
                 <div class="pp-nearby__head">
-                    <h3 class="pp-nearby__title" id="ppNearbyTitle"></h3>
+                    <div class="pp-nearby__title-row">
+                        <h3 class="pp-nearby__title" id="ppNearbyTitle"></h3>
+                        <button type="button" class="pp-nearby__chip" id="ppNearbyChip" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2.2"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8Z" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>내 주변 장소</button>
+                    </div>
                     <p class="pp-nearby__sub" id="ppNearbySub"></p>
-                    <span class="pp-nearby__chip" id="ppNearbyChip" style="display:none">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                        내 주변으로 보기
-                    </span>
                 </div>
                 <div class="pp-nearby__scroll">
                     <div class="pp-nearby__track" id="ppNearbyTrack"></div>
                 </div>
             </div>
         </div>
+        @endif
 
         @auth
         <div class="pp-mine-sechead">
@@ -2398,10 +2430,9 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
 })();
 @endauth
 
-// ── 추천 장소 모듈 ──
+// ── 추천 장소 모듈 (SSR + hydration) ──
 (function() {
-    const POOL_KEY = 'pp_nearby_pool';
-    const GEO_KEY = 'pp_nearby_geo';
+    const STORE_KEY = 'pp_rec_v2';
     const TTL = 10 * 60 * 1000;
     const module = document.getElementById('ppNearby');
     const content = document.getElementById('ppNearbyContent');
@@ -2410,6 +2441,8 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
     const subEl = document.getElementById('ppNearbySub');
     const chip = document.getElementById('ppNearbyChip');
     if (!module) return;
+
+    const ssrReady = content && content.style.display !== 'none' && track && track.children.length > 0;
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function formatDist(m) {
@@ -2424,31 +2457,30 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
         }
         return a;
     }
+    function roundCoord(v) { return Math.round((v || 0) * 100) / 100; }
 
-    function render(data) {
-        if (!data || !data.places || !data.places.length) { module.style.display = 'none'; return; }
-        module.style.display = '';
-        content.style.display = '';
+    function save(data, lat, lng, version) {
+        try {
+            localStorage.setItem(STORE_KEY, JSON.stringify({
+                data, lat: lat || 0, lng: lng || 0, version: version || 'global', ts: Date.now()
+            }));
+        } catch(e) {}
+    }
+    function load() {
+        try {
+            const raw = localStorage.getItem(STORE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch(e) { return null; }
+    }
 
+    function buildCards(data) {
         const isGlobal = !!data.is_global;
-        if (isGlobal) {
-            titleEl.textContent = '요즘 저장할 만한 곳들이에요';
-            subEl.textContent = '다른 사람들이 담은 장소를 구경해보세요';
-        } else {
-            titleEl.textContent = '지금 ' + (data.region || '여기') + '에 계시네요?';
-            subEl.textContent = '주변에 가볼 만한 맛집·핫플이 있어요';
-            if (chip) chip.style.display = 'none';
-        }
-
         let places = data.places.slice();
         if (isGlobal && places.length > 1) {
             places = shuffle(places);
         } else if (!isGlobal && places.length > 1) {
-            const closest = places[0];
-            const rest = shuffle(places.slice(1));
-            places = [closest].concat(rest);
+            places = [places[0]].concat(shuffle(places.slice(1)));
         }
-
         let html = '';
         places.forEach(p => {
             const hasBg = !!p.thumb_url;
@@ -2468,117 +2500,139 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
                     : '<div class="pp-nearby__card-dist">' + dist + '</div>';
             }
             const cid = p.curation_id || '';
-            html += '<a href="/c/' + cid + '?place=' + p.id + '" class="pp-nearby__card' + phClass + '" style="' + bg + '">'
+            html += '<a href="/c/' + cid + '" class="pp-nearby__card' + phClass + '" style="' + bg + '">'
                 + '<div class="pp-nearby__card-overlay">'
                 + '<div class="pp-nearby__card-name">' + esc(p.name) + '</div>'
                 + subLine
                 + '</div></a>';
         });
-
         html += '<a href="/explore" class="pp-nearby__card pp-nearby__card--more">'
             + '<span class="pp-nearby__card--more-label">장소 더보기</span>'
             + '<span class="pp-nearby__card--more-arrow">→</span></a>';
-
-        track.innerHTML = html;
+        return html;
     }
 
-    function savePool(data, lat, lng) {
-        sessionStorage.setItem(POOL_KEY, JSON.stringify({ data, lat: lat || 0, lng: lng || 0, ts: Date.now() }));
+    function crossfade(data, showChip) {
+        if (!data || !data.places || !data.places.length) return;
+        const isGlobal = !!data.is_global;
+        const newTitle = isGlobal ? '요즘 다들 어디 가나 볼까요?' : '지금 ' + (data.region || '여기') + '에 계시네요?';
+        const newSub = isGlobal ? '사람들이 리스트에 담아둔 장소들이에요' : '주변에 가볼 만한 맛집·핫플이 있어요';
+        const newHtml = buildCards(data);
+
+        content.style.transition = 'opacity 150ms ease';
+        content.style.opacity = '0';
+        setTimeout(() => {
+            titleEl.textContent = newTitle;
+            subEl.textContent = newSub;
+            track.innerHTML = newHtml;
+            if (chip) chip.style.display = (isGlobal && showChip) ? '' : 'none';
+            content.style.opacity = '1';
+            setTimeout(() => { content.style.transition = ''; }, 160);
+        }, 150);
     }
 
-    function loadPool(currentLat, currentLng) {
-        try {
-            const raw = sessionStorage.getItem(POOL_KEY);
-            if (!raw) return null;
-            const cached = JSON.parse(raw);
-            if (Date.now() - cached.ts > TTL) return null;
-            const reqNearby = !!(currentLat && currentLng);
-            const cachedNearby = !!(cached.lat && cached.lng);
-            if (reqNearby !== cachedNearby) return null;
-            if (reqNearby && cachedNearby) {
-                if (Math.abs(currentLat - cached.lat) > 0.01 || Math.abs(currentLng - cached.lng) > 0.01) return null;
-            }
-            return cached.data;
-        } catch(e) { return null; }
+    function renderDirect(data, showChip) {
+        if (!data || !data.places || !data.places.length) {
+            module.style.display = 'none'; return;
+        }
+        module.style.display = '';
+        content.style.display = '';
+        const isGlobal = !!data.is_global;
+        titleEl.textContent = isGlobal ? '요즘 다들 어디 가나 볼까요?' : '지금 ' + (data.region || '여기') + '에 계시네요?';
+        subEl.textContent = isGlobal ? '사람들이 리스트에 담아둔 장소들이에요' : '주변에 가볼 만한 맛집·핫플이 있어요';
+        track.innerHTML = buildCards(data);
+        if (chip) chip.style.display = (isGlobal && showChip) ? '' : 'none';
     }
 
     async function fetchPool(lat, lng) {
         try {
             const r = await fetch('/api/curations/nearby?lat=' + (lat || 0) + '&lng=' + (lng || 0));
             const json = await r.json();
-            if (json.data) { savePool(json.data, lat, lng); render(json.data); }
-            else module.style.display = 'none';
-        } catch(e) { module.style.display = 'none'; }
+            if (json.data && json.data.places && json.data.places.length) {
+                const ver = (lat && lng) ? 'nearby' : 'global';
+                save(json.data, lat, lng, ver);
+                return json.data;
+            }
+        } catch(e) {}
+        return null;
     }
 
-    function showGlobal() {
-        const pool = loadPool(0, 0);
-        if (pool) { render(pool); return; }
-        fetchPool(0, 0);
+    function needsRefresh(cached, lat, lng) {
+        if (!cached || Date.now() - cached.ts > TTL) return true;
+        if (lat && lng) {
+            if (cached.version !== 'nearby') return true;
+            if (roundCoord(lat) !== roundCoord(cached.lat) || roundCoord(lng) !== roundCoord(cached.lng)) return true;
+        }
+        return false;
     }
 
     function switchToNearby() {
         if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition(
-            pos => {
+            async pos => {
                 const lat = pos.coords.latitude, lng = pos.coords.longitude;
-                sessionStorage.setItem(GEO_KEY, JSON.stringify({ lat, lng }));
-                sessionStorage.removeItem(POOL_KEY);
-                fetchPool(lat, lng);
+                const data = await fetchPool(lat, lng);
+                if (data) crossfade(data, false);
             },
             () => { if (chip) chip.style.display = 'none'; },
             { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
         );
     }
 
-    function requestGeo() {
-        if (!navigator.geolocation) { showGlobal(); return; }
-        navigator.geolocation.getCurrentPosition(
-            pos => {
-                const lat = pos.coords.latitude, lng = pos.coords.longitude;
-                sessionStorage.setItem(GEO_KEY, JSON.stringify({ lat, lng }));
-                const pool = loadPool(lat, lng);
-                if (pool) { render(pool); return; }
-                fetchPool(lat, lng);
-            },
-            () => showGlobal(),
-            { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
-        );
-    }
+    if (chip) chip.addEventListener('click', switchToNearby);
 
-    if (chip) {
-        chip.addEventListener('click', switchToNearby);
-    }
+    const cached = load();
 
-    const geo = (() => { try { return JSON.parse(sessionStorage.getItem(GEO_KEY)); } catch(e) { return null; } })();
-    if (geo && geo.lat) {
-        const pool = loadPool(geo.lat, geo.lng);
-        if (pool) { module.style.display = ''; render(pool); return; }
+    function boot(geoState) {
+        const showChip = geoState === 'prompt' || geoState === 'unknown';
+
+        if (cached && cached.version === 'nearby' && cached.data && cached.data.places && cached.data.places.length) {
+            if (geoState === 'denied') {
+                if (ssrReady) {
+                    // SSR 전지역 유지
+                } else {
+                    renderDirect({ places: cached.data.places, is_global: true }, false);
+                }
+            } else {
+                if (ssrReady) {
+                    crossfade(cached.data, false);
+                } else {
+                    renderDirect(cached.data, false);
+                }
+            }
+        } else if (ssrReady) {
+            if (showChip && chip) chip.style.display = '';
+        } else {
+            if (cached && cached.data && cached.data.places && cached.data.places.length) {
+                renderDirect(cached.data, showChip);
+            } else {
+                module.style.display = 'none';
+            }
+        }
+
+        if (geoState === 'granted') {
+            navigator.geolocation.getCurrentPosition(
+                async pos => {
+                    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                    if (needsRefresh(cached, lat, lng)) {
+                        const data = await fetchPool(lat, lng);
+                        if (data) crossfade(data, false);
+                    }
+                },
+                () => {},
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+            );
+        }
     }
 
     if (navigator.permissions && navigator.permissions.query) {
         navigator.permissions.query({ name: 'geolocation' }).then(result => {
-            module.style.display = '';
-            if (result.state === 'granted') {
-                requestGeo();
-            } else if (result.state === 'prompt') {
-                if (chip) chip.style.display = '';
-                showGlobal();
-            } else {
-                showGlobal();
-            }
-        }).catch(() => {
-            module.style.display = '';
-            if (chip) chip.style.display = '';
-            showGlobal();
-        });
+            boot(result.state);
+        }).catch(() => boot('unknown'));
     } else if (navigator.geolocation) {
-        module.style.display = '';
-        if (chip) chip.style.display = '';
-        showGlobal();
+        boot('unknown');
     } else {
-        module.style.display = '';
-        showGlobal();
+        boot('denied');
     }
 })();
 </script>

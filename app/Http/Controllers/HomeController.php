@@ -80,9 +80,12 @@ class HomeController extends Controller
             ? Curation::byUser($request->user()->id)->where('status', 'pending')->count()
             : 0;
 
+        $recPlaces = CurationController::getGlobalPool($request->user()?->id);
+
         return view('home.index', compact(
             'categories', 'myPlaces', 'selectedCategory', 'q', 'curation', 'categoryLatest',
-            'recentPlaces', 'savedCount', 'weekNewCount', 'defaultRegion', 'pendingCurationCount'
+            'recentPlaces', 'savedCount', 'weekNewCount', 'defaultRegion', 'pendingCurationCount',
+            'recPlaces'
         ));
     }
 

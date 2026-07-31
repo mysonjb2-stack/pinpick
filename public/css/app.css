@@ -6465,20 +6465,24 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 .pp-nearby { padding: 0 0 8px; }
 
 .pp-nearby__head { padding: 16px 16px 0; }
-.pp-nearby__chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  margin-top: 8px; padding: 6px 12px;
-  border: 1px solid var(--pp-line); border-radius: 999px;
-  background: var(--pp-bg); color: var(--pp-text-sub);
-  font-size: 12px; font-weight: 600;
-  cursor: pointer; -webkit-tap-highlight-color: transparent;
-  transition: background .15s;
+.pp-nearby__title-row {
+  position: relative;
 }
-.pp-nearby__chip:active { background: var(--pp-primary-soft); }
-.pp-nearby__chip svg { color: var(--pp-accent); flex-shrink: 0; }
+.pp-nearby__chip {
+  position: absolute; right: 0; top: 2px;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 5px 11px 5px 9px; border-radius: 999px;
+  background: var(--pp-primary); color: #fff;
+  font-size: 12px; font-weight: 600; border: none;
+  cursor: pointer; white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity .15s;
+}
+.pp-nearby__chip svg { flex-shrink: 0; }
+.pp-nearby__chip:active { opacity: .7; }
 .pp-nearby__title {
   font-size: 16px; font-weight: 700; line-height: 1.3;
-  color: var(--pp-text); margin: 0;
+  color: var(--pp-text); margin: 0; padding-right: 100px;
 }
 .pp-nearby__sub {
   font-size: 12.5px; color: var(--pp-text-sub); margin: 4px 0 0;
@@ -6538,6 +6542,24 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
 .pp-nearby__card--more-label { font-size: 13px; font-weight: 700; }
 .pp-nearby__card--more-count { font-size: 11px; opacity: .6; }
 .pp-nearby__card--more-arrow { font-size: 16px; opacity: .5; }
+
+@keyframes pp-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 400px 0; }
+}
+.pp-skel-bar {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--pp-chip-bg) 25%, #f0e8df 50%, var(--pp-chip-bg) 75%);
+  background-size: 400px 100%;
+  animation: pp-shimmer 1.4s ease infinite;
+}
+.pp-skel-card {
+  flex: 0 0 120px; height: 160px; border-radius: 12px;
+  background: linear-gradient(90deg, var(--pp-chip-bg) 25%, #f0e8df 50%, var(--pp-chip-bg) 75%);
+  background-size: 400px 100%;
+  animation: pp-shimmer 1.4s ease infinite;
+}
+
 .pp-nearby__explore {
   display: block; text-align: center;
   font-size: 12.5px; color: var(--pp-text-sub);

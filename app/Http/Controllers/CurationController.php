@@ -284,6 +284,81 @@ class CurationController extends Controller
         return response()->json($curations);
     }
 
+    public static function getGlobalPool(?int $userId = null): array
+    {
+        $globalPool = Cache::remember('cur_nearby:global:pool', 600, function () {
+            $rows = DB::select("
+                SELECT cp.id, cp.curation_id, cp.place_name, cp.thumbnail_url,
+                       cp.latitude, cp.longitude, cp.is_overseas,
+                       cp.external_place_id, cp.naver_place_id,
+                       cp.address,
+                       c.save_count AS cur_save_count
+                FROM curation_places cp
+                JOIN curations c ON c.id = cp.curation_id
+                WHERE c.status = 'approved'
+            ");
+            return collect($rows)->map(fn($r) => (array) $r)->values()->toArray();
+        });
+
+        $globalPool = collect($globalPool);
+        if ($globalPool->isEmpty()) return [];
+
+        if ($userId) {
+            $savedExtIds = Place::where('user_id', $userId)
+                ->whereNotNull('kakao_place_id')
+                ->pluck('kakao_place_id')
+                ->merge(
+                    Place::where('user_id', $userId)
+                        ->whereNotNull('naver_place_id')
+                        ->pluck('naver_place_id')
+                )
+                ->toArray();
+
+            if (!empty($savedExtIds)) {
+                $globalPool = $globalPool->reject(fn($p) =>
+                    ($p['external_place_id'] && in_array($p['external_place_id'], $savedExtIds))
+                    || ($p['naver_place_id'] && in_array($p['naver_place_id'], $savedExtIds))
+                );
+            }
+        }
+
+        $deduped = collect();
+        $seenExt = [];
+        $globalPool->sortByDesc('cur_save_count')->each(function ($p) use (&$deduped, &$seenExt) {
+            $extId = $p['external_place_id'] ?: null;
+            if ($extId && isset($seenExt[$extId])) return;
+            if ($extId) $seenExt[$extId] = true;
+            $deduped->push($p);
+        });
+        $globalPool = $deduped;
+
+        $withPhoto = $globalPool->filter(fn($p) => !empty($p['thumbnail_url']))->values();
+        $noPhoto = $globalPool->filter(fn($p) => empty($p['thumbnail_url']))->values();
+        $maxPick = 30;
+        if ($withPhoto->count() >= $maxPick) {
+            $pick = $withPhoto->random($maxPick);
+        } else {
+            $pick = $withPhoto;
+            $need = $maxPick - $pick->count();
+            if ($noPhoto->count() > 0) {
+                $pick = $pick->merge($noPhoto->random(min($need, $noPhoto->count())));
+            }
+        }
+
+        $self = new self();
+        return $pick->sortByDesc('cur_save_count')->values()->map(fn($p) => [
+            'id' => $p['id'],
+            'curation_id' => $p['curation_id'],
+            'name' => $p['place_name'],
+            'thumb_url' => $p['thumbnail_url'],
+            'lat' => $p['latitude'],
+            'lng' => $p['longitude'],
+            'is_overseas' => (bool) $p['is_overseas'],
+            'distance' => null,
+            'region_label' => $self->parseRegionLabel($p['address'] ?? ''),
+        ])->values()->toArray();
+    }
+
     public function apiNearby(Request $request)
     {
         $lat = (float) $request->query('lat');
