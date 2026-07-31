@@ -246,11 +246,11 @@ input, select, textarea { font: inherit; color: inherit; }
   position: fixed; left: 0; right: 0; bottom: 0;
   max-width: 480px; margin: 0 auto;
   height: calc(var(--pp-nav-h) + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding: 6px 0 env(safe-area-inset-bottom, 0px);
   background: #fff;
   border-top: 1px solid var(--pp-line);
-  box-shadow: none;
-  display: flex; align-items: stretch; justify-content: space-around;
+  box-shadow: 0 -1px 4px rgba(0,0,0,0.04);
+  display: flex; align-items: center; justify-content: space-around;
   z-index: 100;
 }
 .pp-nav__item {
