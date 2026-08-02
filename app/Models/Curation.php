@@ -11,7 +11,7 @@ class Curation extends Model
 {
     protected $fillable = [
         'title', 'slug', 'type', 'nights', 'days', 'category', 'description', 'cover_image',
-        'region_label', 'status', 'published_at',
+        'region_label', 'center_lat', 'center_lng', 'status', 'published_at',
         'view_count', 'save_count',
         'author_type', 'author_user_id',
         'rejected_reason', 'approved_snapshot',
@@ -85,6 +85,22 @@ class Curation extends Model
             return $this->approved_snapshot['description'] ?? $this->description;
         }
         return $this->description;
+    }
+
+    public function refreshCenter(): void
+    {
+        $coords = $this->places()
+            ->whereNotNull('latitude')->where('latitude', '!=', 0)
+            ->whereNotNull('longitude')->where('longitude', '!=', 0)
+            ->selectRaw('MIN(latitude) as min_lat, MAX(latitude) as max_lat, MIN(longitude) as min_lng, MAX(longitude) as max_lng')
+            ->first();
+
+        if ($coords && $coords->min_lat !== null) {
+            $this->update([
+                'center_lat' => round(($coords->min_lat + $coords->max_lat) / 2, 7),
+                'center_lng' => round(($coords->min_lng + $coords->max_lng) / 2, 7),
+            ]);
+        }
     }
 
     public static function generateSlug(string $title): string

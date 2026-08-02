@@ -271,6 +271,8 @@ class CurationController extends Controller
 
         $place = CurationPlace::create($data);
 
+        $curation->refreshCenter();
+
         return response()->json(['success' => true, 'place' => $place]);
     }
 
@@ -545,6 +547,8 @@ class CurationController extends Controller
                 ];
             }
         }
+
+        $place->curation->refreshCenter();
 
         return response()->json([
             'success' => true,

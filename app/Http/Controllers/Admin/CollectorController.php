@@ -230,6 +230,8 @@ class CollectorController extends Controller
             }
         }
 
+        $curation->refreshCenter();
+
         return response()->json([
             'success' => true,
             'redirect' => route('admin.curations.edit', $curation),

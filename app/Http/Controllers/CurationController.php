@@ -216,7 +216,8 @@ class CurationController extends Controller
             ->limit(50)
             ->get(['id', 'title', 'slug', 'type', 'category', 'description',
                     'cover_image', 'save_count', 'published_at',
-                    'author_type', 'author_user_id', 'status', 'approved_snapshot']);
+                    'author_type', 'author_user_id', 'status', 'approved_snapshot',
+                    'center_lat', 'center_lng']);
 
         $savedIds = [];
         if (Auth::check()) {
@@ -278,10 +279,40 @@ class CurationController extends Controller
                 ? $c->author->profile_image : null;
             $c->is_official = $c->author_type === 'admin';
             $c->author_hue = $c->author_name ? crc32($c->author_name) % 360 : 0;
-            unset($c->places, $c->author, $c->status, $c->approved_snapshot);
+            unset($c->places, $c->author, $c->status, $c->approved_snapshot, $c->region_label);
         });
 
+        $lat = (float) $request->query('lat');
+        $lng = (float) $request->query('lng');
+        if ($lat && $lng) {
+            $curations->each(function ($c) use ($lat, $lng) {
+                if ($c->center_lat && $c->center_lng) {
+                    $c->nearby_dist = $this->haversineKm($lat, $lng, (float) $c->center_lat, (float) $c->center_lng);
+                } else {
+                    $c->nearby_dist = 99999;
+                }
+                $c->is_nearby = $c->nearby_dist <= 50;
+                unset($c->center_lat, $c->center_lng);
+            });
+            $near = $curations->filter(fn($c) => $c->is_nearby)->sortBy('nearby_dist')->values();
+            $far = $curations->filter(fn($c) => !$c->is_nearby)->values();
+            $curations = $near->merge($far);
+        } else {
+            $curations->each(function ($c) {
+                unset($c->center_lat, $c->center_lng);
+            });
+        }
+
         return response()->json($curations);
+    }
+
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $r = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        return $r * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     public static function getGlobalPool(?int $userId = null): array
@@ -334,7 +365,7 @@ class CurationController extends Controller
 
         $withPhoto = $globalPool->filter(fn($p) => !empty($p['thumbnail_url']))->values();
         $noPhoto = $globalPool->filter(fn($p) => empty($p['thumbnail_url']))->values();
-        $maxPick = 30;
+        $maxPick = 12;
         if ($withPhoto->count() >= $maxPick) {
             $pick = $withPhoto->random($maxPick);
         } else {
@@ -475,7 +506,7 @@ class CurationController extends Controller
 
             $withPhoto = $globalPool->filter(fn($p) => !empty($p['thumbnail_url']))->values();
             $noPhoto = $globalPool->filter(fn($p) => empty($p['thumbnail_url']))->values();
-            $maxPick = 30;
+            $maxPick = 12;
             $pick = collect();
             if ($withPhoto->count() >= $maxPick) {
                 $pick = $withPhoto->random($maxPick);
@@ -516,7 +547,7 @@ class CurationController extends Controller
         $withPhoto = $pool->filter(fn($p) => !empty($p['thumbnail_url']))->values();
         $noPhoto = $pool->filter(fn($p) => empty($p['thumbnail_url']))->values();
 
-        $maxPick = 30;
+        $maxPick = 12;
         $pick = collect();
         if ($withPhoto->count() >= $maxPick) {
             $pick = $withPhoto->random($maxPick);

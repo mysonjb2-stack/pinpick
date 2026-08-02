@@ -215,6 +215,8 @@ class MyCurationController extends Controller
             \App\Services\OgImageResolver::mapOgForCuration($curation);
         }
 
+        $curation->refreshCenter();
+
         return response()->json([
             'success' => true,
             'id' => $curation->id,
@@ -395,6 +397,8 @@ class MyCurationController extends Controller
         } else {
             \App\Services\OgImageResolver::mapOgForCuration($curation);
         }
+
+        $curation->refreshCenter();
 
         return response()->json([
             'success' => true,

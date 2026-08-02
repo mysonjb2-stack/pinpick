@@ -37,10 +37,15 @@
     let allCurations = [];
     let activeCat = '';
 
+    const urlParams = new URLSearchParams(location.search);
+    const qLat = parseFloat(urlParams.get('lat')) || 0;
+    const qLng = parseFloat(urlParams.get('lng')) || 0;
+
     async function init() {
         try {
+            const apiUrl = '/api/curations' + (qLat && qLng ? '?lat=' + qLat + '&lng=' + qLng : '');
             const [curRes, catRes] = await Promise.all([
-                fetch('/api/curations'),
+                fetch(apiUrl),
                 fetch('/api/curations/categories'),
             ]);
             allCurations = await curRes.json();
@@ -87,7 +92,17 @@
         }
 
         let html = '';
+        const hasNearby = qLat && qLng && filtered.some(c => c.is_nearby);
+        let nearbyHeaderDone = false;
+        let farHeaderDone = false;
         filtered.forEach((c, i) => {
+            if (hasNearby && c.is_nearby && !nearbyHeaderDone) {
+                html += '<div class="pp-expl-divider"><span>가까운 곳부터</span></div>';
+                nearbyHeaderDone = true;
+            }
+            if (hasNearby && !c.is_nearby && !farHeaderDone) {
+                farHeaderDone = true;
+            }
             html += renderSection(c);
             if (i === 0 && IS_LOGGED_IN) {
                 html += renderCtaCard();

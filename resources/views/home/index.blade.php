@@ -375,6 +375,7 @@
                         <a href="/explore" class="pp-nearby__card pp-nearby__card--more"><span class="pp-nearby__card--more-label">장소 더보기</span><span class="pp-nearby__card--more-arrow">→</span></a>
                     </div>
                 </div>
+                <a href="/explore" class="pp-nearby__more-btn" id="ppNearbyMoreBtn">다른 장소도 둘러보기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></a>
             </div>
         </div>
         @else
@@ -390,6 +391,7 @@
                 <div class="pp-nearby__scroll">
                     <div class="pp-nearby__track" id="ppNearbyTrack"></div>
                 </div>
+                <a href="/explore" class="pp-nearby__more-btn" id="ppNearbyMoreBtn" style="display:none">다른 장소도 둘러보기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></a>
             </div>
         </div>
         @endif
@@ -2442,7 +2444,9 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
     const chip = document.getElementById('ppNearbyChip');
     if (!module) return;
 
+    const moreBtn = document.getElementById('ppNearbyMoreBtn');
     const ssrReady = content && content.style.display !== 'none' && track && track.children.length > 0;
+    let userLat = 0, userLng = 0;
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function formatDist(m) {
@@ -2471,6 +2475,20 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
             const raw = localStorage.getItem(STORE_KEY);
             return raw ? JSON.parse(raw) : null;
         } catch(e) { return null; }
+    }
+
+    function updateMoreBtn(isGlobal) {
+        if (!moreBtn) return;
+        moreBtn.style.display = '';
+        if (!isGlobal && userLat && userLng) {
+            moreBtn.textContent = '';
+            moreBtn.insertAdjacentHTML('beforeend', '주변 핫플 더보기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>');
+            moreBtn.href = '/explore?lat=' + userLat + '&lng=' + userLng;
+        } else {
+            moreBtn.textContent = '';
+            moreBtn.insertAdjacentHTML('beforeend', '다른 장소도 둘러보기<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>');
+            moreBtn.href = '/explore';
+        }
     }
 
     function buildCards(data) {
@@ -2526,6 +2544,7 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
             subEl.textContent = newSub;
             track.innerHTML = newHtml;
             if (chip) chip.style.display = (isGlobal && showChip) ? '' : 'none';
+            updateMoreBtn(isGlobal);
             content.style.opacity = '1';
             setTimeout(() => { content.style.transition = ''; }, 160);
         }, 150);
@@ -2542,6 +2561,7 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
         subEl.textContent = isGlobal ? '사람들이 리스트에 담아둔 장소들이에요' : '주변에 가볼 만한 맛집·핫플이 있어요';
         track.innerHTML = buildCards(data);
         if (chip) chip.style.display = (isGlobal && showChip) ? '' : 'none';
+        updateMoreBtn(isGlobal);
     }
 
     async function fetchPool(lat, lng) {
@@ -2571,6 +2591,7 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
         navigator.geolocation.getCurrentPosition(
             async pos => {
                 const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                userLat = lat; userLng = lng;
                 const data = await fetchPool(lat, lng);
                 if (data) crossfade(data, false);
             },
@@ -2614,9 +2635,12 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
             navigator.geolocation.getCurrentPosition(
                 async pos => {
                     const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                    userLat = lat; userLng = lng;
                     if (needsRefresh(cached, lat, lng)) {
                         const data = await fetchPool(lat, lng);
                         if (data) crossfade(data, false);
+                    } else {
+                        updateMoreBtn(false);
                     }
                 },
                 () => {},
