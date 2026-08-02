@@ -261,7 +261,7 @@
     let currentCat = sessionStorage.getItem('pp_map_cat') || 'all';
 
     // ===== 거리 계산 =====
-    const NEARBY_RADIUS_KM = 5;
+    const NEARBY_RADIUS_KM = 10;
     function haversineKm(lat1, lng1, lat2, lng2) {
         const R = 6371;
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -280,15 +280,12 @@
         if (nMap) return;
         if (typeof naver === 'undefined' || !naver.maps) return;
         const domestic = places.filter(p => !p.is_overseas);
-        let nCenter, nZoom;
+        let nCenter = new naver.maps.LatLng(37.5665, 126.9780), nZoom = 7;
         if (_userPos && domestic.length && hasNearbyIn(_userPos.lat, _userPos.lng, domestic)) {
             nCenter = new naver.maps.LatLng(_userPos.lat, _userPos.lng);
             nZoom = 15;
-        } else if (domestic.length) {
-            nCenter = new naver.maps.LatLng(domestic[0].lat, domestic[0].lng);
-            nZoom = 13;
-        } else {
-            nCenter = new naver.maps.LatLng(37.5665, 126.9780);
+        } else if (_userPos) {
+            nCenter = new naver.maps.LatLng(_userPos.lat, _userPos.lng);
             nZoom = 13;
         }
         nMap = new naver.maps.Map('pp-map-naver', {
@@ -338,16 +335,13 @@
         if (gMap) return;
         if (typeof google === 'undefined' || !google.maps) return;
         const overseas = places.filter(p => p.is_overseas);
-        let gCenter, gZoom;
+        let gCenter = { lat: 35.6762, lng: 139.6503 }, gZoom = 3;
         if (_userPos && overseas.length && hasNearbyIn(_userPos.lat, _userPos.lng, overseas)) {
             gCenter = { lat: _userPos.lat, lng: _userPos.lng };
             gZoom = 15;
-        } else if (overseas.length) {
-            gCenter = { lat: overseas[0].lat, lng: overseas[0].lng };
-            gZoom = 13;
-        } else {
-            gCenter = { lat: 35.6762, lng: 139.6503 };
-            gZoom = 13;
+        } else if (_userPos) {
+            gCenter = { lat: _userPos.lat, lng: _userPos.lng };
+            gZoom = 5;
         }
         gMap = new google.maps.Map(document.getElementById('pp-map-google'), {
             center: gCenter, zoom: gZoom,
