@@ -21,9 +21,10 @@
     <div id="pp-map-google" class="pp-map"{{ $defaultScope === 'overseas' ? '' : ' hidden' }}></div>
     <div class="pp-map-credit" id="ppMapCredit">지도: NAVER</div>
     <div class="pp-map-toast" id="ppMapToast" hidden>
-        <span class="pp-map-toast__text">내 주변에 저장한 장소가 없어 전체 지도를 보여드려요</span>
-        <button type="button" class="pp-map-toast__action" id="ppToastAction" hidden>내 위치로 보기</button>
-        <button type="button" class="pp-map-toast__dismiss" id="ppToastDismiss" aria-label="닫기">&times;</button>
+        <div class="pp-map-toast__pill">
+            <span class="pp-map-toast__text" id="ppToastText"></span>
+            <button type="button" class="pp-map-toast__action" id="ppToastAction" hidden>내 위치로</button>
+        </div>
     </div>
 </div>
 <div class="pp-map-locate-anchor">
@@ -294,7 +295,7 @@
             scaleControl: false, logoControl: false, mapDataControl: false,
         });
         naver.maps.Event.addListener(nMap, 'click', closeSheet);
-        naver.maps.Event.addListener(nMap, 'idle', () => {});
+        naver.maps.Event.addListener(nMap, 'dragstart', dismissToast);
     }
     function clearNaver() { nMarkers.forEach(m => m.setMap(null)); nMarkers = []; nActive = null; }
     function renderNaver(cat) {
@@ -350,7 +351,7 @@
             gestureHandling: 'greedy',
         });
         gMap.addListener('click', () => { if (!_pinClickGuard) closeSheet(); });
-        gMap.addListener('idle', () => {});
+        gMap.addListener('dragstart', dismissToast);
 
         HtmlOverlay = class extends google.maps.OverlayView {
             constructor(position, html, onClick) {
@@ -441,35 +442,36 @@
 
     // ===== 토스트 =====
     const toastEl = document.getElementById('ppMapToast');
+    const toastText = document.getElementById('ppToastText');
     const toastAction = document.getElementById('ppToastAction');
-    const toastDismiss = document.getElementById('ppToastDismiss');
     let _toastTimer = null;
 
-    function showMapToast(hasGeo, lat, lng) {
-        if (hasGeo) {
+    function showNearbyToast(count) {
+        toastText.textContent = '내 주변 저장한 장소 ' + count + '곳';
+        toastAction.hidden = true;
+        toastEl.hidden = false;
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(dismissToast, 2500);
+    }
+    function showFallbackToast(lat, lng) {
+        toastText.textContent = '주변에 저장한 장소가 없어 전체를 표시했어요';
+        if (lat && lng) {
             toastAction.hidden = false;
             toastAction.onclick = () => {
                 dismissToast();
-                if (currentScope === 'domestic' && nMap) {
-                    nMap.setCenter(new naver.maps.LatLng(lat, lng));
-                    nMap.setZoom(15);
-                } else if (currentScope === 'overseas' && gMap) {
-                    gMap.setCenter({ lat, lng });
-                    gMap.setZoom(15);
-                }
+                centerMap(lat, lng, 13);
             };
         } else {
             toastAction.hidden = true;
         }
         toastEl.hidden = false;
         clearTimeout(_toastTimer);
-        _toastTimer = setTimeout(dismissToast, 5000);
+        _toastTimer = setTimeout(dismissToast, 2500);
     }
     function dismissToast() {
         toastEl.hidden = true;
         clearTimeout(_toastTimer);
     }
-    toastDismiss.addEventListener('click', dismissToast);
 
     // ===== 초기 카메라 결정 =====
     const _cameraDecided = {};
@@ -552,9 +554,10 @@
             const nearby = sp.filter(p => haversineKm(_userPos.lat, _userPos.lng, p.lat, p.lng) <= NEARBY_RADIUS_KM);
             if (nearby.length) {
                 fitWithMyPos(_userPos.lat, _userPos.lng, nearby);
+                showNearbyToast(nearby.length);
             } else {
                 fitScopePlaces(sp);
-                showMapToast(true, _userPos.lat, _userPos.lng);
+                showFallbackToast(_userPos.lat, _userPos.lng);
             }
             return;
         }
@@ -562,7 +565,7 @@
         fitScopePlaces(sp);
 
         if (!navigator.geolocation) {
-            showMapToast(false);
+            showFallbackToast();
             return;
         }
 
@@ -575,11 +578,12 @@
                 const nearby = sp.filter(p => haversineKm(lat, lng, p.lat, p.lng) <= NEARBY_RADIUS_KM);
                 if (nearby.length) {
                     fitWithMyPos(lat, lng, nearby);
+                    showNearbyToast(nearby.length);
                 } else {
-                    showMapToast(true, lat, lng);
+                    showFallbackToast(lat, lng);
                 }
             },
-            () => { showMapToast(false); },
+            () => { showFallbackToast(); },
             { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
         );
     }
