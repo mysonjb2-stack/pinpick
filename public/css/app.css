@@ -6596,7 +6596,7 @@ a.pp-mine-grid__empty:active { transform: scale(0.99); }
   border-radius: 10px;
   border: 1px solid var(--pp-line-strong);
   background: transparent; color: var(--pp-text);
-  font-size: 14px; font-weight: 600;
+  font-size: 13px; font-weight: 500;
   text-decoration: none; cursor: pointer;
   transition: background 120ms;
 }
