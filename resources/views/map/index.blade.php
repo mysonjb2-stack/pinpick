@@ -499,6 +499,18 @@
             }
         }
     }
+    function fitWithMyPos(lat, lng, nearbyPlaces) {
+        const pts = [{ lat, lng }, ...nearbyPlaces];
+        if (currentScope === 'domestic' && nMap) {
+            const bounds = new naver.maps.LatLngBounds();
+            pts.forEach(p => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
+            nMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+        } else if (currentScope === 'overseas' && gMap) {
+            const bounds = new google.maps.LatLngBounds();
+            pts.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+            gMap.fitBounds(bounds, { top: 110, right: 30, bottom: 120, left: 30 });
+        }
+    }
     function centerMap(lat, lng, zoom) {
         if (currentScope === 'domestic' && nMap) {
             nMap.setCenter(new naver.maps.LatLng(lat, lng));
@@ -537,8 +549,9 @@
 
         if (_userPos) {
             showMyLocation(_userPos.lat, _userPos.lng);
-            if (hasNearbyIn(_userPos.lat, _userPos.lng, sp)) {
-                centerMap(_userPos.lat, _userPos.lng, 15);
+            const nearby = sp.filter(p => haversineKm(_userPos.lat, _userPos.lng, p.lat, p.lng) <= NEARBY_RADIUS_KM);
+            if (nearby.length) {
+                fitWithMyPos(_userPos.lat, _userPos.lng, nearby);
             } else {
                 fitScopePlaces(sp);
                 showMapToast(true, _userPos.lat, _userPos.lng);
@@ -559,8 +572,9 @@
                 _userPos = { lat, lng };
                 writeGeoCache(lat, lng);
                 showMyLocation(lat, lng);
-                if (hasNearbyIn(lat, lng, sp)) {
-                    centerMap(lat, lng, 15);
+                const nearby = sp.filter(p => haversineKm(lat, lng, p.lat, p.lng) <= NEARBY_RADIUS_KM);
+                if (nearby.length) {
+                    fitWithMyPos(lat, lng, nearby);
                 } else {
                     showMapToast(true, lat, lng);
                 }
