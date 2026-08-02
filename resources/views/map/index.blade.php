@@ -240,8 +240,6 @@
         sessionStorage.removeItem('pp_map_cat');
         sessionStorage.removeItem('pp_map_scope');
     }
-    // 저장된 뷰포트가 있으면 복원(뒤로가기 등), 없으면 첫 방문 → geolocation으로 현재 위치
-    const _hasSavedView = !!(sessionStorage.getItem('pp_map_naver_view') || sessionStorage.getItem('pp_map_google_view'));
 
     // 현위치 캐시 (30분 TTL) — 내 지도 재진입 시 제주도→현위치 깜빡임 제거
     const GEO_TTL = 24 * 60 * 60 * 1000;
@@ -256,7 +254,7 @@
     function writeGeoCache(lat, lng) {
         try { localStorage.setItem('pp_last_geo', JSON.stringify({ lat, lng, ts: Date.now() })); } catch (e) {}
     }
-    const _cachedGeo = !_hasSavedView ? readGeoCache() : null;
+    const _cachedGeo = readGeoCache();
 
     const _savedScope = sessionStorage.getItem('pp_map_scope');
     let currentScope = (_savedScope === 'domestic' || _savedScope === 'overseas') ? _savedScope : @json($defaultScope);
@@ -282,12 +280,8 @@
         if (nMap) return;
         if (typeof naver === 'undefined' || !naver.maps) return;
         const domestic = places.filter(p => !p.is_overseas);
-        const savedN = JSON.parse(sessionStorage.getItem('pp_map_naver_view') || 'null');
         let nCenter, nZoom;
-        if (savedN) {
-            nCenter = new naver.maps.LatLng(savedN.lat, savedN.lng);
-            nZoom = savedN.zoom;
-        } else if (_userPos && domestic.length && hasNearbyIn(_userPos.lat, _userPos.lng, domestic)) {
+        if (_userPos && domestic.length && hasNearbyIn(_userPos.lat, _userPos.lng, domestic)) {
             nCenter = new naver.maps.LatLng(_userPos.lat, _userPos.lng);
             nZoom = 15;
         } else if (domestic.length) {
@@ -303,10 +297,7 @@
             scaleControl: false, logoControl: false, mapDataControl: false,
         });
         naver.maps.Event.addListener(nMap, 'click', closeSheet);
-        naver.maps.Event.addListener(nMap, 'idle', () => {
-            const ct = nMap.getCenter();
-            sessionStorage.setItem('pp_map_naver_view', JSON.stringify({ lat: ct.lat(), lng: ct.lng(), zoom: nMap.getZoom() }));
-        });
+        naver.maps.Event.addListener(nMap, 'idle', () => {});
     }
     function clearNaver() { nMarkers.forEach(m => m.setMap(null)); nMarkers = []; nActive = null; }
     function renderNaver(cat) {
@@ -347,12 +338,8 @@
         if (gMap) return;
         if (typeof google === 'undefined' || !google.maps) return;
         const overseas = places.filter(p => p.is_overseas);
-        const savedG = JSON.parse(sessionStorage.getItem('pp_map_google_view') || 'null');
         let gCenter, gZoom;
-        if (savedG) {
-            gCenter = { lat: savedG.lat, lng: savedG.lng };
-            gZoom = savedG.zoom;
-        } else if (_userPos && overseas.length && hasNearbyIn(_userPos.lat, _userPos.lng, overseas)) {
+        if (_userPos && overseas.length && hasNearbyIn(_userPos.lat, _userPos.lng, overseas)) {
             gCenter = { lat: _userPos.lat, lng: _userPos.lng };
             gZoom = 15;
         } else if (overseas.length) {
@@ -369,10 +356,7 @@
             gestureHandling: 'greedy',
         });
         gMap.addListener('click', () => { if (!_pinClickGuard) closeSheet(); });
-        gMap.addListener('idle', () => {
-            const ct = gMap.getCenter();
-            sessionStorage.setItem('pp_map_google_view', JSON.stringify({ lat: ct.lat(), lng: ct.lng(), zoom: gMap.getZoom() }));
-        });
+        gMap.addListener('idle', () => {});
 
         HtmlOverlay = class extends google.maps.OverlayView {
             constructor(position, html, onClick) {
@@ -532,17 +516,12 @@
     }
 
     function decideInitialCamera() {
-        if (_hasSavedView) {
-            if (_userPos) showMyLocation(_userPos.lat, _userPos.lng);
-            return;
-        }
         if (_cameraDecided[currentScope]) return;
         _cameraDecided[currentScope] = true;
 
         const sp = scopePlaces();
         dismissToast();
 
-        // 장소 0건 → 내 위치로만 이동 (엠티스테이트 카드는 checkEmptyState가 처리)
         if (!sp.length) {
             if (_userPos) {
                 centerMap(_userPos.lat, _userPos.lng, 13);
