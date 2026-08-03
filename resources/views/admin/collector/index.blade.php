@@ -41,6 +41,15 @@
 .cl-meta-badge--warn { background: #fff3e0; color: #e65100; }
 .cl-cat-warn { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: #ffebee; color: #c62828; margin-left: 4px; }
 
+.cl-search-ctrl {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 10px 14px; background: #f0f7ff; border-radius: 8px; margin-bottom: 16px;
+    border: 1px solid #bbdefb; font-size: 13px;
+}
+.cl-search-ctrl select, .cl-search-ctrl input { font-size: 13px; padding: 4px 8px; }
+.cl-search-ctrl .cl-vp-status { font-size: 11px; color: #2e7d32; font-weight: 600; }
+.cl-search-ctrl .cl-vp-status--none { color: #e65100; }
+
 .cl-type-toggle { display: flex; gap: 0; margin-bottom: 16px; }
 .cl-type-btn {
     padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -65,14 +74,24 @@
 .cl-table tr:hover { background: #fafafa; }
 .cl-table tr.cl-no-match { opacity: .6; }
 
-.cl-match-list { list-style: none; padding: 0; margin: 0; }
 .cl-match-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; cursor: pointer; }
 .cl-match-item label { cursor: pointer; font-size: 12.5px; }
 .cl-match-item .cl-addr { color: var(--ad-text-sub); font-size: 11.5px; }
 
+.cl-match-stage {
+    display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px;
+    border-radius: 4px; margin-left: 4px;
+}
+.cl-match-stage--ko { background: #e8f5e9; color: #2e7d32; }
+.cl-match-stage--local { background: #e3f2fd; color: #1565c0; }
+.cl-match-stage--en { background: #fce4ec; color: #c62828; }
+.cl-match-stage--context { background: #fff3e0; color: #e65100; }
+
 .cl-research { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
 .cl-research input { width: 140px; font-size: 12px; padding: 3px 6px; }
 .cl-research button { font-size: 11px; padding: 3px 8px; }
+
+.cl-names-sub { font-size: 10.5px; color: #999; line-height: 1.3; margin-top: 2px; }
 
 .cl-context { font-size: 11.5px; color: #888; max-width: 200px; }
 
@@ -116,7 +135,33 @@
 <script>
 const CSRF = '{{ csrf_token() }}';
 let extractedData = null;
+let rawPlaces = null;
 let currentType = 'list';
+
+let searchCtrl = {
+    isOverseas: false,
+    countryCode: null,
+    regionHint: null,
+    viewport: null,
+    vpName: null,
+};
+
+const COUNTRY_OPTIONS = {
+    'JP':'일본','VN':'베트남','TH':'태국','SG':'싱가포르','MY':'말레이시아',
+    'ID':'인도네시아','PH':'필리핀','TW':'대만','CN':'중국','HK':'홍콩',
+    'MO':'마카오','US':'미국','CA':'캐나다','AU':'호주','NZ':'뉴질랜드',
+    'GB':'영국','FR':'프랑스','DE':'독일','IT':'이탈리아','ES':'스페인',
+    'PT':'포르투갈','CH':'스위스','AT':'오스트리아','CZ':'체코','HR':'크로아티아',
+    'GR':'그리스','TR':'튀르키예','IN':'인도','KH':'캄보디아','MX':'멕시코',
+};
+
+const STAGE_LABELS = {
+    ko: '한국어로 매칭됨',
+    local: '현지어로 매칭됨',
+    en: '영문으로 매칭됨',
+    context: '맥락 검색으로 매칭됨',
+};
+const STAGE_CLASS = { ko: 'ko', local: 'local', en: 'en', context: 'context' };
 
 function switchTab(tab) {
     document.querySelectorAll('.cl-tab').forEach((t, i) => {
@@ -144,7 +189,18 @@ async function extractYoutube() {
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || '오류가 발생했습니다.');
         extractedData = data;
+        rawPlaces = JSON.parse(JSON.stringify(data.places));
         currentType = data.detected_type || 'list';
+
+        searchCtrl.isOverseas = !!data.is_overseas;
+        searchCtrl.countryCode = data.detected_country || null;
+        searchCtrl.regionHint = data.detected_region || null;
+        searchCtrl.viewport = null;
+        searchCtrl.vpName = null;
+
+        if (searchCtrl.isOverseas && searchCtrl.regionHint) {
+            await resolveViewport();
+        }
         renderResult(data);
     } catch (e) {
         alert(e.message);
@@ -166,12 +222,128 @@ async function extractText() {
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || '오류가 발생했습니다.');
         extractedData = data;
+        rawPlaces = JSON.parse(JSON.stringify(data.places));
         currentType = data.detected_type || 'list';
+
+        searchCtrl.isOverseas = !!data.is_overseas;
+        searchCtrl.countryCode = data.detected_country || null;
+        searchCtrl.regionHint = data.detected_region || null;
+        searchCtrl.viewport = null;
+        searchCtrl.vpName = null;
+
+        if (searchCtrl.isOverseas && searchCtrl.regionHint) {
+            await resolveViewport();
+        }
         renderResult(data);
     } catch (e) {
         alert(e.message);
     } finally {
         showLoading(false);
+    }
+}
+
+async function resolveViewport() {
+    const region = searchCtrl.regionHint;
+    if (!region) { searchCtrl.viewport = null; searchCtrl.vpName = null; return; }
+    try {
+        const resp = await fetch('/admin/collector/geocode-region', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+            body: JSON.stringify({ region, country_code: searchCtrl.countryCode }),
+        });
+        const data = await resp.json();
+        if (data.found && data.viewport) {
+            searchCtrl.viewport = data.viewport;
+            searchCtrl.vpName = data.name;
+        } else {
+            searchCtrl.viewport = null;
+            searchCtrl.vpName = null;
+        }
+    } catch (e) {
+        searchCtrl.viewport = null;
+        searchCtrl.vpName = null;
+    }
+}
+
+function onOverseasToggle(val) {
+    searchCtrl.isOverseas = val;
+    updateSearchCtrlUI();
+}
+
+function onCountryChange(val) {
+    searchCtrl.countryCode = val || null;
+}
+
+async function onRegionChange() {
+    const input = document.getElementById('clRegionInput');
+    searchCtrl.regionHint = input.value.trim() || null;
+    if (searchCtrl.regionHint) {
+        await resolveViewport();
+    } else {
+        searchCtrl.viewport = null;
+        searchCtrl.vpName = null;
+    }
+    updateVpStatus();
+}
+
+function updateSearchCtrlUI() {
+    const overseasRow = document.getElementById('clOverseasRow');
+    if (overseasRow) overseasRow.style.display = searchCtrl.isOverseas ? 'flex' : 'none';
+    updateVpStatus();
+}
+
+function updateVpStatus() {
+    const el = document.getElementById('clVpStatus');
+    if (!el) return;
+    if (searchCtrl.viewport && searchCtrl.vpName) {
+        el.className = 'cl-vp-status';
+        el.textContent = esc(searchCtrl.vpName) + ' · 검색 범위 확인됨';
+    } else if (searchCtrl.regionHint) {
+        el.className = 'cl-vp-status cl-vp-status--none';
+        el.textContent = '범위 미확인';
+    } else {
+        el.textContent = '';
+    }
+}
+
+async function rematchAll() {
+    if (!rawPlaces || rawPlaces.length === 0) return;
+    const btn = document.getElementById('btnRematch');
+    btn.disabled = true; btn.textContent = '재매칭 중...';
+
+    const placesForRematch = rawPlaces.map(p => ({
+        name: p.extracted_name,
+        name_local: p.name_local || null,
+        name_en: p.name_en || null,
+        region_hint: p.region_hint || searchCtrl.regionHint || null,
+        mention_context: p.mention_context || '',
+        day: p.day,
+        order: p.order,
+        transit_hint: p.transit_hint || null,
+    }));
+
+    try {
+        const resp = await fetch('/admin/collector/rematch-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+            body: JSON.stringify({
+                places: placesForRematch,
+                is_overseas: searchCtrl.isOverseas,
+                country_code: searchCtrl.countryCode,
+                region_hint: searchCtrl.regionHint,
+                viewport: searchCtrl.viewport,
+            }),
+        });
+        const data = await resp.json();
+        if (data.places) {
+            extractedData.places = data.places;
+            rawPlaces = JSON.parse(JSON.stringify(data.places));
+            renderResult(extractedData);
+        }
+    } catch (e) {
+        alert('재매칭 오류: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = '전체 재매칭';
     }
 }
 
@@ -202,13 +374,45 @@ function renderResult(data) {
         </div>`;
     }
 
-    let metaHtml = '';
-    if (data.has_chapters || data.has_pinned_comment) {
-        metaHtml = '<div class="cl-meta-badges">';
-        if (data.has_chapters) metaHtml += '<span class="cl-meta-badge">챕터 감지됨</span>';
-        if (data.has_pinned_comment) metaHtml += '<span class="cl-meta-badge">댓글 수집됨</span>';
-        metaHtml += '</div>';
+    let metaHtml = '<div class="cl-meta-badges">';
+    if (data.has_chapters) metaHtml += '<span class="cl-meta-badge">챕터 감지됨</span>';
+    if (data.has_pinned_comment) metaHtml += '<span class="cl-meta-badge">댓글 수집됨</span>';
+    if (data.detected_country && data.detected_country !== 'KR') {
+        metaHtml += `<span class="cl-meta-badge" style="background:#e3f2fd;color:#1565c0">해외: ${esc(COUNTRY_OPTIONS[data.detected_country] || data.detected_country)}</span>`;
     }
+    if (data.detected_region) {
+        metaHtml += `<span class="cl-meta-badge" style="background:#fce4ec;color:#ad1457">지역: ${esc(data.detected_region)}</span>`;
+    }
+    metaHtml += '</div>';
+
+    let countryOpts = '<option value="">선택</option>';
+    for (const [k, v] of Object.entries(COUNTRY_OPTIONS)) {
+        const sel = searchCtrl.countryCode === k ? 'selected' : '';
+        countryOpts += `<option value="${k}" ${sel}>${v} (${k})</option>`;
+    }
+
+    const searchCtrlHtml = `<div class="cl-search-ctrl">
+        <span style="font-weight:600">검색 기준:</span>
+        <label style="cursor:pointer"><input type="radio" name="clOverseas" value="0" ${!searchCtrl.isOverseas ? 'checked' : ''} onchange="onOverseasToggle(false)"> 국내</label>
+        <label style="cursor:pointer"><input type="radio" name="clOverseas" value="1" ${searchCtrl.isOverseas ? 'checked' : ''} onchange="onOverseasToggle(true)"> 해외</label>
+        <div id="clOverseasRow" style="display:${searchCtrl.isOverseas ? 'flex' : 'none'};align-items:center;gap:6px;flex-wrap:wrap">
+            <select class="ad-input" onchange="onCountryChange(this.value)" style="width:130px">${countryOpts}</select>
+            <input class="ad-input" id="clRegionInput" value="${esc(searchCtrl.regionHint || '')}" placeholder="기준 지역 (예: 오키나와)" style="width:140px">
+            <button class="ad-btn ad-btn--sm" onclick="onRegionChange()">범위 확인</button>
+            <span id="clVpStatus" class="${searchCtrl.viewport ? 'cl-vp-status' : 'cl-vp-status cl-vp-status--none'}">${searchCtrl.vpName ? esc(searchCtrl.vpName) + ' · 검색 범위 확인됨' : ''}</span>
+        </div>
+        <button class="ad-btn ad-btn--sm" id="btnRematch" onclick="rematchAll()" style="margin-left:auto">전체 재매칭</button>
+    </div>`;
+
+    const matchedCount = data.places.filter(p => p.matches && p.matches.length > 0).length;
+    const totalCount = data.places.length;
+    const stageStats = {};
+    data.places.forEach(p => { if (p.match_stage) stageStats[p.match_stage] = (stageStats[p.match_stage] || 0) + 1; });
+    let statsHtml = `<span style="font-size:12px;color:var(--ad-text-sub);margin-left:8px">매칭 ${matchedCount}/${totalCount}`;
+    for (const [s, cnt] of Object.entries(stageStats)) {
+        statsHtml += ` · ${STAGE_LABELS[s] ? s.toUpperCase() : s}:${cnt}`;
+    }
+    statsHtml += '</span>';
 
     const cats = @json(config('curation_categories'));
     let catOptions = '';
@@ -252,8 +456,9 @@ function renderResult(data) {
         <div class="cl-result">
             ${sourceHtml}
             ${metaHtml}
+            ${searchCtrlHtml}
             <div class="cl-result-header">
-                <h3>추출 결과 (${data.places.length}곳)</h3>
+                <h3>추출 결과 (${data.places.length}곳)${statsHtml}</h3>
                 <label style="font-size:12px;cursor:pointer"><input type="checkbox" id="checkAll" checked onchange="toggleAll(this.checked)"> 전체선택</label>
             </div>
             ${typeToggle}
@@ -261,7 +466,7 @@ function renderResult(data) {
             <div id="resultBody">${bodyHtml}</div>
             <div class="cl-footer">
                 <select class="ad-input cl-cat-select" id="draftCategory">${catOptions}</select>
-                <button class="ad-btn ad-btn--primary" onclick="createDraft()" id="btnDraft">선택한 <span id="selCount">${data.places.filter(p => p.matches?.length > 0).length}</span>곳으로 큐레이션 초안 만들기</button>
+                <button class="ad-btn ad-btn--primary" onclick="createDraft()" id="btnDraft">선택한 <span id="selCount">${matchedCount}</span>곳으로 큐레이션 초안 만들기</button>
             </div>
         </div>`;
 
@@ -271,9 +476,7 @@ function renderResult(data) {
 
 function renderListView(places) {
     let rows = '';
-    places.forEach((p, idx) => {
-        rows += buildRow(p, idx, false);
-    });
+    places.forEach((p, idx) => { rows += buildRow(p, idx, false); });
     return `<div class="cl-table-wrap"><table class="cl-table">
         <thead><tr><th style="width:30px"></th><th>추출명</th><th>매칭 결과</th><th>맥락</th></tr></thead>
         <tbody>${rows}</tbody></table></div>`;
@@ -318,10 +521,14 @@ function renderCourseView(places) {
     return html;
 }
 
-const SUSPECT_CATS = ['전기차충전소','충전소','주차장','자동차정비','주유소','은행','병원','부동산','약국','편의점','ATM'];
+const SUSPECT_CATS_KR = ['전기차충전소','충전소','주차장','자동차정비','주유소','은행','병원','부동산'];
+const SUSPECT_TYPES_GOOGLE = ['electric_vehicle_charging_station','parking','gas_station','car_repair','bank','hospital','real_estate_agency'];
 function isSuspectCat(label) {
     if (!label) return false;
-    return SUSPECT_CATS.some(s => label.includes(s));
+    const lower = label.toLowerCase();
+    if (SUSPECT_CATS_KR.some(s => label.includes(s))) return true;
+    if (SUSPECT_TYPES_GOOGLE.some(s => lower.includes(s))) return true;
+    return false;
 }
 
 function buildRow(p, idx, isCourse, showDaySelect) {
@@ -330,9 +537,12 @@ function buildRow(p, idx, isCourse, showDaySelect) {
 
     let matchHtml = '';
     if (hasMatch) {
+        if (p.match_stage && STAGE_LABELS[p.match_stage]) {
+            matchHtml += `<span class="cl-match-stage cl-match-stage--${STAGE_CLASS[p.match_stage]}">${STAGE_LABELS[p.match_stage]}</span> `;
+        }
         p.matches.forEach((m, mi) => {
             const checked = mi === 0 ? 'checked' : '';
-            const catWarn = isSuspectCat(m.category_label) ? ` <span class="cl-cat-warn" title="${esc(m.category_label)}">이 카테고리가 맞나요?</span>` : '';
+            const catWarn = isSuspectCat(m.category_label) ? ` <span class="cl-cat-warn" title="${esc(m.category_label)}">카테고리 확인</span>` : '';
             matchHtml += `<div class="cl-match-item">
                 <input type="radio" name="match_${idx}" value="${mi}" ${checked} id="m_${idx}_${mi}">
                 <label for="m_${idx}_${mi}">${esc(m.place_name)} <span class="cl-addr">${esc(m.address)}</span>${catWarn}</label>
@@ -345,6 +555,13 @@ function buildRow(p, idx, isCourse, showDaySelect) {
         <input class="ad-input" placeholder="재검색" id="rs_${idx}" onkeydown="if(event.key==='Enter'){event.preventDefault();reSearch(${idx})}">
         <button class="ad-btn ad-btn--sm" onclick="reSearch(${idx})">검색</button>
     </div>`;
+
+    let nameHtml = esc(p.extracted_name);
+    if (p.region_hint) nameHtml += ` <span style="color:#999;font-size:11px">(${esc(p.region_hint)})</span>`;
+    const altNames = [p.name_local, p.name_en].filter(Boolean);
+    if (altNames.length > 0) {
+        nameHtml += `<div class="cl-names-sub">${altNames.map(n => esc(n)).join(' / ')}</div>`;
+    }
 
     let courseCells = '';
     if (isCourse) {
@@ -361,9 +578,9 @@ function buildRow(p, idx, isCourse, showDaySelect) {
     return `<tr class="${rowClass}" id="row_${idx}">
         <td><input type="checkbox" class="cl-check" data-idx="${idx}" ${hasMatch ? 'checked' : ''}></td>
         ${courseCells}
-        <td>${esc(p.extracted_name)}${p.region_hint ? ' <span style="color:#999;font-size:11px">(' + esc(p.region_hint) + ')</span>' : ''}</td>
+        <td>${nameHtml}</td>
         <td class="cl-match-cell" id="matches_${idx}">${matchHtml}</td>
-        ${isCourse && !showDaySelect ? '' : ''}<td class="cl-context">${esc(p.mention_context)}</td>
+        <td class="cl-context">${esc(p.mention_context)}</td>
     </tr>`;
 }
 
@@ -393,14 +610,26 @@ async function reSearch(idx) {
     if (!query) return;
 
     try {
-        const resp = await fetch('/admin/collector/search-kakao?query=' + encodeURIComponent(query), {
-            headers: { 'X-CSRF-TOKEN': CSRF },
-        });
-        const data = await resp.json();
-        const results = data.results || [];
+        let results = [];
+        if (searchCtrl.isOverseas) {
+            const params = new URLSearchParams({ query, country_code: searchCtrl.countryCode || '' });
+            if (searchCtrl.viewport) params.set('viewport', JSON.stringify(searchCtrl.viewport));
+            const resp = await fetch('/admin/collector/search-google?' + params, {
+                headers: { 'X-CSRF-TOKEN': CSRF },
+            });
+            const data = await resp.json();
+            results = data.results || [];
+        } else {
+            const resp = await fetch('/admin/collector/search-kakao?query=' + encodeURIComponent(query), {
+                headers: { 'X-CSRF-TOKEN': CSRF },
+            });
+            const data = await resp.json();
+            results = data.results || [];
+        }
 
         if (extractedData && extractedData.places[idx]) {
             extractedData.places[idx].matches = results.slice(0, 3);
+            extractedData.places[idx].match_stage = results.length > 0 ? 'ko' : null;
         }
 
         const cell = document.getElementById('matches_' + idx);
@@ -408,7 +637,7 @@ async function reSearch(idx) {
         if (results.length > 0) {
             results.slice(0, 3).forEach((m, mi) => {
                 const checked = mi === 0 ? 'checked' : '';
-                const catWarn = isSuspectCat(m.category_label) ? ` <span class="cl-cat-warn" title="${esc(m.category_label)}">이 카테고리가 맞나요?</span>` : '';
+                const catWarn = isSuspectCat(m.category_label) ? ` <span class="cl-cat-warn" title="${esc(m.category_label)}">카테고리 확인</span>` : '';
                 html += `<div class="cl-match-item">
                     <input type="radio" name="match_${idx}" value="${mi}" ${checked} id="m_${idx}_${mi}">
                     <label for="m_${idx}_${mi}">${esc(m.place_name)} <span class="cl-addr">${esc(m.address)}</span>${catWarn}</label>
@@ -468,6 +697,7 @@ async function createDraft() {
             longitude: match.longitude,
             category_label: match.category_label || null,
             external_place_id: match.external_place_id || null,
+            google_place_id: match.google_place_id || null,
             phone: match.phone || null,
             editor_note: p.mention_context || null,
             day_number: p.day || null,
@@ -490,9 +720,7 @@ async function createDraft() {
         const da = a.day_number ?? 9999;
         const db = b.day_number ?? 9999;
         if (da !== db) return da - db;
-        const oa = a.sort_order ?? 9999;
-        const ob = b.sort_order ?? 9999;
-        return oa - ob;
+        return (a.sort_order ?? 9999) - (b.sort_order ?? 9999);
     });
 
     const btn = document.getElementById('btnDraft');
@@ -514,9 +742,7 @@ async function createDraft() {
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || '오류가 발생했습니다.');
-        if (data.redirect) {
-            window.location.href = data.redirect;
-        }
+        if (data.redirect) window.location.href = data.redirect;
     } catch (e) {
         alert(e.message);
         btn.disabled = false;

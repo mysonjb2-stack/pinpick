@@ -24,6 +24,8 @@ Route::middleware('admin.auth')->group(function () {
     Route::get('places', [PlaceController::class, 'index'])->name('admin.places.index');
     Route::get('places/{place}', [PlaceController::class, 'show'])->name('admin.places.show');
     Route::delete('places/{place}', [PlaceController::class, 'destroy'])->name('admin.places.destroy');
+    Route::get('places/{place}/similar', [PlaceController::class, 'similarPlaces'])->name('admin.places.similar');
+    Route::put('places/{place}/region', [PlaceController::class, 'updateRegion'])->name('admin.places.update-region');
 
     Route::get('curations', [CurationController::class, 'index'])->name('admin.curations.index');
     Route::get('curations/create', [CurationController::class, 'create'])->name('admin.curations.create');
@@ -49,11 +51,15 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('curations/{curation}/reject', [CurationController::class, 'reject'])->name('admin.curations.reject');
     Route::post('curations/{curation}/suspend', [CurationController::class, 'suspend'])->name('admin.curations.suspend');
     Route::get('curations/places/{place}/tour-images', [CurationController::class, 'searchTourImages'])->name('admin.curations.tour-images');
+    Route::put('curations/places/{place}/region', [CurationController::class, 'updatePlaceRegion'])->name('admin.curations.update-region');
 
     Route::get('collector', [CollectorController::class, 'index'])->name('admin.collector.index');
     Route::post('collector/extract-youtube', [CollectorController::class, 'extractFromYoutube'])->name('admin.collector.extract-youtube');
     Route::post('collector/extract-text', [CollectorController::class, 'extractFromText'])->name('admin.collector.extract-text');
     Route::get('collector/search-kakao', [CollectorController::class, 'searchKakao'])->name('admin.collector.search-kakao');
+    Route::get('collector/search-google', [CollectorController::class, 'searchGoogle'])->name('admin.collector.search-google');
+    Route::post('collector/geocode-region', [CollectorController::class, 'geocodeRegion'])->name('admin.collector.geocode-region');
+    Route::post('collector/rematch-all', [CollectorController::class, 'rematchAll'])->name('admin.collector.rematch-all');
     Route::post('collector/create-draft', [CollectorController::class, 'createDraft'])->name('admin.collector.create-draft');
 
     Route::get('personas', [PersonaController::class, 'index'])->name('admin.personas.index');

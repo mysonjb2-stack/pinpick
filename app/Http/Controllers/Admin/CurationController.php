@@ -7,6 +7,7 @@ use App\Models\Curation;
 use App\Models\CurationPlace;
 use App\Models\User;
 use App\Models\PlaceImage;
+use App\Services\AddressParserService;
 use App\Services\GoogleReviewService;
 use App\Services\ImageProcessor;
 use App\Services\NaverPlaceMatcher;
@@ -255,13 +256,14 @@ class CurationController extends Controller
             'building_name' => 'nullable|string|max:100',
             'naver_place_id' => 'nullable|string',
             'google_place_id' => 'nullable|string|max:255',
+            'address_components' => 'nullable|array',
         ]);
 
         $data['curation_id'] = $curation->id;
         $data['sort_order'] = ($curation->places()->max('sort_order') ?? -1) + 1;
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
 
-        if (!($data['is_overseas'])) {
+        if (!$data['is_overseas']) {
             $data['dong_label'] = $this->parseDongLabel(
                 $data['jibeon_address'] ?? null,
                 (float) ($data['latitude'] ?? 0),
@@ -269,9 +271,32 @@ class CurationController extends Controller
             );
         }
 
+        $parser = app(AddressParserService::class);
+        unset($data['address_components']);
+        if ($data['is_overseas'] && !empty($data['external_place_id'])) {
+            $region = $parser->fetchOverseasRegion($data['external_place_id']);
+            if ($region) {
+                AddressParserService::applyCanonicalDisplay($region);
+                $data['address_raw'] = $region['address_raw'];
+                $data['country_code'] = $region['country_code'];
+                $data['region_l1'] = $region['region_l1'];
+                $data['region_l2'] = $region['region_l2'];
+                $data['region_l1_key'] = $region['region_l1_key'];
+                $data['region_l2_key'] = $region['region_l2_key'];
+            }
+        } else {
+            $region = $parser->parseKorean($data['address'] ?? null);
+            $data['country_code'] = $region['country_code'];
+            $data['region_l1'] = $region['region_l1'];
+            $data['region_l2'] = $region['region_l2'];
+            $data['region_l1_key'] = $region['region_l1_key'];
+            $data['region_l2_key'] = $region['region_l2_key'];
+        }
+
         $place = CurationPlace::create($data);
 
         $curation->refreshCenter();
+        $curation->refreshRegionCodes();
 
         return response()->json(['success' => true, 'place' => $place]);
     }
@@ -470,6 +495,14 @@ class CurationController extends Controller
         }
         if ($manualEdited) {
             $update['is_manual'] = true;
+            $parser = app(AddressParserService::class);
+            $newAddress = $update['address'] ?? $place->address;
+            $region = $parser->parseKorean($newAddress);
+            $update['country_code'] = $region['country_code'];
+            $update['region_l1'] = $region['region_l1'];
+            $update['region_l2'] = $region['region_l2'];
+            $update['region_l1_key'] = $region['region_l1_key'];
+            $update['region_l2_key'] = $region['region_l2_key'];
         }
 
         if ($request->has('phone') && $request->phone === '') {
@@ -490,6 +523,10 @@ class CurationController extends Controller
 
         $place->update($update);
 
+        if ($manualEdited) {
+            $place->curation->refreshRegionCodes();
+        }
+
         return response()->json(['success' => true]);
     }
 
@@ -505,6 +542,7 @@ class CurationController extends Controller
             'building_name' => 'nullable|string|max:100',
             'external_place_id' => 'nullable|string|max:100',
             'is_overseas' => 'boolean',
+            'address_components' => 'nullable|array',
         ]);
 
         $isOverseas = (bool) ($data['is_overseas'] ?? false);
@@ -512,49 +550,85 @@ class CurationController extends Controller
             ? $this->parseDongLabel($data['jibeon_address'] ?? null, (float) $data['latitude'], (float) $data['longitude'])
             : null;
 
+        $oldGooglePlaceId = $place->google_place_id;
+
+        $parser = app(AddressParserService::class);
+        $regionData = ['address_raw' => null];
+        $extId = $data['external_place_id'] ?? null;
+        if ($isOverseas && $extId) {
+            $region = $parser->fetchOverseasRegion($extId);
+            if ($region) {
+                AddressParserService::applyCanonicalDisplay($region);
+                $regionData = $region;
+            }
+        } else {
+            $region = $parser->parseKorean($data['address'] ?? null);
+            $regionData = array_merge($regionData, $region);
+        }
+
         $place->update([
             'place_name' => $data['place_name'],
             'address' => $data['address'] ?? null,
+            'address_raw' => $regionData['address_raw'] ?? null,
             'jibeon_address' => $data['jibeon_address'] ?? null,
             'latitude' => $data['latitude'],
             'longitude' => $data['longitude'],
             'phone' => $data['phone'] ?? null,
             'building_name' => $data['building_name'] ?? null,
-            'external_place_id' => $data['external_place_id'] ?? null,
+            'external_place_id' => $extId,
             'is_overseas' => $isOverseas,
             'google_place_id' => null,
             'naver_place_id' => null,
             'is_manual' => false,
             'dong_label' => $dongLabel,
+            'country_code' => $regionData['country_code'] ?? null,
+            'region_l1' => $regionData['region_l1'] ?? null,
+            'region_l2' => $regionData['region_l2'] ?? null,
+            'region_l1_key' => $regionData['region_l1_key'] ?? null,
+            'region_l2_key' => $regionData['region_l2_key'] ?? null,
         ]);
 
+        if ($oldGooglePlaceId) {
+            $this->clearGoogleReviewCache($oldGooglePlaceId, $place->curation_id);
+        }
+
         $googleResult = null;
-        if (!($data['is_overseas'] ?? false)) {
-            $service = app(GoogleReviewService::class);
-            $placeId = $service->matchPlaceId(
-                $data['place_name'],
-                (float) $data['latitude'],
-                (float) $data['longitude'],
-                $data['address'] ?? ''
-            );
-            if ($placeId) {
-                $place->update(['google_place_id' => $placeId]);
-                $cache = $service->fetchAndCache($placeId);
-                $googleResult = [
-                    'google_place_id' => $placeId,
-                    'rating' => $cache?->rating,
-                    'review_count' => $cache?->review_count,
-                ];
-            }
+        $service = app(GoogleReviewService::class);
+        $placeId = $service->matchPlaceId(
+            $data['place_name'],
+            (float) $data['latitude'],
+            (float) $data['longitude'],
+            $data['address'] ?? ''
+        );
+        if ($placeId) {
+            $place->update(['google_place_id' => $placeId]);
+            $cache = $service->fetchAndCache($placeId);
+            $googleResult = [
+                'google_place_id' => $placeId,
+                'rating' => $cache?->rating,
+                'review_count' => $cache?->review_count,
+            ];
         }
 
         $place->curation->refreshCenter();
+        $place->curation->refreshRegionCodes();
 
         return response()->json([
             'success' => true,
             'place' => $place->fresh(),
             'google' => $googleResult,
         ]);
+    }
+
+    private function clearGoogleReviewCache(string $googlePlaceId, int $curationId): void
+    {
+        $otherUsage = CurationPlace::where('google_place_id', $googlePlaceId)
+            ->where('curation_id', '!=', $curationId)
+            ->exists();
+        if ($otherUsage) return;
+
+        \App\Models\GoogleReview::where('google_place_id', $googlePlaceId)->delete();
+        \App\Models\GooglePlaceCache::where('google_place_id', $googlePlaceId)->delete();
     }
 
     public function enrichNaver(Request $request, CurationPlace $place)
@@ -735,12 +809,14 @@ class CurationController extends Controller
 
     public function removePlace(CurationPlace $place)
     {
+        $curation = $place->curation;
         if ($place->photos) {
             foreach ($place->photos as $path) {
                 $this->deletePhotoFileIfUnreferenced($path);
             }
         }
         $place->delete();
+        $curation->refreshRegionCodes();
         return response()->json(['success' => true]);
     }
 
@@ -826,6 +902,28 @@ class CurationController extends Controller
     public function clearGooglePlace(CurationPlace $place)
     {
         $place->update(['google_place_id' => null]);
+        return response()->json(['success' => true]);
+    }
+
+    public function updatePlaceRegion(Request $request, CurationPlace $place)
+    {
+        $data = $request->validate([
+            'country_code' => 'nullable|string|max:2',
+            'region_l1' => 'nullable|string|max:50',
+            'region_l2' => 'nullable|string|max:50',
+        ]);
+
+        $place->update([
+            'country_code' => $data['country_code'] ?: null,
+            'region_l1' => $data['region_l1'] ?: null,
+            'region_l2' => $data['region_l2'] ?: null,
+            'region_l1_key' => AddressParserService::normalizeKey($data['region_l1'] ?: null),
+            'region_l2_key' => AddressParserService::normalizeKey($data['region_l2'] ?: null),
+            'is_manual' => true,
+        ]);
+
+        $place->curation->refreshRegionCodes();
+
         return response()->json(['success' => true]);
     }
 

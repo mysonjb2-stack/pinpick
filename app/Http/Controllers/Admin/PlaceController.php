@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Place;
+use App\Services\AddressParserService;
 use Illuminate\Http\Request;
 
 class PlaceController extends Controller
@@ -39,5 +40,84 @@ class PlaceController extends Controller
     {
         $place->delete();
         return redirect()->route('admin.places.index')->with('success', '장소가 삭제되었습니다.');
+    }
+
+    public function similarPlaces(Place $place)
+    {
+        if (!$place->lat || !$place->lng) {
+            return response()->json(['similar' => []]);
+        }
+
+        $similar = Place::whereNull('deleted_at')
+            ->where('id', '!=', $place->id)
+            ->where('name', $place->name)
+            ->whereNotNull('lat')->whereNotNull('lng')
+            ->get()
+            ->filter(function ($p) use ($place) {
+                $dlat = abs($p->lat - $place->lat);
+                $dlng = abs($p->lng - $place->lng);
+                return $dlat < 0.0005 && $dlng < 0.0005;
+            })
+            ->map(fn($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'address' => $p->road_address ?: $p->address,
+                'country_code' => $p->country_code,
+                'region_l1' => $p->region_l1,
+                'user_name' => $p->user?->name ?? '(삭제됨)',
+            ])
+            ->values();
+
+        return response()->json(['similar' => $similar]);
+    }
+
+    public function updateRegion(Request $request, Place $place)
+    {
+        $data = $request->validate([
+            'country_code' => 'nullable|string|max:2',
+            'region_l1' => 'nullable|string|max:50',
+            'region_l2' => 'nullable|string|max:50',
+            'region_l1_key' => 'nullable|string|max:80',
+            'region_l2_key' => 'nullable|string|max:80',
+            'apply_similar' => 'nullable|boolean',
+        ]);
+
+        $l1Key = !empty($data['region_l1_key'])
+            ? $data['region_l1_key']
+            : AddressParserService::normalizeKey($data['region_l1'] ?? null);
+        $l2Key = !empty($data['region_l2_key'])
+            ? $data['region_l2_key']
+            : AddressParserService::normalizeKey($data['region_l2'] ?? null);
+
+        $updateData = [
+            'country_code' => $data['country_code'] ?: null,
+            'region_l1' => $data['region_l1'] ?: null,
+            'region_l2' => $data['region_l2'] ?: null,
+            'region_l1_key' => $l1Key,
+            'region_l2_key' => $l2Key,
+        ];
+
+        $place->update($updateData);
+        $updated = [$place->id];
+
+        if (!empty($data['apply_similar']) && $place->lat && $place->lng) {
+            $similar = Place::whereNull('deleted_at')
+                ->where('id', '!=', $place->id)
+                ->where('name', $place->name)
+                ->whereNotNull('lat')->whereNotNull('lng')
+                ->get()
+                ->filter(function ($p) use ($place) {
+                    $dlat = abs($p->lat - $place->lat);
+                    $dlng = abs($p->lng - $place->lng);
+                    return $dlat < 0.0005 && $dlng < 0.0005;
+                });
+
+            foreach ($similar as $s) {
+                $s->update($updateData);
+                $updated[] = $s->id;
+            }
+        }
+
+        return response()->json(['success' => true, 'updated_ids' => $updated]);
     }
 }

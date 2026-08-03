@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CurationPlace extends Model
 {
     protected $fillable = [
-        'curation_id', 'place_name', 'address', 'jibeon_address', 'latitude', 'longitude',
+        'curation_id', 'place_name', 'address', 'address_raw', 'jibeon_address', 'latitude', 'longitude',
         'category_label', 'thumbnail_url', 'photos', 'external_place_id', 'is_overseas',
+        'country_code', 'region_l1', 'region_l2', 'region_l1_key', 'region_l2_key',
         'source_channel', 'source_url', 'source_date', 'day_number',
         'sort_order', 'transit_hint', 'is_manual', 'editor_note', 'phone', 'opening_hours',
         'building_name', 'naver_place_id', 'google_place_id', 'dong_label',
@@ -24,6 +25,7 @@ class CurationPlace extends Model
         'is_manual' => 'boolean',
         'opening_hours' => 'array',
         'photos' => 'array',
+        'address_raw' => 'array',
         'source_date' => 'date',
     ];
 

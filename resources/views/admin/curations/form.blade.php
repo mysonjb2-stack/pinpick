@@ -126,6 +126,12 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
 .cur-replace-cmp__addr { font-size:12px; color:var(--ad-text-sub); margin-top:2px; }
 .cur-manual-badge { display:inline-block; font-size:10px; padding:1px 5px; border-radius:3px; background:#fef3c7; color:#92400e; margin-left:4px; vertical-align:middle; }
 .cur-day-select { width:80px; font-size:12px; padding:3px 4px; border:1px solid var(--ad-border); border-radius:4px; background:var(--ad-card); }
+.cur-region-row { display:flex; gap:4px; align-items:center; margin-top:4px; flex-wrap:wrap; }
+.cur-region-tag { font-size:10px; padding:1px 6px; border-radius:3px; background:#e3f2fd; color:#1565c0; }
+.cur-region-edit { display:none; gap:4px; margin-top:4px; }
+.cur-region-edit.is-open { display:flex; }
+.cur-region-edit input { font-size:11px; padding:2px 6px; border:1px solid var(--ad-border); border-radius:3px; width:70px; }
+.cur-region-edit input.wider { width:100px; }
 </style>
 @endpush
 
@@ -224,8 +230,16 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                 </div>
                 <div class="ad-form-group">
                     <label>지역 라벨</label>
-                    <input class="ad-input" name="region_label" value="{{ old('region_label', $curation?->region_label) }}" placeholder="예: 서울, 분당, 맛집 (쉼표로 구분)">
-                    <small style="color:var(--ad-text-sub);font-size:11px">쉼표로 구분하면 개별 칩으로 표시됩니다</small>
+                    @php $hasRegionCodes = $curation && $curation->region_codes && count($curation->region_codes) > 0; @endphp
+                    <input class="ad-input" name="region_label" id="regionLabelInput" value="{{ old('region_label', $curation?->region_label) }}" {{ $hasRegionCodes ? 'readonly' : '' }} placeholder="장소 추가 시 자동 생성됩니다" style="{{ $hasRegionCodes ? 'background:#f5f5f5;' : '' }}">
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+                        <small style="color:var(--ad-text-sub);font-size:11px">{{ $hasRegionCodes ? '장소 기반 자동 도출' : '쉼표로 구분하면 개별 칩으로 표시됩니다' }}</small>
+                        @if($hasRegionCodes)
+                        <label style="font-size:11px;cursor:pointer;color:var(--ad-primary)">
+                            <input type="checkbox" id="regionManualToggle" style="margin-right:2px" onchange="toggleRegionManual(this.checked)">직접 지정
+                        </label>
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -269,6 +283,20 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                             <input class="cur-place__name-input" data-field="place_name" value="{{ $p->place_name }}">
                             <input class="cur-place__addr-input" data-field="address" value="{{ $p->address }}">
                             @if($p->is_manual)<span class="cur-manual-badge">수동 수정</span>@endif
+                            @if($p->region_l1)
+                            <div class="cur-region-row">
+                                <span class="cur-region-tag">{{ $p->country_code }}</span>
+                                <span class="cur-region-tag">{{ $p->region_l1 }}</span>
+                                @if($p->region_l2)<span class="cur-region-tag">{{ $p->region_l2 }}</span>@endif
+                                <button type="button" style="font-size:10px;border:none;background:none;color:var(--ad-text-sub);cursor:pointer;padding:0" onclick="toggleRegionEdit({{ $p->id }})">✏️</button>
+                            </div>
+                            <div class="cur-region-edit" id="regionEdit{{ $p->id }}">
+                                <input data-region="country_code" value="{{ $p->country_code }}" placeholder="국가" maxlength="2">
+                                <input class="wider" data-region="region_l1" value="{{ $p->region_l1 }}" placeholder="시도/주">
+                                <input class="wider" data-region="region_l2" value="{{ $p->region_l2 }}" placeholder="시군구/도시">
+                                <button type="button" class="ad-btn ad-btn--sm" style="font-size:10px;padding:2px 6px" onclick="saveRegion({{ $p->id }})">저장</button>
+                            </div>
+                            @endif
                             <div class="cur-place__gid" data-gid-row>
                                 @if($p->google_place_id)
                                 <span class="cur-place__gid-tag" title="{{ $p->google_place_id }}">G {{ \Illuminate\Support\Str::limit($p->google_place_id, 20) }}</span>
@@ -390,7 +418,9 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
         </div>
         <div class="cur-replace-modal__body" id="replaceBody">
             <div style="display:flex;gap:6px;margin-bottom:8px">
-                <input class="ad-input" id="replaceSearch" placeholder="장소명 검색" autocomplete="off" style="flex:1">
+                <button type="button" class="ad-btn ad-btn--sm" id="replTabDom" onclick="setReplaceTab(false)" style="background:var(--ad-primary);color:#fff;border-color:var(--ad-primary)">국내</button>
+                <button type="button" class="ad-btn ad-btn--sm" id="replTabOvs" onclick="setReplaceTab(true)">해외</button>
+                <input class="ad-input" id="replaceSearch" placeholder="장소명 검색 (국내 · 카카오)" autocomplete="off" style="flex:1">
                 <button type="button" class="ad-btn ad-btn--sm" id="replaceSearchBtn" onclick="doReplaceSearch()">검색</button>
             </div>
             <div style="margin-bottom:12px"><button type="button" class="ad-btn ad-btn--sm" style="font-size:12px;color:var(--ad-text-sub)" onclick="showManualReplace()">검색 결과가 없나요? 수동 입력</button></div>
@@ -675,6 +705,7 @@ async function addPlaceFromSearch(d, isOverseas) {
         is_overseas: isOverseas,
     };
     if (isOverseas && d.id) body.google_place_id = d.id;
+    if (isOverseas && d.address_components) body.address_components = d.address_components;
     if (d.opening_hours) body.opening_hours = d.opening_hours;
 
     if (!isOverseas && addr) {
@@ -909,6 +940,23 @@ function showManualReplace() {
     document.getElementById('replaceConfirmBtn').textContent = '수동 교체 확정';
 }
 
+function setReplaceTab(overseas) {
+    replaceIsOverseas = overseas;
+    const domBtn = document.getElementById('replTabDom');
+    const ovsBtn = document.getElementById('replTabOvs');
+    const search = document.getElementById('replaceSearch');
+    if (overseas) {
+        ovsBtn.style.cssText = 'background:var(--ad-primary);color:#fff;border-color:var(--ad-primary)';
+        domBtn.style.cssText = '';
+        search.placeholder = '장소명 검색 (해외 · Google)';
+    } else {
+        domBtn.style.cssText = 'background:var(--ad-primary);color:#fff;border-color:var(--ad-primary)';
+        ovsBtn.style.cssText = '';
+        search.placeholder = '장소명 검색 (국내 · 카카오)';
+    }
+    search.focus();
+}
+
 function openReplace(placeId, btn) {
     replaceTargetId = placeId;
     replaceTargetCard = btn.closest('.cur-place');
@@ -918,6 +966,8 @@ function openReplace(placeId, btn) {
     const addrInp = card.querySelector('[data-field="address"]');
     const addr = addrInp ? addrInp.value : '';
     if (addr && !/[가-힣]/.test(addr)) replaceIsOverseas = true;
+
+    setReplaceTab(replaceIsOverseas);
 
     document.getElementById('replaceSearch').value = nameInp ? nameInp.value : '';
     document.getElementById('replaceResults').innerHTML = '';
@@ -1068,6 +1118,9 @@ async function confirmReplace() {
         external_place_id: d.id || '',
         is_overseas: replaceIsOverseas,
     };
+    if (replaceIsOverseas && d.address_components) {
+        body.address_components = d.address_components;
+    }
 
     try {
         const r = await fetch('/admin/curations/places/' + replaceTargetId + '/replace', {
@@ -1715,6 +1768,54 @@ renumber();
 if (cType === 'course' && curDaysVal) rebuildDayGroups();
 updateDurationLabel();
 if (document.getElementById('curNights')?.value !== '' && document.getElementById('curDaysField')?.value !== '') daysAutoFill = false;
+
+function toggleRegionEdit(placeId) {
+    const el = document.getElementById('regionEdit' + placeId);
+    if (el) el.classList.toggle('is-open');
+}
+
+async function saveRegion(placeId) {
+    const el = document.getElementById('regionEdit' + placeId);
+    if (!el) return;
+    const cc = el.querySelector('[data-region="country_code"]').value.trim();
+    const l1 = el.querySelector('[data-region="region_l1"]').value.trim();
+    const l2 = el.querySelector('[data-region="region_l2"]').value.trim();
+    try {
+        const r = await fetch('/admin/curations/places/' + placeId + '/region', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            body: JSON.stringify({ country_code: cc, region_l1: l1, region_l2: l2 }),
+        });
+        const data = await r.json();
+        if (data.success) {
+            el.classList.remove('is-open');
+            const row = el.previousElementSibling;
+            if (row && row.classList.contains('cur-region-row')) {
+                const tags = row.querySelectorAll('.cur-region-tag');
+                if (tags[0]) tags[0].textContent = cc;
+                if (tags[1]) tags[1].textContent = l1;
+                if (tags[2]) { tags[2].textContent = l2; tags[2].style.display = l2 ? '' : 'none'; }
+                else if (l2) {
+                    const tag = document.createElement('span');
+                    tag.className = 'cur-region-tag';
+                    tag.textContent = l2;
+                    row.querySelector('button').before(tag);
+                }
+            }
+        }
+    } catch(e) { alert('저장 실패'); }
+}
+
+function toggleRegionManual(on) {
+    const inp = document.getElementById('regionLabelInput');
+    if (on) {
+        inp.removeAttribute('readonly');
+        inp.style.background = '';
+    } else {
+        inp.setAttribute('readonly', '');
+        inp.style.background = '#f5f5f5';
+    }
+}
 </script>
 @endpush
 @endif

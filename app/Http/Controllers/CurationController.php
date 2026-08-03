@@ -167,6 +167,12 @@ class CurationController extends Controller
                 'kakao_place_id' => $cp->external_place_id,
                 'naver_place_id' => $cp->naver_place_id,
                 'google_place_id' => $cp->google_place_id,
+                'address_raw' => $cp->address_raw,
+                'country_code' => $cp->country_code,
+                'region_l1' => $cp->region_l1,
+                'region_l2' => $cp->region_l2,
+                'region_l1_key' => $cp->region_l1_key,
+                'region_l2_key' => $cp->region_l2_key,
             ]);
 
             if (!empty($cp->photos)) {

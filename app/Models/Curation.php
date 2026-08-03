@@ -11,7 +11,7 @@ class Curation extends Model
 {
     protected $fillable = [
         'title', 'slug', 'type', 'nights', 'days', 'category', 'description', 'cover_image',
-        'region_label', 'center_lat', 'center_lng', 'status', 'published_at',
+        'region_label', 'region_codes', 'center_lat', 'center_lng', 'status', 'published_at',
         'view_count', 'save_count',
         'author_type', 'author_user_id',
         'rejected_reason', 'approved_snapshot',
@@ -24,6 +24,7 @@ class Curation extends Model
         'nights' => 'integer',
         'days' => 'integer',
         'approved_snapshot' => 'array',
+        'region_codes' => 'array',
     ];
 
     public function getDurationLabelAttribute(): ?string
@@ -85,6 +86,18 @@ class Curation extends Model
             return $this->approved_snapshot['description'] ?? $this->description;
         }
         return $this->description;
+    }
+
+    public function refreshRegionCodes(): void
+    {
+        $places = $this->places()->whereNotNull('country_code')->get();
+        $parser = app(\App\Services\AddressParserService::class);
+        $codes = $parser->buildRegionCodesCache($places);
+        $labels = $parser->deriveRegionLabels($places);
+        $this->update([
+            'region_codes' => $codes ?: null,
+            'region_label' => $labels ? implode(', ', array_slice($labels, 0, 4)) : $this->region_label,
+        ]);
     }
 
     public function refreshCenter(): void

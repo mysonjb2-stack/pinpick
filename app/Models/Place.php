@@ -14,6 +14,7 @@ class Place extends Model
 
     protected $fillable = [
         'user_id', 'category_id', 'name', 'original_name', 'phone', 'opening_hours', 'address', 'road_address',
+        'address_raw', 'country_code', 'region_l1', 'region_l2', 'region_l1_key', 'region_l2_key',
         'building_name', 'detail_location',
         'lat', 'lng', 'memo', 'status', 'visited_at',
         'naver_place_id', 'kakao_place_id', 'google_place_id', 'naver_matched_at',
@@ -23,6 +24,7 @@ class Place extends Model
     protected $casts = [
         'visited_at' => 'date',
         'opening_hours' => 'array',
+        'address_raw' => 'array',
         'is_visible' => 'boolean',
         'is_overseas' => 'boolean',
         'is_public' => 'boolean',

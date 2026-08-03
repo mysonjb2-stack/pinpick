@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use App\Models\PlaceImage;
+use App\Services\AddressParserService;
 use App\Services\GoogleReviewService;
 use App\Services\ImageProcessor;
 use Illuminate\Support\Str;
@@ -256,6 +257,15 @@ class SharedCollectionController extends Controller
                 }
             }
 
+            $parser = app(AddressParserService::class);
+            $gpid = $sp->google_place_id;
+            if ($isOverseas && $gpid) {
+                $region = $parser->fetchOverseasRegion($gpid) ?? $parser->parse($sp->address, true);
+            } else {
+                $region = $parser->parse($sp->address, $isOverseas);
+            }
+            AddressParserService::applyCanonicalDisplay($region);
+
             $newPlace = Place::create([
                 'user_id' => $user->id,
                 'category_id' => $category->id,
@@ -276,7 +286,13 @@ class SharedCollectionController extends Controller
                 'sort_order' => ++$maxSort,
                 'kakao_place_id' => $sp->external_place_id,
                 'naver_place_id' => $sp->naver_place_id,
-                'google_place_id' => $sp->google_place_id,
+                'google_place_id' => $gpid,
+                'address_raw' => $region['address_raw'] ?? null,
+                'country_code' => $region['country_code'],
+                'region_l1' => $region['region_l1'],
+                'region_l2' => $region['region_l2'],
+                'region_l1_key' => $region['region_l1_key'] ?? null,
+                'region_l2_key' => $region['region_l2_key'] ?? null,
             ]);
 
             if (!empty($sp->themes)) {

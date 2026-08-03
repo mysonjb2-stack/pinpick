@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Place;
 use App\Models\PlaceImage;
 use App\Models\Theme;
+use App\Services\AddressParserService;
 use App\Services\ImageProcessor;
 use App\Services\NaverPlaceMatcher;
 use App\Services\NaverUrlParser;
@@ -52,6 +53,7 @@ class PlaceController extends Controller
             'google_place_id' => ['nullable', 'string', 'max:255'],
             'naver_url' => ['nullable', 'string', 'max:500'],
             'is_overseas' => ['nullable', 'boolean'],
+            'address_components' => ['nullable', 'array'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
             'theme_ids' => ['nullable', 'array', 'max:2'],
@@ -83,6 +85,39 @@ class PlaceController extends Controller
         $data['user_id'] = $request->user()->id;
         // personal-only-v1: 공개 장소 노출 차단 — 항상 비공개로 강제
         $data['is_public'] = false;
+
+        $addressComponents = $data['address_components'] ?? null;
+        unset($data['address_components']);
+
+        $parser = app(AddressParserService::class);
+        if ($data['is_overseas'] && !empty($data['google_place_id'])) {
+            $region = $parser->fetchOverseasRegion($data['google_place_id']);
+            if ($region) {
+                AddressParserService::applyCanonicalDisplay($region);
+                $data['address_raw'] = $region['address_raw'];
+                $data['country_code'] = $region['country_code'];
+                $data['region_l1'] = $region['region_l1'];
+                $data['region_l2'] = $region['region_l2'];
+                $data['region_l1_key'] = $region['region_l1_key'];
+                $data['region_l2_key'] = $region['region_l2_key'];
+            }
+        } elseif ($data['is_overseas'] && $addressComponents) {
+            $data['address_raw'] = $addressComponents;
+            $region = $parser->parseOverseas($addressComponents);
+            AddressParserService::applyCanonicalDisplay($region);
+            $data['country_code'] = $region['country_code'];
+            $data['region_l1'] = $region['region_l1'];
+            $data['region_l2'] = $region['region_l2'];
+            $data['region_l1_key'] = $region['region_l1_key'];
+            $data['region_l2_key'] = $region['region_l2_key'];
+        } else {
+            $region = $parser->parseKorean($data['road_address'] ?? $data['address'] ?? null);
+            $data['country_code'] = $region['country_code'];
+            $data['region_l1'] = $region['region_l1'];
+            $data['region_l2'] = $region['region_l2'];
+            $data['region_l1_key'] = $region['region_l1_key'];
+            $data['region_l2_key'] = $region['region_l2_key'];
+        }
 
         // 좌표가 비어있으면 주소로 forward geocoding
         if (empty($data['lat']) || empty($data['lng'])) {
@@ -248,6 +283,16 @@ class PlaceController extends Controller
                 $addr = null;
             }
 
+            $isOverseas = !empty($p['is_overseas']);
+            $guestParser = app(AddressParserService::class);
+            $gpid = $p['google_place_id'] ?? null;
+            if ($isOverseas && $gpid) {
+                $guestRegion = $guestParser->fetchOverseasRegion($gpid) ?? $guestParser->parse($roadAddr ?? $addr, true);
+            } else {
+                $guestRegion = $guestParser->parse($roadAddr ?? $addr, $isOverseas);
+            }
+            AddressParserService::applyCanonicalDisplay($guestRegion);
+
             $newPlace = Place::create([
                 'user_id' => $user->id,
                 'category_id' => $catId,
@@ -264,13 +309,19 @@ class PlaceController extends Controller
                 'memo' => $p['memo'] ?? null,
                 'status' => $p['status'] ?? 'planned',
                 'visited_at' => $visited,
-                'is_overseas' => !empty($p['is_overseas']),
+                'is_overseas' => $isOverseas,
                 'kakao_place_id' => $p['kakao_place_id'] ?? null,
                 'naver_place_id' => $p['naver_place_id'] ?? null,
-                'google_place_id' => $p['google_place_id'] ?? null,
+                'google_place_id' => $gpid,
                 'sort_order' => ++$maxSort,
                 'is_visible' => true,
                 'is_public' => false,
+                'address_raw' => $guestRegion['address_raw'] ?? null,
+                'country_code' => $guestRegion['country_code'],
+                'region_l1' => $guestRegion['region_l1'],
+                'region_l2' => $guestRegion['region_l2'],
+                'region_l1_key' => $guestRegion['region_l1_key'] ?? null,
+                'region_l2_key' => $guestRegion['region_l2_key'] ?? null,
             ]);
 
             if (!empty($p['themes'])) {
@@ -353,6 +404,7 @@ class PlaceController extends Controller
             'google_place_id' => ['nullable', 'string', 'max:255'],
             'naver_url' => ['nullable', 'string', 'max:500'],
             'is_overseas' => ['nullable', 'boolean'],
+            'address_components' => ['nullable', 'array'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpg,jpeg,png,webp,heic', 'max:10240'],
             'theme_ids' => ['nullable', 'array', 'max:2'],
@@ -383,6 +435,46 @@ class PlaceController extends Controller
         $data['is_overseas'] = (bool) ($data['is_overseas'] ?? false);
         // personal-only-v1: 공개 장소 노출 차단 — 항상 비공개로 강제 (기존 true 였던 장소도 update 시 false로 정정)
         $data['is_public'] = false;
+
+        $addressComponents = $data['address_components'] ?? null;
+        unset($data['address_components']);
+
+        $addrChanged = ($data['road_address'] ?? '') !== ($place->road_address ?? '')
+            || ($data['address'] ?? '') !== ($place->address ?? '')
+            || (bool) $data['is_overseas'] !== (bool) $place->is_overseas;
+
+        if ($addrChanged) {
+            $parser = app(AddressParserService::class);
+            $gpid = $data['google_place_id'] ?? $place->google_place_id;
+            if ($data['is_overseas'] && $gpid) {
+                $region = $parser->fetchOverseasRegion($gpid);
+                if ($region) {
+                    AddressParserService::applyCanonicalDisplay($region);
+                    $data['address_raw'] = $region['address_raw'];
+                    $data['country_code'] = $region['country_code'];
+                    $data['region_l1'] = $region['region_l1'];
+                    $data['region_l2'] = $region['region_l2'];
+                    $data['region_l1_key'] = $region['region_l1_key'];
+                    $data['region_l2_key'] = $region['region_l2_key'];
+                }
+            } elseif ($data['is_overseas'] && $addressComponents) {
+                $data['address_raw'] = $addressComponents;
+                $region = $parser->parseOverseas($addressComponents);
+                AddressParserService::applyCanonicalDisplay($region);
+                $data['country_code'] = $region['country_code'];
+                $data['region_l1'] = $region['region_l1'];
+                $data['region_l2'] = $region['region_l2'];
+                $data['region_l1_key'] = $region['region_l1_key'];
+                $data['region_l2_key'] = $region['region_l2_key'];
+            } else {
+                $region = $parser->parseKorean($data['road_address'] ?? $data['address'] ?? null);
+                $data['country_code'] = $region['country_code'];
+                $data['region_l1'] = $region['region_l1'];
+                $data['region_l2'] = $region['region_l2'];
+                $data['region_l1_key'] = $region['region_l1_key'];
+                $data['region_l2_key'] = $region['region_l2_key'];
+            }
+        }
 
         if (empty($data['lat']) || empty($data['lng'])) {
             $addr = $data['road_address'] ?? $data['address'] ?? '';
@@ -969,7 +1061,7 @@ class PlaceController extends Controller
         $res = \Illuminate\Support\Facades\Http::withHeaders([
             'Content-Type' => 'application/json',
             'X-Goog-Api-Key' => $key,
-            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.location,places.primaryType,places.regularOpeningHours',
+            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.location,places.primaryType,places.regularOpeningHours,places.addressComponents',
         ])->post('https://places.googleapis.com/v1/places:searchText', $body);
 
         $data = $res->json();
@@ -993,6 +1085,7 @@ class PlaceController extends Controller
                 'x' => (string) ($p['location']['longitude'] ?? ''),
                 'y' => (string) ($p['location']['latitude'] ?? ''),
                 'category_group_name' => $p['primaryType'] ?? '',
+                'address_components' => $p['addressComponents'] ?? null,
             ];
         }, $places));
 
