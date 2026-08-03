@@ -280,6 +280,7 @@
 </div>
 
 @php
+    $isOverseasCuration = $curation->places->contains(fn($p) => $p->is_overseas);
     $placesJson = $curation->places->map(function($p) {
         return [
             'id' => $p->id,
@@ -350,7 +351,11 @@
         $initLng = $midLng;
     }
 @endphp
+@if($isOverseasCuration)
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.api_key') }}&language=ko"></script>
+@else
 <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={{ config('services.naver_map.client_id') }}"></script>
+@endif
 <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js" integrity="sha384-DKYJZ8NLiK8MN4/C5P2dtSmLQ4KwPaoqAfyA/DQ/7hV+E1NASW+/MNlHjao0fzm" crossorigin="anonymous"></script>
 <script>
 (function() {
@@ -365,6 +370,7 @@
     const places = @json($placesJson);
     const userCats = @json($userCategories);
     const totalCount = places.length;
+    const isOverseasCuration = {{ $isOverseasCuration ? 'true' : 'false' }};
     const selected = new Set();
     let reselectMode = false;
     let reselectLimit = 0;
@@ -482,7 +488,9 @@
         const vis = getVisibleMapArea();
         const deltaY = ch / 2 - (vis.top + vis.height / 2);
         const mpp = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
-        return new naver.maps.LatLng(lat - deltaY * mpp / 111320, lng);
+        const offsetLat = lat - deltaY * mpp / 111320;
+        if (isOverseasCuration) return new google.maps.LatLng(offsetLat, lng);
+        return new naver.maps.LatLng(offsetLat, lng);
     }
 
     function fitMapToAll() {
@@ -522,7 +530,56 @@
     const mapEl = document.getElementById('curMap');
     const skelEl = document.getElementById('curMapSkel');
 
-    if (places.length && typeof naver !== 'undefined') {
+    function gPinIcon(num, hl) {
+        const bg = hl ? '%23FF6B00' : '%23fff';
+        const clr = hl ? '%23fff' : '%23C2410C';
+        const stroke = hl ? '%23fff' : '%23FF6B00';
+        const sz = hl ? 32 : 28;
+        const fs = hl ? 14 : 12;
+        const r = sz / 2;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}"><circle cx="${r}" cy="${r}" r="${r-1.5}" fill="${bg}" stroke="${stroke}" stroke-width="2"/><text x="${r}" y="${r}" text-anchor="middle" dominant-baseline="central" font-size="${fs}" font-weight="700" font-family="sans-serif" fill="${clr}">${num}</text></svg>`;
+        return {
+            url: 'data:image/svg+xml,' + svg,
+            scaledSize: new google.maps.Size(sz, sz),
+            anchor: new google.maps.Point(sz/2, sz/2),
+        };
+    }
+
+    if (isOverseasCuration && places.length && typeof google !== 'undefined') {
+        map = new google.maps.Map(mapEl, {
+            center: { lat: {{ $initLat }}, lng: {{ $initLng }} },
+            zoom: {{ $initZoom }},
+            disableDefaultUI: true,
+            gestureHandling: 'greedy',
+        });
+
+        places.forEach((p, i) => {
+            if (!p.lat || !p.lng) { markers.push(null); return; }
+            const m = new google.maps.Marker({
+                position: { lat: p.lat, lng: p.lng },
+                map: map,
+                icon: gPinIcon(i+1, false),
+                zIndex: 100,
+            });
+            m.addListener('click', () => handlePinTap(i));
+            markers.push(m);
+        });
+        map.addListener('click', () => resetHighlight());
+
+        let initFitDone = false;
+        function doInitFit() {
+            if (initFitDone) return;
+            initFitDone = true;
+            fitMapToAll();
+            mapEl.classList.add('is-ready');
+            setTimeout(() => { if (skelEl) skelEl.style.display = 'none'; }, 250);
+        }
+        map.addListener('idle', doInitFit);
+        setTimeout(doInitFit, 1200);
+
+        window.addEventListener('resize', () => { if (map) setTimeout(fitMapToAll, 100); });
+
+    } else if (!isOverseasCuration && places.length && typeof naver !== 'undefined') {
         map = new naver.maps.Map('curMap', {
             center: new naver.maps.LatLng({{ $initLat }}, {{ $initLng }}),
             zoom: {{ $initZoom }},
@@ -567,8 +624,14 @@
         markers.forEach((m, i) => {
             if (!m) return;
             const hl = selected.has(places[i].id);
-            m.setIcon({ content: pinHtml(i+1, hl), anchor: new naver.maps.Point(pinSize/2, pinSize/2) });
-            m.setZIndex(i === activeMarkerIdx ? 200 : (hl ? 150 : 100));
+            const z = i === activeMarkerIdx ? 200 : (hl ? 150 : 100);
+            if (isOverseasCuration) {
+                m.setIcon(gPinIcon(i+1, hl));
+                m.setZIndex(z);
+            } else {
+                m.setIcon({ content: pinHtml(i+1, hl), anchor: new naver.maps.Point(pinSize/2, pinSize/2) });
+                m.setZIndex(z);
+            }
         });
         fitBtn.style.display = activeMarkerIdx >= 0 ? '' : 'none';
     }
@@ -777,7 +840,9 @@
             });
             markers.forEach((m, i) => {
                 if (!m) return;
-                m.setVisible(activeDay === 'all' || places[i].day_number == activeDay);
+                const vis = activeDay === 'all' || places[i].day_number == activeDay;
+                if (isOverseasCuration) { m.setMap(vis ? map : null); }
+                else { m.setVisible(vis); }
             });
             resetHighlight();
         });
