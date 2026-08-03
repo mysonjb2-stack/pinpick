@@ -77,10 +77,13 @@
   margin: 0; letter-spacing: -0.02em; line-height: 1.3; flex: 1; min-width: 0;
 }
 .pp-cur-sheet__share-btn {
-  flex-shrink: 0; border: none; width: 36px; height: 36px;
+  flex-shrink: 0; border: none; width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
   background: var(--pp-bg-card, #f5f5f5); color: var(--pp-text-sub);
-  cursor: pointer; border-radius: 50%;
+  cursor: pointer; border-radius: 50%; position: relative;
+}
+.pp-cur-sheet__share-btn::before {
+  content: ''; position: absolute; inset: -6px; border-radius: 50%;
 }
 .pp-cur-sheet__share-btn:active { background: var(--pp-chip-bg); }
 .pp-cur-sheet__summary {
