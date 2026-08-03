@@ -64,7 +64,12 @@ class CollectorController extends Controller
         $detectedRegion = $this->detectRegionFromPlaces($places);
         $isOverseas = $detectedCountry && $detectedCountry !== 'KR';
 
-        $matched = $this->matchPlaces($places, $isOverseas, $detectedCountry, $detectedRegion);
+        $viewport = null;
+        if ($isOverseas && $detectedRegion) {
+            $viewport = $this->fetchViewport($detectedRegion, $detectedCountry);
+        }
+
+        $matched = $this->matchPlaces($places, $isOverseas, $detectedCountry, $detectedRegion, $viewport);
 
         $hasCourse = collect($places)->contains(fn($p) => !empty($p['day']));
 
@@ -82,6 +87,7 @@ class CollectorController extends Controller
             'detected_country' => $detectedCountry,
             'detected_region' => $detectedRegion,
             'is_overseas' => $isOverseas,
+            'viewport' => $viewport,
             'places' => $matched,
         ]);
     }
@@ -99,7 +105,12 @@ class CollectorController extends Controller
         $detectedRegion = $this->detectRegionFromPlaces($places);
         $isOverseas = $detectedCountry && $detectedCountry !== 'KR';
 
-        $matched = $this->matchPlaces($places, $isOverseas, $detectedCountry, $detectedRegion);
+        $viewport = null;
+        if ($isOverseas && $detectedRegion) {
+            $viewport = $this->fetchViewport($detectedRegion, $detectedCountry);
+        }
+
+        $matched = $this->matchPlaces($places, $isOverseas, $detectedCountry, $detectedRegion, $viewport);
 
         $hasCourse = collect($places)->contains(fn($p) => !empty($p['day']));
 
@@ -109,6 +120,7 @@ class CollectorController extends Controller
             'detected_country' => $detectedCountry,
             'detected_region' => $detectedRegion,
             'is_overseas' => $isOverseas,
+            'viewport' => $viewport,
             'places' => $matched,
         ]);
     }
@@ -623,13 +635,18 @@ PROMPT;
         $request->validate([
             'query' => 'required|string',
             'country_code' => 'nullable|string|max:2',
-            'viewport' => 'nullable|array',
+            'viewport' => 'nullable|string',
         ]);
+
+        $viewport = null;
+        if ($request->query('viewport')) {
+            $viewport = json_decode($request->query('viewport'), true);
+        }
 
         $results = $this->googleTextSearch(
             $request->query('query'),
             $request->query('country_code'),
-            $request->query('viewport') ? json_decode($request->query('viewport'), true) : null
+            $viewport
         );
 
         return response()->json(['results' => $results]);
@@ -682,6 +699,29 @@ PROMPT;
         $counts = array_count_values($hints);
         arsort($counts);
         return array_key_first($counts);
+    }
+
+    private function fetchViewport(string $region, ?string $countryCode = null): ?array
+    {
+        $key = config('services.google_maps.api_key');
+        if (!$key) return null;
+
+        try {
+            $params = ['address' => $region, 'key' => $key, 'language' => 'ko'];
+            if ($countryCode) $params['components'] = 'country:' . $countryCode;
+
+            $resp = Http::timeout(6)->get('https://maps.googleapis.com/maps/api/geocode/json', $params);
+            $result = $resp->json()['results'][0] ?? null;
+            $vp = $result['geometry']['viewport'] ?? null;
+            if (!$vp) return null;
+
+            return [
+                'low' => ['lat' => $vp['southwest']['lat'], 'lng' => $vp['southwest']['lng']],
+                'high' => ['lat' => $vp['northeast']['lat'], 'lng' => $vp['northeast']['lng']],
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function parseDongFromAddress(string $address): ?string

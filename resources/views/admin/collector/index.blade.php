@@ -195,10 +195,10 @@ async function extractYoutube() {
         searchCtrl.isOverseas = !!data.is_overseas;
         searchCtrl.countryCode = data.detected_country || null;
         searchCtrl.regionHint = data.detected_region || null;
-        searchCtrl.viewport = null;
-        searchCtrl.vpName = null;
+        searchCtrl.viewport = data.viewport || null;
+        searchCtrl.vpName = data.viewport ? (data.detected_region || null) : null;
 
-        if (searchCtrl.isOverseas && searchCtrl.regionHint) {
+        if (searchCtrl.isOverseas && searchCtrl.regionHint && !searchCtrl.viewport) {
             await resolveViewport();
         }
         renderResult(data);
@@ -228,10 +228,10 @@ async function extractText() {
         searchCtrl.isOverseas = !!data.is_overseas;
         searchCtrl.countryCode = data.detected_country || null;
         searchCtrl.regionHint = data.detected_region || null;
-        searchCtrl.viewport = null;
-        searchCtrl.vpName = null;
+        searchCtrl.viewport = data.viewport || null;
+        searchCtrl.vpName = data.viewport ? (data.detected_region || null) : null;
 
-        if (searchCtrl.isOverseas && searchCtrl.regionHint) {
+        if (searchCtrl.isOverseas && searchCtrl.regionHint && !searchCtrl.viewport) {
             await resolveViewport();
         }
         renderResult(data);
