@@ -615,14 +615,19 @@ async function reSearch(idx) {
             const params = new URLSearchParams({ query, country_code: searchCtrl.countryCode || '' });
             if (searchCtrl.viewport) params.set('viewport', JSON.stringify(searchCtrl.viewport));
             const resp = await fetch('/admin/collector/search-google?' + params, {
-                headers: { 'X-CSRF-TOKEN': CSRF },
+                headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
             });
+            const ct = resp.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) throw new Error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
             const data = await resp.json();
+            if (data.error) throw new Error(data.error);
             results = data.results || [];
         } else {
             const resp = await fetch('/admin/collector/search-kakao?query=' + encodeURIComponent(query), {
-                headers: { 'X-CSRF-TOKEN': CSRF },
+                headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
             });
+            const ct = resp.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) throw new Error('서버 오류가 발생했습니다.');
             const data = await resp.json();
             results = data.results || [];
         }

@@ -547,6 +547,8 @@ PROMPT;
         $key = config('services.google_places.api_key');
         if (!$key || !$query) return [];
 
+        $expandedVp = $viewport ? $this->expandViewport($viewport, 0.2) : null;
+
         $body = [
             'textQuery' => $query,
             'languageCode' => 'ko',
@@ -557,11 +559,11 @@ PROMPT;
             $body['regionCode'] = $countryCode;
         }
 
-        if ($viewport && isset($viewport['low']) && isset($viewport['high'])) {
+        if ($expandedVp) {
             $body['locationRestriction'] = [
                 'rectangle' => [
-                    'low' => ['latitude' => (float) $viewport['low']['lat'], 'longitude' => (float) $viewport['low']['lng']],
-                    'high' => ['latitude' => (float) $viewport['high']['lat'], 'longitude' => (float) $viewport['high']['lng']],
+                    'low' => ['latitude' => $expandedVp['low']['lat'], 'longitude' => $expandedVp['low']['lng']],
+                    'high' => ['latitude' => $expandedVp['high']['lat'], 'longitude' => $expandedVp['high']['lng']],
                 ],
             ];
         }
@@ -577,7 +579,7 @@ PROMPT;
 
             $places = $resp->json()['places'] ?? [];
 
-            return collect($places)->map(fn($p) => [
+            $results = collect($places)->map(fn($p) => [
                 'place_name' => $p['displayName']['text'] ?? '',
                 'address' => $p['formattedAddress'] ?? '',
                 'latitude' => (float) ($p['location']['latitude'] ?? 0),
@@ -586,11 +588,38 @@ PROMPT;
                 'external_place_id' => null,
                 'google_place_id' => $p['id'] ?? null,
                 'phone' => $p['internationalPhoneNumber'] ?? null,
-            ])->toArray();
+            ]);
+
+            if ($expandedVp) {
+                $results = $results->filter(fn($r) =>
+                    $r['latitude'] >= $expandedVp['low']['lat'] &&
+                    $r['latitude'] <= $expandedVp['high']['lat'] &&
+                    $r['longitude'] >= $expandedVp['low']['lng'] &&
+                    $r['longitude'] <= $expandedVp['high']['lng']
+                );
+            }
+
+            return $results->values()->toArray();
         } catch (\Throwable $e) {
             Log::warning('Collector: Google search error', ['error' => $e->getMessage()]);
             return [];
         }
+    }
+
+    private function expandViewport(array $vp, float $ratio = 0.2): array
+    {
+        $latSpan = $vp['high']['lat'] - $vp['low']['lat'];
+        $lngSpan = $vp['high']['lng'] - $vp['low']['lng'];
+        return [
+            'low' => [
+                'lat' => $vp['low']['lat'] - $latSpan * $ratio,
+                'lng' => $vp['low']['lng'] - $lngSpan * $ratio,
+            ],
+            'high' => [
+                'lat' => $vp['high']['lat'] + $latSpan * $ratio,
+                'lng' => $vp['high']['lng'] + $lngSpan * $ratio,
+            ],
+        ];
     }
 
     public function geocodeRegion(Request $request)
@@ -632,24 +661,28 @@ PROMPT;
 
     public function searchGoogle(Request $request)
     {
-        $request->validate([
-            'query' => 'required|string',
-            'country_code' => 'nullable|string|max:2',
-            'viewport' => 'nullable|string',
-        ]);
+        try {
+            $request->validate([
+                'query' => 'required|string',
+                'country_code' => 'nullable|string|max:2',
+                'viewport' => 'nullable|string',
+            ]);
 
-        $viewport = null;
-        if ($request->query('viewport')) {
-            $viewport = json_decode($request->query('viewport'), true);
+            $viewport = null;
+            if ($request->query('viewport')) {
+                $viewport = json_decode($request->query('viewport'), true);
+            }
+
+            $results = $this->googleTextSearch(
+                $request->query('query'),
+                $request->query('country_code'),
+                $viewport
+            );
+
+            return response()->json(['results' => $results]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage(), 'results' => []], 422);
         }
-
-        $results = $this->googleTextSearch(
-            $request->query('query'),
-            $request->query('country_code'),
-            $viewport
-        );
-
-        return response()->json(['results' => $results]);
     }
 
     public function rematchAll(Request $request)
