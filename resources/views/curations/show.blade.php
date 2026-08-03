@@ -352,11 +352,11 @@
     }
 @endphp
 @if($isOverseasCuration)
-<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.api_key') }}&language=ko"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google_maps.api_key') }}&language=ko&loading=async"></script>
 @else
 <script src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId={{ config('services.naver_map.client_id') }}"></script>
 @endif
-<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js" integrity="sha384-DKYJZ8NLiK8MN4/C5P2dtSmLQ4KwPaoqAfyA/DQ/7hV+E1NASW+/MNlHjao0fzm" crossorigin="anonymous"></script>
+<script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js" crossorigin="anonymous"></script>
 <script>
 (function() {
     const csrf = '{{ csrf_token() }}';
@@ -387,7 +387,10 @@
 
     // ── Share ──
     const shareSheet = document.getElementById('curShareSheet');
-    document.getElementById('curShareBtn').addEventListener('click', () => shareSheet.classList.add('is-open'));
+    document.getElementById('curShareBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        shareSheet.classList.add('is-open');
+    });
 
     if (navigator.share) document.getElementById('curShareNative').style.display = '';
     document.getElementById('curShareNative').addEventListener('click', () => {
@@ -788,10 +791,10 @@
     handle.addEventListener('touchmove', onDragMove, { passive: true });
     handle.addEventListener('touchend', onDragEnd);
 
-    sheetHdr.addEventListener('touchstart', onDragStart, { passive: true });
+    sheetHdr.addEventListener('touchstart', (e) => { if (!e.target.closest('button, a, input')) onDragStart(e); }, { passive: true });
     sheetHdr.addEventListener('touchmove', onDragMove, { passive: true });
     sheetHdr.addEventListener('touchend', onDragEnd);
-    sheetHdr.addEventListener('mousedown', (e) => { onDragStart(e); });
+    sheetHdr.addEventListener('mousedown', (e) => { if (!e.target.closest('button, a, input')) onDragStart(e); });
 
     // Pull-down from scroll top → shrink to mid
     let scrollPullStart = 0;
@@ -817,9 +820,10 @@
         }
     }, { passive: true });
 
-    // Click on header → toggle peek/mid (suppress if touch drag just ended)
+    // Click on header → toggle peek/mid (suppress if touch drag just ended or button clicked)
     sheetHdr.addEventListener('click', (e) => {
         if (isDragging || Date.now() - dragEndTime < 300) return;
+        if (e.target.closest('button, a, input')) return;
         if (sheetState === 'peek') setSheetState('mid');
         else if (sheetState === 'mid') setSheetState('full');
     });
