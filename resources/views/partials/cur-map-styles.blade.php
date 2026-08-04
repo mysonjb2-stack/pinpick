@@ -253,13 +253,20 @@
 .pp-cur-card__photos {
   display: flex; gap: 6px; margin-top: 14px;
   overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
 .pp-cur-card__photos::-webkit-scrollbar { display: none; }
 .pp-cur-card__photo {
-  width: 100px; height: 100px; border-radius: 10px;
+  width: 110px; height: 110px; border-radius: 10px;
   overflow: hidden; flex-shrink: 0; background: var(--pp-chip-bg); cursor: pointer;
+  aspect-ratio: 1;
 }
-.pp-cur-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp-cur-card__photos--few .pp-cur-card__photo {
+  flex: 1 1 0; width: auto; min-width: 0;
+}
+.pp-cur-card__photo img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
 
 /* Lightbox */
 .pp-cur-lb { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.88); }

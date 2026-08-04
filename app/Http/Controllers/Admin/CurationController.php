@@ -303,8 +303,9 @@ class CurationController extends Controller
 
     public function uploadPlacePhotos(Request $request, CurationPlace $place)
     {
+        $maxPhotos = config('curation.place_photos_max', 6);
         $request->validate([
-            'photos' => 'required|array|max:5',
+            'photos' => 'required|array|max:' . $maxPhotos,
             'photos.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
@@ -313,7 +314,7 @@ class CurationController extends Controller
         $existing = $place->photos ?? [];
 
         foreach ($request->file('photos') as $file) {
-            if (count($existing) >= 5) break;
+            if (count($existing) >= $maxPhotos) break;
             $path = $proc->processPlaceImage($file, $dir);
             $existing[] = $path;
         }
@@ -336,8 +337,9 @@ class CurationController extends Controller
         $request->validate(['url' => 'required|url|max:2000']);
 
         $existing = $place->photos ?? [];
-        if (count($existing) >= 5) {
-            return response()->json(['success' => false, 'error' => '최대 5장까지 등록할 수 있습니다.'], 422);
+        $maxPhotos = config('curation.place_photos_max', 6);
+        if (count($existing) >= $maxPhotos) {
+            return response()->json(['success' => false, 'error' => '최대 ' . $maxPhotos . '장까지 등록할 수 있습니다.'], 422);
         }
 
         $url = $request->url;

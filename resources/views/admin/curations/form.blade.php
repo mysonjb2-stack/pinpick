@@ -297,6 +297,28 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                                 <button type="button" class="ad-btn ad-btn--sm" style="font-size:10px;padding:2px 6px" onclick="saveRegion({{ $p->id }})">저장</button>
                             </div>
                             @endif
+                            @if($p->category_label)
+                            @php
+                                $rawCat = $p->category_label;
+                                $mappedCat = '';
+                                if ($p->is_overseas) {
+                                    $typeMap = config('google_type_labels', []);
+                                    foreach (explode(',', $rawCat) as $t) {
+                                        $t = trim($t);
+                                        if (isset($typeMap[$t]) && $typeMap[$t] !== null) {
+                                            $mappedCat = $typeMap[$t];
+                                            break;
+                                        }
+                                    }
+                                }
+                            @endphp
+                            <div style="font-size:10px;color:var(--ad-text-sub);margin-top:2px">
+                                업종: <code style="background:var(--ad-bg);padding:1px 4px;border-radius:3px">{{ $rawCat }}</code>
+                                @if($p->is_overseas)
+                                → <strong style="color:var(--ad-text)">{{ $mappedCat ?: '(매핑없음)' }}</strong>
+                                @endif
+                            </div>
+                            @endif
                             <div class="cur-place__gid" data-gid-row>
                                 @if($p->google_place_id)
                                 <span class="cur-place__gid-tag" title="{{ $p->google_place_id }}">G {{ \Illuminate\Support\Str::limit($p->google_place_id, 20) }}</span>
@@ -318,7 +340,7 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                                     </div>
                                     @endforeach
                                 @endif
-                                @if(!$p->photos || count($p->photos) < 5)
+                                @if(!$p->photos || count($p->photos) < config('curation.place_photos_max', 6))
                                 <label class="cur-place__photo-add">
                                     +
                                     <input type="file" accept="image/*" multiple hidden onchange="uploadPhotos({{ $p->id }}, this)">
@@ -456,6 +478,7 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
 const csrf = '{{ csrf_token() }}';
 const curationId = {{ $curation->id }};
 const cType = '{{ $curation->type }}';
+const PHOTO_MAX = {{ config('curation.place_photos_max', 6) }};
 let searchTimer;
 let searchMode = 'domestic';
 let curDaysVal = {{ $curation->days ?? 0 }};
@@ -1346,7 +1369,7 @@ function rebuildPhotos(pid, photos) {
     photos.forEach((p, i) => {
         h += '<div class="cur-place__photo" draggable="true" data-pidx="'+i+'"><img src="'+esc(p.thumb)+'" alt=""><button type="button" class="cur-place__photo-del" onclick="deletePhoto('+pid+','+i+',this)">✕</button></div>';
     });
-    if (photos.length < 5) {
+    if (photos.length < PHOTO_MAX) {
         h += '<label class="cur-place__photo-add">+<input type="file" accept="image/*" multiple hidden onchange="uploadPhotos('+pid+',this)"></label>';
         h += '<div class="cur-place__url-row"><textarea rows="3" placeholder="이미지 URL (여러 줄 가능)" class="cur-url-input"></textarea><button type="button" class="ad-btn ad-btn--sm cur-url-btn" onclick="uploadFromUrl('+pid+',this)">URL</button></div>';
         h += '<div class="cur-place__hint">URL 여러 개 줄바꿈 입력 → Ctrl+Enter 또는 URL 버튼 · Ctrl+V 붙여넣기 · 드래그앤드롭</div>';
@@ -1371,12 +1394,12 @@ function addLoader(wrap) {
 async function uploadFiles(pid, fileList) {
     const wrap = document.querySelector('.cur-place__photos[data-pid="'+pid+'"]');
     if (!wrap) return;
-    const remaining = 3 - photoCount(pid);
-    if (remaining <= 0) { alert('최대 3장까지 등록할 수 있습니다.'); return; }
+    const remaining = PHOTO_MAX - photoCount(pid);
+    if (remaining <= 0) { alert('최대 ' + PHOTO_MAX + '장까지 등록할 수 있습니다.'); return; }
     const imgs = Array.from(fileList).filter(f => f.type.startsWith('image/'));
     if (!imgs.length) return;
     const toUpload = imgs.slice(0, remaining);
-    if (imgs.length > remaining) alert('최대 3장 제한으로 ' + toUpload.length + '장만 업로드합니다.');
+    if (imgs.length > remaining) alert('최대 ' + PHOTO_MAX + '장 제한으로 ' + toUpload.length + '장만 업로드합니다.');
     const loader = addLoader(wrap);
     const fd = new FormData();
     toUpload.forEach(f => fd.append('photos[]', f));
@@ -1399,10 +1422,10 @@ async function uploadFromUrl(pid, btn) {
     if (!urls.length) { ta.focus(); return; }
     const bad = urls.find(u => !/^https?:\/\//i.test(u));
     if (bad) { alert('유효하지 않은 URL:\n' + bad); return; }
-    const remain = 3 - photoCount(pid);
-    if (remain <= 0) { alert('최대 3장까지 등록할 수 있습니다.'); return; }
+    const remain = PHOTO_MAX - photoCount(pid);
+    if (remain <= 0) { alert('최대 ' + PHOTO_MAX + '장까지 등록할 수 있습니다.'); return; }
     const batch = urls.slice(0, remain);
-    if (batch.length < urls.length) alert((urls.length - batch.length) + '개 URL은 3장 제한으로 건너뜁니다.');
+    if (batch.length < urls.length) alert((urls.length - batch.length) + '개 URL은 ' + PHOTO_MAX + '장 제한으로 건너뜁니다.');
     const origText = btn.textContent;
     btn.disabled = true; btn.textContent = '0/' + batch.length + ' 처리중…';
     const loaders = batch.map(() => addLoader(wrap));

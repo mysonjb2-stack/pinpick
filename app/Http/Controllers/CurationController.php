@@ -8,6 +8,7 @@ use App\Models\CurationPlace;
 use App\Models\Place;
 use App\Models\PlaceImage;
 use App\Models\Theme;
+use App\Services\AddressParserService;
 use App\Services\GoogleReviewService;
 use App\Services\ImageProcessor;
 use Illuminate\Http\Request;
@@ -220,10 +221,10 @@ class CurationController extends Controller
             ->when($category, fn($q) => $q->where('category', $category))
             ->orderByDesc('published_at')
             ->limit(50)
-            ->get(['id', 'title', 'slug', 'type', 'category', 'description',
+            ->get(['id', 'title', 'slug', 'type', 'nights', 'days', 'category', 'description',
                     'cover_image', 'save_count', 'published_at',
                     'author_type', 'author_user_id', 'status', 'approved_snapshot',
-                    'center_lat', 'center_lng']);
+                    'center_lat', 'center_lng', 'region_codes', 'region_label']);
 
         $savedIds = [];
         if (Auth::check()) {
@@ -238,7 +239,10 @@ class CurationController extends Controller
                 ->toArray();
         }
 
-        $curations->each(function ($c) use ($savedIds) {
+        $googleTypeLabels = config('google_type_labels');
+        $addressParser = app(AddressParserService::class);
+
+        $curations->each(function ($c) use ($savedIds, $googleTypeLabels, $addressParser) {
             if ($c->status === 'pending' && $c->approved_snapshot) {
                 $snap = $c->approved_snapshot;
                 $c->title = $snap['title'] ?? $c->title;
@@ -258,7 +262,7 @@ class CurationController extends Controller
             $c->category_label = $catConfig['label'] ?? $c->category;
 
             $hasSaved = false;
-            $c->places_list = $c->places->map(function ($p) use (&$hasSaved, $savedIds) {
+            $c->places_list = $c->places->map(function ($p) use (&$hasSaved, $savedIds, $googleTypeLabels, $addressParser) {
                 $thumb = $p->thumb_url;
                 if (!empty($savedIds)) {
                     if (($p->external_place_id && in_array($p->external_place_id, $savedIds))
@@ -266,13 +270,23 @@ class CurationController extends Controller
                         $hasSaved = true;
                     }
                 }
+
+                if ($p->is_overseas) {
+                    $koAlias = $addressParser->regionL1KoAlias($p->country_code, $p->region_l1_key);
+                    $region = $koAlias ?: $p->region_l1 ?: ($p->country_code ? $addressParser->countryCodeToName($p->country_code) : '');
+                    $catLabel = $this->resolveGoogleTypeLabel($p->category_label, $googleTypeLabels);
+                } else {
+                    $region = $p->region_l1 ?: '';
+                    $catLabel = $p->category_label ?: '';
+                }
+
                 return [
                     'id' => $p->id,
                     'name' => $p->place_name,
                     'address' => $p->address,
-                    'category_label' => $p->category_label,
+                    'category_label' => $catLabel,
                     'thumb_url' => $thumb,
-                    'region' => $p->address ? mb_substr(explode(' ', $p->address)[0] ?? '', 0, 10) : '',
+                    'region' => $region,
                     'lat' => $p->latitude,
                     'lng' => $p->longitude,
                     'is_overseas' => (bool) $p->is_overseas,
@@ -285,7 +299,32 @@ class CurationController extends Controller
                 ? $c->author->profile_image : null;
             $c->is_official = $c->author_type === 'admin';
             $c->author_hue = $c->author_name ? crc32($c->author_name) % 360 : 0;
-            unset($c->places, $c->author, $c->status, $c->approved_snapshot, $c->region_label);
+
+            $catConfig = config("curation_categories.{$c->category}");
+            $catIcon = $catConfig['icon'] ?? '';
+            $catLabel = $catConfig['label'] ?? '';
+            $c->cat_badge = $catLabel ? ($catIcon . $catLabel) : '';
+
+            $badges = $this->buildRegionBadgesFromPlaces($c->places, $addressParser);
+            if (empty($badges) || (count($badges) === 1 && $badges[0] === '해외')) {
+                $badges = $this->parseRegionLabelToBadges($c->region_label);
+            }
+            $c->region_badges = $badges;
+
+            $durationLabel = '';
+            if ($c->type === 'course' && $c->nights !== null && $c->days !== null) {
+                if ($c->nights == 0 && $c->days == 1) {
+                    $durationLabel = '당일치기';
+                } elseif ($c->nights == 0) {
+                    $durationLabel = '무박 ' . $c->days . '일';
+                } else {
+                    $durationLabel = $c->nights . '박 ' . $c->days . '일';
+                }
+            }
+            $c->duration_badge = $durationLabel;
+
+            unset($c->places, $c->author, $c->status, $c->approved_snapshot,
+                  $c->region_codes, $c->region_label, $c->nights, $c->days);
         });
 
         $lat = (float) $request->query('lat');
@@ -312,6 +351,108 @@ class CurationController extends Controller
         return response()->json($curations);
     }
 
+    private function resolveGoogleTypeLabel(?string $rawType, array $map): string
+    {
+        if (!$rawType) return '';
+        $types = array_map('trim', explode(',', $rawType));
+        $best = '';
+        foreach ($types as $t) {
+            if (!isset($map[$t])) continue;
+            if ($map[$t] === null) continue;
+            $best = $map[$t];
+            break;
+        }
+        return $best;
+    }
+
+    private function parseRegionLabelToBadges(?string $regionLabel): array
+    {
+        if (!$regionLabel) return [];
+        $parts = array_map('trim', explode(',', $regionLabel));
+        return array_values(array_filter(array_slice($parts, 0, 2)));
+    }
+
+    private function buildRegionBadgesFromPlaces($places, AddressParserService $parser): array
+    {
+        if ($places->isEmpty()) return [];
+
+        $isOverseas = $places->contains(fn($p) => $p->is_overseas);
+        $countryCode = $places->first(fn($p) => $p->is_overseas && $p->country_code)?->country_code;
+
+        if ($isOverseas) {
+            $countryName = $countryCode ? $parser->countryCodeToName($countryCode) : '';
+            $l1Groups = [];
+            foreach ($places as $p) {
+                if (!$p->is_overseas) continue;
+                $key = $p->region_l1_key ?: ($p->region_l1 ?: '');
+                if (!$key) continue;
+                $koAlias = $parser->regionL1KoAlias($p->country_code, $p->region_l1_key);
+                $display = $koAlias ?: $p->region_l1 ?: $key;
+                if (!isset($l1Groups[$key])) {
+                    $l1Groups[$key] = ['display' => $display, 'count' => 0];
+                }
+                $l1Groups[$key]['count']++;
+            }
+
+            if (empty($l1Groups)) return $countryName ? [$countryName] : ['해외'];
+
+            $firstL1 = reset($l1Groups)['display'];
+            if (count($l1Groups) === 1 && $countryName && mb_strtolower($countryName) === mb_strtolower($firstL1)) {
+                return [$countryName];
+            }
+
+            if (count($l1Groups) === 1) {
+                return [$countryName, $firstL1];
+            }
+
+            uasort($l1Groups, fn($a, $b) => $b['count'] <=> $a['count']);
+            $top = array_values($l1Groups)[0]['display'];
+            $rest = count($l1Groups) - 1;
+            return [$countryName, $top . ' 외 ' . $rest];
+        }
+
+        // 국내
+        $l1Groups = [];
+        $l2Groups = [];
+        foreach ($places as $p) {
+            $l1Key = $p->region_l1_key ?: ($p->region_l1 ?: '');
+            $l2Key = $p->region_l2_key ?: ($p->region_l2 ?: '');
+            $l1Display = $p->region_l1 ?: $l1Key;
+            $l2Display = $p->region_l2 ?: $l2Key;
+
+            if ($l1Key) {
+                if (!isset($l1Groups[$l1Key])) {
+                    $l1Groups[$l1Key] = ['display' => $l1Display, 'count' => 0];
+                }
+                $l1Groups[$l1Key]['count']++;
+            }
+            if ($l2Key) {
+                $ck = $l1Key . '/' . $l2Key;
+                if (!isset($l2Groups[$ck])) {
+                    $l2Groups[$ck] = ['display' => $l2Display, 'count' => 0];
+                }
+                $l2Groups[$ck]['count']++;
+            }
+        }
+
+        if (empty($l1Groups)) return [];
+
+        if (count($l1Groups) === 1) {
+            $l1Display = reset($l1Groups)['display'];
+            if (empty($l2Groups)) return [$l1Display];
+
+            uasort($l2Groups, fn($a, $b) => $b['count'] <=> $a['count']);
+            $l2Vals = array_values($l2Groups);
+            if (count($l2Vals) === 1) return [$l1Display, $l2Vals[0]['display']];
+            return [$l1Display, $l2Vals[0]['display'] . ' 외 ' . (count($l2Vals) - 1)];
+        }
+
+        uasort($l1Groups, fn($a, $b) => $b['count'] <=> $a['count']);
+        $l1Vals = array_values($l1Groups);
+        if (count($l1Vals) === 2) return [$l1Vals[0]['display'], $l1Vals[1]['display']];
+        return [$l1Vals[0]['display'], $l1Vals[1]['display'] . ' 외 ' . (count($l1Vals) - 2)];
+    }
+
     private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
         $r = 6371;
@@ -323,12 +464,12 @@ class CurationController extends Controller
 
     public static function getGlobalPool(?int $userId = null): array
     {
-        $globalPool = Cache::remember('cur_nearby:global:pool', 600, function () {
+        $globalPool = Cache::remember('cur_nearby:global:pool:v2', 600, function () {
             $rows = DB::select("
                 SELECT cp.id, cp.curation_id, cp.place_name, cp.thumbnail_url,
                        cp.latitude, cp.longitude, cp.is_overseas,
                        cp.external_place_id, cp.naver_place_id,
-                       cp.address,
+                       cp.address, cp.country_code, cp.region_l1, cp.region_l1_key,
                        c.save_count AS cur_save_count
                 FROM curation_places cp
                 JOIN curations c ON c.id = cp.curation_id
@@ -392,7 +533,7 @@ class CurationController extends Controller
             'lng' => $p['longitude'],
             'is_overseas' => (bool) $p['is_overseas'],
             'distance' => null,
-            'region_label' => $self->parseRegionLabel($p['address'] ?? ''),
+            'region_label' => $self->buildRegionLabel($p),
         ])->values()->toArray();
     }
 
@@ -421,14 +562,14 @@ class CurationController extends Controller
         $pool = collect();
 
         if (!$isLocationless) {
-            $pool = Cache::remember($cacheKey . ':pool', 600, function () use ($lat, $lng) {
+            $pool = Cache::remember($cacheKey . ':pool:v2', 600, function () use ($lat, $lng) {
                 $found = collect();
                 foreach ([5000, 10000] as $radius) {
                     $rows = DB::select("
                         SELECT cp.id, cp.curation_id, cp.place_name, cp.thumbnail_url,
                                cp.latitude, cp.longitude, cp.is_overseas,
                                cp.external_place_id, cp.naver_place_id,
-                               cp.dong_label,
+                               cp.dong_label, cp.country_code, cp.region_l1, cp.region_l1_key,
                                c.save_count AS cur_save_count,
                                (6371000 * acos(LEAST(1, cos(radians(?)) * cos(radians(cp.latitude))
                                 * cos(radians(cp.longitude) - radians(?))
@@ -474,12 +615,12 @@ class CurationController extends Controller
         }
 
         if ($isLocationless || $isFallback) {
-            $globalPool = Cache::remember('cur_nearby:global:pool', 600, function () {
+            $globalPool = Cache::remember('cur_nearby:global:pool:v2', 600, function () {
                 $rows = DB::select("
                     SELECT cp.id, cp.curation_id, cp.place_name, cp.thumbnail_url,
                            cp.latitude, cp.longitude, cp.is_overseas,
                            cp.external_place_id, cp.naver_place_id,
-                           cp.address,
+                           cp.address, cp.country_code, cp.region_l1, cp.region_l1_key,
                            c.save_count AS cur_save_count
                     FROM curation_places cp
                     JOIN curations c ON c.id = cp.curation_id
@@ -533,7 +674,7 @@ class CurationController extends Controller
                 'lng' => $p['longitude'],
                 'is_overseas' => (bool) $p['is_overseas'],
                 'distance' => null,
-                'region_label' => $this->parseRegionLabel($p['address'] ?? ''),
+                'region_label' => $this->buildRegionLabel($p),
             ];
 
             $places = $pick->sortByDesc('cur_save_count')->values()->map($toMap)->values();
@@ -573,8 +714,10 @@ class CurationController extends Controller
             'lat' => $p['latitude'],
             'lng' => $p['longitude'],
             'is_overseas' => (bool) $p['is_overseas'],
-            'distance' => round($p['dist'], 1),
-            'dong' => $p['dong_label'] ?? null,
+            // 해외는 거리 대신 지역 라벨 (사용자가 해외에 있어 주변 풀에 해외가 들어온 경우)
+            'distance' => $p['is_overseas'] ? null : round($p['dist'], 1),
+            'dong' => $p['is_overseas'] ? null : ($p['dong_label'] ?? null),
+            'region_label' => $p['is_overseas'] ? $this->buildRegionLabel($p) : null,
         ];
 
         $places = $pick->sortBy('dist')->values()->map($toMap)->values();
@@ -606,6 +749,75 @@ class CurationController extends Controller
                 'pool_size' => $pool->count(),
             ]
         ]);
+    }
+
+    /**
+     * 추천 카드 서브라벨.
+     * 국내: "{시도} {시군구}" (주소 파싱)
+     * 해외: "{한글 국가명} {region_l1}" — 국가명과 region_l1이 같거나(도시국가)
+     *       region_l1이 비면 국가명만. 거리는 표시하지 않는다.
+     */
+    private function buildRegionLabel(array $p): ?string
+    {
+        if (empty($p['is_overseas'])) {
+            return $this->parseRegionLabel($p['address'] ?? '');
+        }
+
+        $cc = $p['country_code'] ?? null;
+        // 미분류(NULL) 또는 KR 오분류 해외 건은 라벨 생략 — region:backfill 대상
+        if (!$cc || $cc === 'KR') return null;
+
+        $parser = app(AddressParserService::class);
+        $country = $parser->countryCodeToName($cc);
+
+        // 도시국가는 region_l1이 국가명과 같아 "싱가포르 싱가포르"가 된다
+        if ($parser->isCityState($cc)) return $country;
+
+        $l1Key = $p['region_l1_key'] ?? null;
+        $l1 = $parser->regionL1KoAlias($cc, $l1Key)
+            ?? (self::overseasL1DisplayMap()[$cc . '|' . $l1Key] ?? null)
+            ?? trim((string) ($p['region_l1'] ?? ''));
+
+        if ($l1 === '' || $l1 === $country) return $country;
+
+        return $country . ' ' . $l1;
+    }
+
+    /**
+     * (country_code|region_l1_key) → 대표 표기.
+     * Google의 ko 응답이 지역마다 한글/현지어로 뒤섞여 들어오므로
+     * 같은 키에 한글 표기가 하나라도 있으면 그것을, 없으면 최다 표기를 쓴다.
+     */
+    private static function overseasL1DisplayMap(): array
+    {
+        return Cache::remember('cur_region:l1_display:v1', 600, function () {
+            $rows = DB::select("
+                SELECT country_code, region_l1_key, region_l1, COUNT(*) AS n
+                FROM curation_places
+                WHERE is_overseas = 1
+                  AND country_code IS NOT NULL AND country_code <> 'KR'
+                  AND region_l1_key IS NOT NULL AND region_l1 <> ''
+                GROUP BY country_code, region_l1_key, region_l1
+            ");
+
+            $best = [];
+            foreach ($rows as $r) {
+                $key = $r->country_code . '|' . $r->region_l1_key;
+                $cand = [
+                    'label' => $r->region_l1,
+                    'ko' => (bool) preg_match('/\p{Hangul}/u', $r->region_l1),
+                    'n' => (int) $r->n,
+                ];
+                $cur = $best[$key] ?? null;
+                if (!$cur
+                    || ($cand['ko'] && !$cur['ko'])
+                    || ($cand['ko'] === $cur['ko'] && $cand['n'] > $cur['n'])) {
+                    $best[$key] = $cand;
+                }
+            }
+
+            return array_map(fn($v) => $v['label'], $best);
+        });
     }
 
     private function parseRegionLabel(string $address): ?string

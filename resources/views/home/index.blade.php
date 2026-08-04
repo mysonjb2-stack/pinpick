@@ -352,7 +352,7 @@
                 <div class="pp-nearby__head">
                     <div class="pp-nearby__title-row">
                         <h3 class="pp-nearby__title" id="ppNearbyTitle">요즘 다들 어디 가나 볼까요?</h3>
-                        <button type="button" class="pp-nearby__chip" id="ppNearbyChip" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2.2"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8Z" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>내 주변 장소</button>
+                        <button type="button" class="pp-nearby__chip" id="ppNearbyChip" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2.2"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8Z" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>내 주변 보기</button>
                     </div>
                     <p class="pp-nearby__sub" id="ppNearbySub">사람들이 리스트에 담아둔 장소들이에요</p>
                 </div>
@@ -384,7 +384,7 @@
                 <div class="pp-nearby__head">
                     <div class="pp-nearby__title-row">
                         <h3 class="pp-nearby__title" id="ppNearbyTitle"></h3>
-                        <button type="button" class="pp-nearby__chip" id="ppNearbyChip" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2.2"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8Z" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>내 주변 장소</button>
+                        <button type="button" class="pp-nearby__chip" id="ppNearbyChip" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2.2"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8Z" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>내 주변 보기</button>
                     </div>
                     <p class="pp-nearby__sub" id="ppNearbySub"></p>
                 </div>
@@ -395,6 +395,27 @@
             </div>
         </div>
         @endif
+
+        {{-- 위치 권한 안내 바텀시트 --}}
+        <div class="pp-geo-guide" id="ppGeoGuide" style="display:none">
+            <div class="pp-geo-guide__backdrop" id="ppGeoGuideClose"></div>
+            <div class="pp-geo-guide__sheet">
+                <div class="pp-geo-guide__handle"></div>
+                <div class="pp-geo-guide__body">
+                    <div class="pp-geo-guide__icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="var(--pp-accent)" stroke-width="1.8"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C13 21.5 20 15.4 20 10a8 8 0 0 0-8-8Z" stroke="var(--pp-accent)" stroke-width="1.8" fill="none"/></svg>
+                    </div>
+                    <h4 class="pp-geo-guide__title">위치 권한을 허용해 주세요</h4>
+                    <p class="pp-geo-guide__desc" id="ppGeoGuideDesc">내 주변의 맛집과 핫플을 추천받을 수 있어요</p>
+                    <div class="pp-geo-guide__steps" id="ppGeoGuideSteps">
+                        <p class="pp-geo-guide__step">주소창 왼쪽의 <strong>자물쇠(🔒) 아이콘</strong>을 탭하세요</p>
+                        <p class="pp-geo-guide__step"><strong>위치</strong> 항목을 <strong>허용</strong>으로 변경하세요</p>
+                        <p class="pp-geo-guide__step">페이지를 <strong>새로고침</strong>하면 적용돼요</p>
+                    </div>
+                    <button type="button" class="pp-geo-guide__btn" id="ppGeoGuideBtn">확인</button>
+                </div>
+            </div>
+        </div>
 
         @auth
         <div class="pp-mine-sechead">
@@ -2509,7 +2530,8 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
             const bg = (hasBg || imgSrc) ? 'background-image:url(' + esc(imgSrc) + ')' : '';
             const phClass = (!hasBg && !imgSrc) ? ' pp-nearby__card--ph' : '';
             let subLine = '';
-            if (isGlobal) {
+            if (isGlobal || p.is_overseas) {
+                // 해외는 거리를 표시하지 않는다 — 지역 라벨만
                 subLine = p.region_label ? '<div class="pp-nearby__card-region">' + esc(p.region_label) + '</div>' : '';
             } else if (p.distance != null) {
                 const dist = formatDist(p.distance);
@@ -2586,33 +2608,101 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
         return false;
     }
 
-    function switchToNearby() {
+    const GEO_DISMISS_KEY = 'pp_geo_dismiss';
+    const GEO_DISMISS_TTL = 7 * 24 * 60 * 60 * 1000;
+    const isApp = /MYPINPICK/i.test(navigator.userAgent);
+    const guideSheet = document.getElementById('ppGeoGuide');
+    const guideDesc = document.getElementById('ppGeoGuideDesc');
+    const guideSteps = document.getElementById('ppGeoGuideSteps');
+    const guideBtn = document.getElementById('ppGeoGuideBtn');
+    const guideClose = document.getElementById('ppGeoGuideClose');
+
+    function isDeniedDismissed() {
+        try {
+            const raw = localStorage.getItem(GEO_DISMISS_KEY);
+            if (!raw) return false;
+            const ts = JSON.parse(raw);
+            return Date.now() - ts < GEO_DISMISS_TTL;
+        } catch(e) { return false; }
+    }
+    function markDeniedDismissed() {
+        try { localStorage.setItem(GEO_DISMISS_KEY, JSON.stringify(Date.now())); } catch(e) {}
+    }
+
+    function showGeoGuide() {
+        if (!guideSheet) return;
+        if (isApp) {
+            guideDesc.textContent = '앱 설정에서 위치 권한을 허용해 주세요';
+            guideSteps.innerHTML = '<p class="pp-geo-guide__step"><strong>설정 > 핀픽 > 위치</strong>에서 허용으로 변경하세요</p>';
+            guideBtn.textContent = '설정으로 이동';
+            guideBtn.onclick = function() {
+                try { location.href = 'pinpick://settings/location'; } catch(e) {}
+                closeGeoGuide();
+            };
+        } else {
+            guideBtn.onclick = function() { closeGeoGuide(); };
+        }
+        guideSheet.style.display = '';
+        requestAnimationFrame(() => guideSheet.classList.add('is-open'));
+    }
+    function closeGeoGuide() {
+        if (!guideSheet) return;
+        guideSheet.classList.remove('is-open');
+        markDeniedDismissed();
+        if (chip) chip.style.display = 'none';
+        setTimeout(() => { guideSheet.style.display = 'none'; }, 250);
+    }
+    if (guideClose) guideClose.addEventListener('click', closeGeoGuide);
+
+    function handleChipClick(geoState) {
+        if (geoState === 'denied') {
+            showGeoGuide();
+            return;
+        }
         if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition(
             async pos => {
                 const lat = pos.coords.latitude, lng = pos.coords.longitude;
                 userLat = lat; userLng = lng;
+                if (chip) chip.style.display = 'none';
                 const data = await fetchPool(lat, lng);
                 if (data) crossfade(data, false);
             },
-            () => { if (chip) chip.style.display = 'none'; },
+            (err) => {
+                if (err.code === 1) {
+                    showGeoGuide();
+                } else if (chip) {
+                    chip.style.display = 'none';
+                }
+            },
             { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
         );
     }
 
-    if (chip) chip.addEventListener('click', switchToNearby);
-
     const cached = load();
+    let currentGeoState = 'unknown';
+
+    function shouldShowChip(geoState) {
+        if (geoState === 'granted') return false;
+        if (geoState === 'denied') return !isDeniedDismissed();
+        return true;
+    }
 
     function boot(geoState) {
-        const showChip = geoState === 'prompt' || geoState === 'unknown';
+        currentGeoState = geoState;
+        const showChip = shouldShowChip(geoState);
+
+        if (chip) {
+            chip.onclick = function() { handleChipClick(currentGeoState); };
+        }
 
         if (cached && cached.version === 'nearby' && cached.data && cached.data.places && cached.data.places.length) {
             if (geoState === 'denied') {
                 if (ssrReady) {
-                    // SSR 전지역 유지
+                    // SSR 전지역 유지, 칩만 판단
+                    if (showChip && chip) chip.style.display = '';
                 } else {
-                    renderDirect({ places: cached.data.places, is_global: true }, false);
+                    renderDirect({ places: cached.data.places, is_global: true }, showChip);
                 }
             } else {
                 if (ssrReady) {
@@ -2652,6 +2742,21 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
     if (navigator.permissions && navigator.permissions.query) {
         navigator.permissions.query({ name: 'geolocation' }).then(result => {
             boot(result.state);
+            result.addEventListener('change', () => {
+                if (result.state === 'granted') {
+                    currentGeoState = 'granted';
+                    if (chip) chip.style.display = 'none';
+                    closeGeoGuide();
+                    navigator.geolocation.getCurrentPosition(
+                        async pos => {
+                            userLat = pos.coords.latitude; userLng = pos.coords.longitude;
+                            const data = await fetchPool(userLat, userLng);
+                            if (data) crossfade(data, false);
+                        }, () => {},
+                        { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+                    );
+                }
+            });
         }).catch(() => boot('unknown'));
     } else if (navigator.geolocation) {
         boot('unknown');

@@ -74,23 +74,24 @@
     </div>
     @endif
     @if(!empty($photos) && count($photos) > 0)
-    <div class="pp-cur-card__photos">
+    @php $fewClass = count($photos) <= 2 ? ' pp-cur-card__photos--few' : ''; @endphp
+    <div class="pp-cur-card__photos{{ $fewClass }}">
         @foreach($photos as $photo)
         <div class="pp-cur-card__photo" data-full="{{ asset('storage/' . $photo) }}" onclick="openLightbox(this)">
-            <img src="{{ asset('storage/' . \App\Services\ImageProcessor::thumbPathFor($photo)) }}" alt="" loading="lazy">
+            <img src="{{ asset('storage/' . \App\Services\ImageProcessor::thumbPathFor($photo)) }}" alt="" loading="lazy" width="110" height="110">
         </div>
         @endforeach
     </div>
     @elseif(!empty($thumbnailUrl))
-    <div class="pp-cur-card__photos">
+    <div class="pp-cur-card__photos pp-cur-card__photos--few">
         <div class="pp-cur-card__photo">
-            <img src="{{ $thumbnailUrl }}" alt="" loading="lazy">
+            <img src="{{ $thumbnailUrl }}" alt="" loading="lazy" width="110" height="110">
         </div>
     </div>
     @elseif($latitude && $longitude)
-    <div class="pp-cur-card__photos">
+    <div class="pp-cur-card__photos pp-cur-card__photos--few">
         <div class="pp-cur-card__photo">
-            <img src="/api/static-map?lat={{ $latitude }}&lng={{ $longitude }}&overseas={{ $isOverseas ? 1 : 0 }}&w=320&h=320" alt="{{ $placeName }} 위치 지도" loading="lazy">
+            <img src="/api/static-map?lat={{ $latitude }}&lng={{ $longitude }}&overseas={{ $isOverseas ? 1 : 0 }}&w=320&h=320" alt="{{ $placeName }} 위치 지도" loading="lazy" width="110" height="110">
         </div>
     </div>
     @endif

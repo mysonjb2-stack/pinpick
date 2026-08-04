@@ -166,6 +166,24 @@
                 + '<span class="pp-expl-pcard__more-arrow">→</span></a>';
         }
 
+        let badgesHtml = '';
+        const regionBadges = c.region_badges || [];
+        const catBadge = c.cat_badge || '';
+        const durBadge = c.duration_badge || '';
+        if (regionBadges.length || catBadge || durBadge) {
+            badgesHtml = '<div class="pp-expl-badges">';
+            regionBadges.forEach(r => {
+                badgesHtml += '<span class="pp-expl-badge pp-expl-badge--region">' + esc(r) + '</span>';
+            });
+            if (catBadge) {
+                badgesHtml += '<span class="pp-expl-badge pp-expl-badge--cat">' + esc(catBadge) + '</span>';
+            }
+            if (durBadge) {
+                badgesHtml += '<span class="pp-expl-badge pp-expl-badge--dur">' + esc(durBadge) + '</span>';
+            }
+            badgesHtml += '</div>';
+        }
+
         const secHref = '/c/' + c.id;
         return '<div class="pp-expl-sec">'
             + '<a href="' + secHref + '" class="pp-expl-sec__head">'
@@ -176,6 +194,7 @@
             + '<span class="pp-expl-author__dot">·</span>'
             + '<span class="pp-expl-author__count">' + (c.places_count || 0) + '개 장소</span>'
             + '</div>'
+            + badgesHtml
             + '<div class="pp-expl-sec__title">' + esc(c.title) + '</div>'
             + (c.description ? '<p class="pp-expl-sec__desc">' + esc(c.description) + '</p>' : '')
             + savesMeta

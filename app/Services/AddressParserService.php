@@ -348,6 +348,29 @@ class AddressParserService
         return $entries;
     }
 
+    public function isCityState(?string $code): bool
+    {
+        return $code !== null && in_array($code, self::CITY_STATES);
+    }
+
+    /**
+     * Google가 한글 표기를 내려주지 않는 해외 region_l1 보정.
+     * 키: "{country_code}|{region_l1_key}". 데이터에 한글 표기가 단 한 건도
+     * 없는 지역만 등록한다 (한 건이라도 있으면 표기 우선 로직이 알아서 고른다).
+     */
+    private const REGION_L1_KO_ALIAS = [
+        'ID|bali' => '발리',
+        'JP|okinawa' => '오키나와',
+        'VN|danang' => '다낭',
+        'VN|khanhhoa' => '칸호아',
+    ];
+
+    public function regionL1KoAlias(?string $countryCode, ?string $l1Key): ?string
+    {
+        if (!$countryCode || !$l1Key) return null;
+        return self::REGION_L1_KO_ALIAS[$countryCode . '|' . $l1Key] ?? null;
+    }
+
     public function countryCodeToName(string $code): string
     {
         $map = [
