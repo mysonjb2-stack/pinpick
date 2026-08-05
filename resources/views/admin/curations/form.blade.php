@@ -217,12 +217,15 @@ textarea.ad-input { min-height: 80px; resize: vertical; }
                             $currentAuthor = $curation->author_user_id;
                         }
                     @endphp
-                    <select class="ad-input" name="author_select">
-                        <option value="official" {{ $currentAuthor === 'official' ? 'selected' : '' }}>핀픽 공식</option>
+                    <select class="ad-input" name="author_select" id="authorSelect" onchange="checkAuthorRegion()">
+                        <option value="official" data-scope="" {{ $currentAuthor === 'official' ? 'selected' : '' }}>핀픽 공식</option>
                         @foreach($personas as $p)
-                            <option value="{{ $p->id }}" {{ $currentAuthor == $p->id ? 'selected' : '' }}>{{ $p->name }}{{ $p->bio ? " — {$p->bio}" : '' }}</option>
+                            <option value="{{ $p->id }}" data-scope="{{ $p->persona_scope ?? 'topic' }}" data-region="{{ $p->persona_region_tag ?? '' }}" {{ $currentAuthor == $p->id ? 'selected' : '' }}>[{{ ($p->persona_scope ?? 'topic') === 'region' ? '지역·'.($p->persona_region_tag ?? '?') : '주제' }}] {{ $p->name }}{{ $p->bio ? " — {$p->bio}" : '' }}</option>
                         @endforeach
                     </select>
+                    <div id="authorRegionWarning" hidden style="margin-top:6px;padding:8px 10px;background:#FFF3E0;border-radius:8px;font-size:12px;color:#E65100">
+                        ⚠ 지역형 페르소나입니다. 큐레이션의 지역과 페르소나 지역이 일치하는지 확인하세요.
+                    </div>
                 </div>
                 <div class="ad-form-group">
                     <label>설명</label>
@@ -1839,6 +1842,15 @@ function toggleRegionManual(on) {
         inp.style.background = '#f5f5f5';
     }
 }
+
+function checkAuthorRegion() {
+    var sel = document.getElementById('authorSelect');
+    var warn = document.getElementById('authorRegionWarning');
+    if (!sel || !warn) return;
+    var opt = sel.options[sel.selectedIndex];
+    warn.hidden = opt.dataset.scope !== 'region';
+}
+checkAuthorRegion();
 </script>
 @endpush
 @endif

@@ -91,6 +91,11 @@ return [
         'api_key' => env('ANTHROPIC_API_KEY'),
     ],
 
+    'review' => [
+        'email' => env('REVIEW_EMAIL'),
+        'password' => env('REVIEW_PASSWORD'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

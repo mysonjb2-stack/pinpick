@@ -34,14 +34,15 @@ class AvatarService
         $filename = 'personas/avatar-' . substr(md5($seed), 0, 12) . '.png';
         Storage::disk('public')->put($filename, $response->body());
 
-        return asset('storage/' . $filename);
+        return rtrim(config('app.url'), '/') . '/storage/' . $filename;
     }
 
     public function deleteOldAvatar(?string $profileImage): void
     {
         if (!$profileImage) return;
 
-        $path = str_replace(asset('storage') . '/', '', $profileImage);
+        $parsed = parse_url($profileImage, PHP_URL_PATH);
+        $path = $parsed ? ltrim(str_replace('/storage/', '', $parsed), '/') : '';
         if (str_starts_with($path, 'personas/') && Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
         }

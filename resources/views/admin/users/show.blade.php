@@ -29,10 +29,23 @@
     </div>
     <div class="ad-card">
         <div class="ad-card__title" style="margin-bottom:12px">관리</div>
-        <form method="POST" action="{{ route('admin.users.destroy', $user) }}" onsubmit="return confirm('정말 이 회원을 삭제하시겠습니까? 관련 데이터도 모두 삭제됩니다.')">
-            @csrf @method('DELETE')
-            <button type="submit" class="ad-btn ad-btn--danger">회원 삭제</button>
-        </form>
+        @if($user->is_review_account)
+            <div style="padding:8px 12px;background:#E8F5E9;border-radius:8px;font-size:13px;color:#2E7D32;margin-bottom:12px">
+                App Store 심사 계정 (활성)
+            </div>
+        @endif
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <form method="POST" action="{{ route('admin.users.toggle-review', $user) }}">
+                @csrf
+                <button type="submit" class="ad-btn ad-btn--sm" onclick="return confirm('{{ $user->is_review_account ? '심사 계정을 비활성화합니다.' : '이 계정을 심사 계정으로 설정합니다.' }}')">
+                    {{ $user->is_review_account ? '심사 계정 비활성화' : '심사 계정 활성화' }}
+                </button>
+            </form>
+            <form method="POST" action="{{ route('admin.users.destroy', $user) }}" onsubmit="return confirm('정말 이 회원을 삭제하시겠습니까? 관련 데이터도 모두 삭제됩니다.')">
+                @csrf @method('DELETE')
+                <button type="submit" class="ad-btn ad-btn--danger">회원 삭제</button>
+            </form>
+        </div>
     </div>
 </div>
 

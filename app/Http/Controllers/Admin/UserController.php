@@ -47,4 +47,11 @@ class UserController extends Controller
         $user->delete();
         return redirect()->route('admin.users.index')->with('success', '회원이 삭제되었습니다.');
     }
+
+    public function toggleReview(User $user)
+    {
+        $user->update(['is_review_account' => !$user->is_review_account]);
+        $status = $user->is_review_account ? '활성화' : '비활성화';
+        return back()->with('success', "심사 계정 {$status}: {$user->email}");
+    }
 }

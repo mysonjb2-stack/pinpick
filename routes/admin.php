@@ -20,6 +20,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::get('users', [UserController::class, 'index'])->name('admin.users.index');
     Route::get('users/{user}', [UserController::class, 'show'])->name('admin.users.show');
     Route::delete('users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
+    Route::post('users/{user}/toggle-review', [UserController::class, 'toggleReview'])->name('admin.users.toggle-review');
 
     Route::get('places', [PlaceController::class, 'index'])->name('admin.places.index');
     Route::get('places/{place}', [PlaceController::class, 'show'])->name('admin.places.show');
@@ -67,6 +68,11 @@ Route::middleware('admin.auth')->group(function () {
     Route::put('personas/{persona}', [PersonaController::class, 'update'])->name('admin.personas.update');
     Route::delete('personas/{persona}', [PersonaController::class, 'destroy'])->name('admin.personas.destroy');
     Route::post('personas/seed', [PersonaController::class, 'seed'])->name('admin.personas.seed');
+    Route::post('personas/target-count', [PersonaController::class, 'updateTargetCount'])->name('admin.personas.target-count');
+    Route::post('personas/topic-ratio', [PersonaController::class, 'updateTopicRatio'])->name('admin.personas.topic-ratio');
+    Route::post('personas/restore-excluded', [PersonaController::class, 'restoreExcluded'])->name('admin.personas.restore-excluded');
+    Route::post('personas/generate-ai', [PersonaController::class, 'generateAi'])->name('admin.personas.generate-ai');
+    Route::post('personas/store-ai', [PersonaController::class, 'storeAiCandidates'])->name('admin.personas.store-ai');
     Route::post('personas/{persona}/regenerate-avatar', [PersonaController::class, 'regenerateAvatar'])->name('admin.personas.regenerate-avatar');
     Route::post('personas/regenerate-all-avatars', [PersonaController::class, 'regenerateAllAvatars'])->name('admin.personas.regenerate-all-avatars');
 

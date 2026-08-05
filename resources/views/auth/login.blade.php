@@ -8,7 +8,7 @@
     $lastLogin = in_array($lastLogin, ['kakao', 'naver', 'google', 'apple'], true) ? $lastLogin : null;
 @endphp
 <div class="pp-login">
-    <div class="pp-login__logo">핀픽</div>
+    <div class="pp-login__logo" id="ppLogo">핀픽</div>
     <div class="pp-login__tagline">내가 저장한 장소를 빠르게 꺼내 쓰는<br>나만의 지도</div>
 
     <div class="pp-login__slot">
@@ -51,6 +51,14 @@
 
     <div style="margin-top:30px;font-size:12px;color:var(--pp-text-sub)">
         로그인 없이 최대 5개까지 임시 저장 가능해요
+    </div>
+
+    <div id="ppReviewForm" style="display:none;margin-top:24px;padding:20px;background:var(--pp-bg-sub,#f5f5f5);border-radius:12px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--pp-text)">테스트 로그인</div>
+        <input type="email" id="ppRevEmail" placeholder="이메일" autocomplete="email" style="width:100%;padding:10px 12px;border:1px solid var(--pp-border,#ddd);border-radius:8px;font-size:14px;margin-bottom:8px;box-sizing:border-box;background:var(--pp-bg,#fff);color:var(--pp-text)">
+        <input type="password" id="ppRevPw" placeholder="비밀번호" autocomplete="current-password" style="width:100%;padding:10px 12px;border:1px solid var(--pp-border,#ddd);border-radius:8px;font-size:14px;margin-bottom:10px;box-sizing:border-box;background:var(--pp-bg,#fff);color:var(--pp-text)">
+        <button type="button" id="ppRevBtn" onclick="doReviewLogin()" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--pp-primary,#5B4ACF);color:#fff;font-size:14px;font-weight:600;cursor:pointer">로그인</button>
+        <div id="ppRevErr" style="display:none;margin-top:8px;font-size:12px;color:#C62828"></div>
     </div>
 </div>
 
@@ -103,6 +111,60 @@ function nativeLoginSuccess(provider, accessToken) {
     })
     .catch(() => {
         alert('로그인에 실패했어요. 다시 시도해주세요.');
+    });
+}
+
+// 로고 5회 탭 → 심사 로그인 폼 토글
+(function() {
+    var logo = document.getElementById('ppLogo');
+    var tapCount = 0, tapTimer = null;
+    logo.addEventListener('click', function() {
+        tapCount++;
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(function() { tapCount = 0; }, 2000);
+        if (tapCount >= 5) {
+            tapCount = 0;
+            var form = document.getElementById('ppReviewForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+    });
+})();
+
+function doReviewLogin() {
+    var btn = document.getElementById('ppRevBtn');
+    var errEl = document.getElementById('ppRevErr');
+    btn.disabled = true;
+    btn.textContent = '로그인 중...';
+    errEl.style.display = 'none';
+
+    fetch('/auth/review-login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            email: document.getElementById('ppRevEmail').value,
+            password: document.getElementById('ppRevPw').value
+        })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+        btn.disabled = false;
+        btn.textContent = '로그인';
+        if (res.ok && res.data.success) {
+            location.href = res.data.redirect || '/';
+        } else {
+            errEl.textContent = res.data.error || '로그인 실패';
+            errEl.style.display = 'block';
+        }
+    })
+    .catch(function() {
+        btn.disabled = false;
+        btn.textContent = '로그인';
+        errEl.textContent = '네트워크 오류';
+        errEl.style.display = 'block';
     });
 }
 

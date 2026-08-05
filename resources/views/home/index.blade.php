@@ -2721,20 +2721,31 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
             }
         }
 
-        if (geoState === 'granted') {
+        if (geoState === 'granted' || geoState === 'unknown' || geoState === 'prompt') {
+            if (!navigator.geolocation) return;
             navigator.geolocation.getCurrentPosition(
                 async pos => {
                     const lat = pos.coords.latitude, lng = pos.coords.longitude;
                     userLat = lat; userLng = lng;
+                    currentGeoState = 'granted';
+                    if (chip) chip.style.display = 'none';
                     if (needsRefresh(cached, lat, lng)) {
                         const data = await fetchPool(lat, lng);
                         if (data) crossfade(data, false);
+                    } else if (cached && cached.version === 'nearby' && cached.data) {
+                        if (ssrReady) crossfade(cached.data, false);
+                        updateMoreBtn(false);
                     } else {
                         updateMoreBtn(false);
                     }
                 },
-                () => {},
-                { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+                (err) => {
+                    if (err.code === 1) {
+                        currentGeoState = 'denied';
+                        if (!isDeniedDismissed() && chip) chip.style.display = '';
+                    }
+                },
+                { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
             );
         }
     }
@@ -2753,7 +2764,7 @@ document.querySelectorAll('[data-cat-color]').forEach(el => {
                             const data = await fetchPool(userLat, userLng);
                             if (data) crossfade(data, false);
                         }, () => {},
-                        { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+                        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
                     );
                 }
             });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\ReviewLoginController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\HomeController;
@@ -45,6 +46,8 @@ Route::match(['get', 'post'], '/auth/{provider}/callback', [SocialAuthController
 Route::post('/logout', [SocialAuthController::class, 'logout'])->name('logout');
 Route::post('/auth/native/{provider}', [SocialAuthController::class, 'nativeLogin'])
     ->where('provider', 'kakao|google|naver|apple');
+Route::post('/auth/review-login', [ReviewLoginController::class, 'login'])
+    ->middleware('throttle:5,1');
 
 // 장소 (create 폼은 비로그인도 접근 가능 - 게스트는 localStorage 저장)
 Route::get('/places/create', [PlaceController::class, 'create'])->name('places.create');

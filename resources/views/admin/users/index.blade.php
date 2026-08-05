@@ -37,7 +37,10 @@
             @forelse($users as $user)
                 <tr>
                     <td class="ad-text-sub">{{ $user->id }}</td>
-                    <td><a href="{{ route('admin.users.show', $user) }}">{{ $user->name }}</a></td>
+                    <td>
+                        <a href="{{ route('admin.users.show', $user) }}">{{ $user->name }}</a>
+                        @if($user->is_review_account)<span class="ad-badge ad-badge--green" style="margin-left:4px;font-size:10px">심사</span>@endif
+                    </td>
                     <td class="ad-text-sub">{{ $user->email }}</td>
                     <td>
                         @if($user->provider)

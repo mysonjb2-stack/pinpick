@@ -251,18 +251,17 @@
 
 /* Photo strip */
 .pp-cur-card__photos {
-  display: flex; gap: 6px; margin-top: 14px;
+  display: flex; gap: 8px; margin-top: 14px;
   overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
   overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
 }
 .pp-cur-card__photos::-webkit-scrollbar { display: none; }
 .pp-cur-card__photo {
-  width: 110px; height: 110px; border-radius: 10px;
+  width: 39%; border-radius: 10px;
   overflow: hidden; flex-shrink: 0; background: var(--pp-chip-bg); cursor: pointer;
-  aspect-ratio: 1;
-}
-.pp-cur-card__photos--few .pp-cur-card__photo {
-  flex: 1 1 0; width: auto; min-width: 0;
+  aspect-ratio: 4/3;
+  scroll-snap-align: start;
 }
 .pp-cur-card__photo img {
   width: 100%; height: 100%; object-fit: cover; display: block;
