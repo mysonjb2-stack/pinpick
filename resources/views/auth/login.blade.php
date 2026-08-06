@@ -53,6 +53,12 @@
         로그인 없이 최대 5개까지 임시 저장 가능해요
     </div>
 
+    <div class="pp-login__terms">
+        로그인 시 <a href="{{ route('terms', ['tab' => 'terms']) }}">이용약관</a>,
+        <a href="{{ route('terms', ['tab' => 'privacy']) }}">개인정보처리방침</a>,
+        <a href="{{ route('terms', ['tab' => 'location']) }}">위치기반서비스 이용약관</a>에<br>동의하는 것으로 간주됩니다.
+    </div>
+
     <div id="ppReviewForm" style="display:none;margin-top:24px;padding:20px;background:var(--pp-bg-sub,#f5f5f5);border-radius:12px">
         <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--pp-text)">테스트 로그인</div>
         <input type="email" id="ppRevEmail" placeholder="이메일" autocomplete="email" style="width:100%;padding:10px 12px;border:1px solid var(--pp-border,#ddd);border-radius:8px;font-size:14px;margin-bottom:8px;box-sizing:border-box;background:var(--pp-bg,#fff);color:var(--pp-text)">

@@ -533,7 +533,7 @@
     <footer class="pp-footer">
         <div class="pp-footer__logo">핀픽</div>
         <div class="pp-footer__policy">
-            <a href="#">이용약관</a> ㅣ <a href="#">개인정보 수집이용</a> ㅣ <a href="#">위치정보 이용약관</a>
+            <a href="{{ route('terms', ['tab' => 'terms']) }}">이용약관</a> ㅣ <a href="{{ route('terms', ['tab' => 'privacy']) }}">개인정보처리방침</a> ㅣ <a href="{{ route('terms', ['tab' => 'location']) }}">위치기반서비스 이용약관</a>
         </div>
         <button type="button" class="pp-footer__biz-toggle" id="ppBizToggle">
             사업자 정보

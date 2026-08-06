@@ -82,7 +82,8 @@ class MyPageController extends Controller
 
     public function terms(Request $request)
     {
-        $tab = $request->input('tab') === 'privacy' ? 'privacy' : 'terms';
+        $tab = in_array($request->input('tab'), ['privacy', 'location'], true)
+            ? $request->input('tab') : 'terms';
         return view('mypage.terms', compact('tab'));
     }
 
