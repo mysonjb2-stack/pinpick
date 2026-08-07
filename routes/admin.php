@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\CurationController;
 use App\Http\Controllers\Admin\CollectorController;
 use App\Http\Controllers\Admin\PersonaController;
+use App\Http\Controllers\Admin\ReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('login', [AuthController::class, 'showLogin'])->name('admin.login');
@@ -75,6 +76,11 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('personas/store-ai', [PersonaController::class, 'storeAiCandidates'])->name('admin.personas.store-ai');
     Route::post('personas/{persona}/regenerate-avatar', [PersonaController::class, 'regenerateAvatar'])->name('admin.personas.regenerate-avatar');
     Route::post('personas/regenerate-all-avatars', [PersonaController::class, 'regenerateAllAvatars'])->name('admin.personas.regenerate-all-avatars');
+
+    Route::get('reports', [ReportController::class, 'index'])->name('admin.reports.index');
+    Route::post('reports/{report}/handle', [ReportController::class, 'handle'])->name('admin.reports.handle');
+    Route::post('users/{user}/suspend', [ReportController::class, 'suspendUser'])->name('admin.users.suspend');
+    Route::post('users/{user}/unsuspend', [ReportController::class, 'unsuspendUser'])->name('admin.users.unsuspend');
 
     Route::get('admins', [AdminUserController::class, 'index'])->name('admin.admins.index');
     Route::post('admins', [AdminUserController::class, 'store'])->name('admin.admins.store');

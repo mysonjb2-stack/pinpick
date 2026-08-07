@@ -40,11 +40,47 @@
     <div class="pp-cur-map__el" id="curMap"></div>
 </div>
 
+{{-- Blocked author banner --}}
+@if($isBlockedAuthor)
+<div class="pp-cur-blocked" id="curBlockedBanner">
+    <div class="pp-cur-blocked__msg">차단한 사용자의 리스트입니다</div>
+    <button type="button" class="pp-cur-blocked__unblock" id="curUnblockBtn" data-user-id="{{ $curation->author_user_id }}">차단 해제</button>
+</div>
+@endif
+
 {{-- Header overlay --}}
 <div class="pp-cur-hdr">
     <button type="button" class="pp-cur-hdr__btn" id="curBack" aria-label="뒤로">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
+    <button type="button" class="pp-cur-hdr__btn pp-cur-hdr__more" id="curMoreBtn" aria-label="더보기">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+    </button>
+</div>
+
+{{-- More menu sheet --}}
+<div class="pp-cur-more-sheet" id="curMoreSheet">
+    <div class="pp-cur-more-sheet__backdrop" data-close-more></div>
+    <div class="pp-cur-more-sheet__panel">
+        <div class="pp-cur-more-sheet__head">
+            <h3>리스트 관리</h3>
+            <button type="button" data-close-more class="pp-cur-more-sheet__close">&times;</button>
+        </div>
+        <div class="pp-cur-more-sheet__body">
+            <button type="button" class="pp-cur-more-action" id="curDoReport">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                신고하기
+            </button>
+            @auth
+            @if($curation->author_user_id)
+            <button type="button" class="pp-cur-more-action pp-cur-more-action--block" id="curDoBlock" data-user-id="{{ $curation->author_user_id }}" data-user-name="{{ $curation->author->name ?? '' }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                이 사용자 차단
+            </button>
+            @endif
+            @endauth
+        </div>
+    </div>
 </div>
 
 {{-- Fit button --}}
@@ -163,20 +199,10 @@
         @endforeach
 
         <div class="pp-cur-sheet__bottom-pad"></div>
-
-        @auth
-        <div class="pp-cur-report">
-            <button type="button" class="pp-cur-report__btn" id="curReportBtn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                신고
-            </button>
-        </div>
-        @endauth
     </div>
 </div>
 
 {{-- Report Sheet --}}
-@auth
 <div class="pp-cur-report-sheet" id="curReportSheet">
     <div class="pp-cur-report-sheet__backdrop" data-close-report></div>
     <div class="pp-cur-report-sheet__panel">
@@ -195,7 +221,6 @@
         <button type="button" class="pp-btn pp-cur-report-submit" id="curReportSubmit">신고하기</button>
     </div>
 </div>
-@endauth
 
 {{-- CTA --}}
 <div class="pp-cur-cta" id="curCta">
@@ -414,10 +439,61 @@
         shareSheet.classList.remove('is-open');
     });
 
+    // ── More menu ──
+    const moreSheet = document.getElementById('curMoreSheet');
+    const moreBtn = document.getElementById('curMoreBtn');
+    if (moreSheet && moreBtn) {
+        moreBtn.addEventListener('click', (e) => { e.stopPropagation(); moreSheet.classList.add('is-open'); });
+        moreSheet.querySelectorAll('[data-close-more]').forEach(el => el.addEventListener('click', () => moreSheet.classList.remove('is-open')));
+
+        const doReport = document.getElementById('curDoReport');
+        if (doReport) {
+            doReport.addEventListener('click', () => {
+                moreSheet.classList.remove('is-open');
+                reportSheet.classList.add('is-open');
+            });
+        }
+
+        const doBlock = document.getElementById('curDoBlock');
+        if (doBlock) {
+            doBlock.addEventListener('click', () => {
+                const userId = doBlock.dataset.userId;
+                const userName = doBlock.dataset.userName;
+                if (!confirm(userName + ' 님을 차단하시겠어요?\n이 사용자의 리스트가 더 이상 보이지 않습니다.')) return;
+                fetch('/api/block', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                    body: JSON.stringify({ blocked_user_id: parseInt(userId) }),
+                }).then(r => r.json()).then(d => {
+                    if (d.success) {
+                        moreSheet.classList.remove('is-open');
+                        showToast('이 사용자의 리스트가 더 이상 보이지 않습니다');
+                    }
+                }).catch(() => alert('차단 실패'));
+            });
+        }
+    }
+
+    // ── Blocked banner unblock ──
+    const unblockBtn = document.getElementById('curUnblockBtn');
+    if (unblockBtn) {
+        unblockBtn.addEventListener('click', () => {
+            const userId = unblockBtn.dataset.userId;
+            fetch('/api/block/' + userId, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            }).then(r => r.json()).then(d => {
+                if (d.success) {
+                    document.getElementById('curBlockedBanner').remove();
+                    showToast('차단이 해제되었습니다');
+                }
+            }).catch(() => alert('해제 실패'));
+        });
+    }
+
     // ── Report ──
     const reportSheet = document.getElementById('curReportSheet');
     if (reportSheet) {
-        document.getElementById('curReportBtn').addEventListener('click', () => reportSheet.classList.add('is-open'));
         reportSheet.querySelectorAll('[data-close-report]').forEach(el => el.addEventListener('click', () => reportSheet.classList.remove('is-open')));
         document.getElementById('curReportSubmit').addEventListener('click', () => {
             const reason = reportSheet.querySelector('input[name="reportReason"]:checked');
@@ -427,7 +503,7 @@
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
                 body: JSON.stringify({ reason: reason.value, detail: document.getElementById('curReportDetail').value }),
             }).then(r => r.json()).then(d => {
-                if (d.success) { showToast('신고가 접수되었어요'); reportSheet.classList.remove('is-open'); }
+                if (d.success) { showToast('신고가 접수되었습니다. 확인 중입니다.'); reportSheet.classList.remove('is-open'); }
             }).catch(() => alert('신고 실패'));
         });
     }

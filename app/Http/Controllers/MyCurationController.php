@@ -451,9 +451,10 @@ class MyCurationController extends Controller
             'reporter_user_id' => Auth::id(),
             'reason' => $data['reason'],
             'detail' => $data['detail'] ?? null,
+            'status' => 'pending',
         ]);
 
-        return response()->json(['success' => true]);
+        return response()->json(['success' => true, 'message' => '신고가 접수되었습니다. 확인 중입니다.']);
     }
 
     private function buildSnapshot(Curation $curation): array

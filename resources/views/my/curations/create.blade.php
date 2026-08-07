@@ -215,11 +215,12 @@
     <div class="mc-terms">
         <div class="mc-terms__warn">
             연예인·방송인 이름, 프로그램명은 제목에 쓸 수 없어요.<br>
-            허위 정보나 타인의 권리를 침해하는 콘텐츠는 삭제될 수 있습니다.
+            허위 정보나 타인의 권리를 침해하는 콘텐츠는 삭제될 수 있습니다.<br>
+            부적절한 콘텐츠(스팸, 욕설, 혐오 표현 등)에 대해 무관용 원칙이 적용됩니다.
         </div>
         <label class="mc-terms__check">
             <input type="checkbox" id="mcTerms">
-            위 내용을 확인했으며, 게시에 따른 책임이 작성자에게 있음에 동의합니다.
+            <a href="{{ route('terms') }}" target="_blank" style="text-decoration:underline">이용약관</a>에 동의하며, 게시에 따른 책임이 작성자에게 있음을 확인합니다.
         </label>
     </div>
 </div>

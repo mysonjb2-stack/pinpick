@@ -9,7 +9,15 @@ class CurationReport extends Model
 {
     protected $fillable = [
         'curation_id', 'reporter_user_id', 'reason', 'detail',
+        'status', 'result', 'handled_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'handled_at' => 'datetime',
+        ];
+    }
 
     public function curation(): BelongsTo
     {

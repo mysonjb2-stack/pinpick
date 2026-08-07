@@ -10,6 +10,7 @@ use App\Http\Controllers\PlaceController;
 use App\Http\Controllers\PublicPlaceController;
 use App\Http\Controllers\CurationController;
 use App\Http\Controllers\MyCurationController;
+use App\Http\Controllers\BlockController;
 use App\Http\Controllers\SharedCollectionController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\TrendingController;
@@ -25,7 +26,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/mypage/profile', [MyPageController::class, 'updateProfile'])->name('mypage.profile.update');
     Route::delete('/mypage/account', [MyPageController::class, 'destroyAccount'])->name('mypage.account.destroy');
     Route::get('/mypage/categories', [MyPageController::class, 'categories'])->name('mypage.categories');
+    Route::get('/mypage/blocked-users', [BlockController::class, 'index'])->name('mypage.blocked-users');
     Route::get('/mypage/shared-links', [SharedCollectionController::class, 'myLinks'])->name('mypage.shared-links');
+
+    Route::post('/api/block', [BlockController::class, 'store'])->name('api.block.store');
+    Route::delete('/api/block/{blockedUserId}', [BlockController::class, 'destroy'])->name('api.block.destroy');
     Route::post('/api/share', [SharedCollectionController::class, 'store'])->name('api.share.store')
         ->middleware('throttle:10,1');
     Route::patch('/api/share/{collection}/deactivate', [SharedCollectionController::class, 'deactivate'])->name('api.share.deactivate');
@@ -105,9 +110,10 @@ Route::get('/c/{id}', [CurationController::class, 'show'])
     ->where('id', '[0-9]+')
     ->middleware('throttle:60,1')
     ->name('curation.show');
+Route::post('/c/{curation}/report', [MyCurationController::class, 'report'])->name('curation.report')
+    ->middleware('throttle:10,1');
 Route::middleware('auth')->group(function () {
     Route::post('/c/{id}/save', [CurationController::class, 'saveToMyPinpick'])->name('curation.save');
-    Route::post('/c/{curation}/report', [MyCurationController::class, 'report'])->name('curation.report');
 
     // 내 큐레이션
     Route::get('/my/curations', [MyCurationController::class, 'index'])->name('my.curations');

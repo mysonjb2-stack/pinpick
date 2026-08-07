@@ -122,6 +122,76 @@
             + '</div>';
     }
 
+    // ── More menu (event delegation) ──
+    document.getElementById('curFeed').addEventListener('click', function(e) {
+        const mBtn = e.target.closest('[data-more-cid]');
+        if (!mBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        showMoreMenu(
+            parseInt(mBtn.dataset.moreCid),
+            mBtn.dataset.moreUid ? parseInt(mBtn.dataset.moreUid) : null,
+            mBtn.dataset.moreUname || '',
+            mBtn
+        );
+    });
+
+    let activeMoreId = null;
+    function showMoreMenu(cId, authorId, authorName, btnEl) {
+        closeMoreMenu();
+        const menu = document.createElement('div');
+        menu.className = 'pp-expl-more-menu';
+        menu.id = 'explMoreMenu';
+        menu.innerHTML = '<button type="button" class="pp-expl-more-item" data-action="report" data-cid="' + cId + '">'
+            + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>'
+            + ' 신고하기</button>'
+            + (IS_LOGGED_IN && authorId ? '<button type="button" class="pp-expl-more-item pp-expl-more-item--block" data-action="block" data-uid="' + authorId + '" data-uname="' + esc(authorName) + '">'
+            + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'
+            + ' 이 사용자 차단</button>' : '');
+        btnEl.appendChild(menu);
+        activeMoreId = cId;
+        menu.addEventListener('click', handleMoreAction);
+        setTimeout(() => document.addEventListener('click', closeMoreMenu, { once: true }), 10);
+    }
+    function closeMoreMenu() {
+        const m = document.getElementById('explMoreMenu');
+        if (m) m.remove();
+        activeMoreId = null;
+    }
+    function handleMoreAction(e) {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        e.stopPropagation();
+        if (btn.dataset.action === 'report') {
+            closeMoreMenu();
+            window.location.href = '/c/' + btn.dataset.cid;
+        } else if (btn.dataset.action === 'block') {
+            const uid = btn.dataset.uid;
+            const uname = btn.dataset.uname;
+            if (!confirm(uname + ' 님을 차단하시겠어요?\n이 사용자의 리스트가 더 이상 보이지 않습니다.')) { closeMoreMenu(); return; }
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            fetch('/api/block', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ blocked_user_id: parseInt(uid) }),
+            }).then(r => r.json()).then(d => {
+                if (d.success) {
+                    closeMoreMenu();
+                    allCurations = allCurations.filter(c => c.author_user_id != uid);
+                    renderFeed();
+                    showExplToast('이 사용자의 리스트가 더 이상 보이지 않습니다');
+                }
+            }).catch(() => {});
+        }
+    }
+    function showExplToast(msg) {
+        let t = document.getElementById('ppExplToast');
+        if (!t) { t = document.createElement('div'); t.id = 'ppExplToast'; t.className = 'pp-toast'; document.body.appendChild(t); }
+        t.textContent = msg;
+        t.classList.add('is-show');
+        setTimeout(() => t.classList.remove('is-show'), 3000);
+    }
+
     function renderSection(c) {
         const places = c.places_list || [];
         const savesMeta = c.save_count > 0
@@ -185,22 +255,26 @@
         }
 
         const secHref = '/c/' + c.id;
+        const moreBtn = (c.author_user_id || !c.is_official)
+            ? '<button type="button" class="pp-expl-sec__more-btn" data-more-cid="' + c.id + '" data-more-uid="' + (c.author_user_id || '') + '" data-more-uname="' + esc(c.author_name || '') + '" aria-label="더보기"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>'
+            : '';
         return '<div class="pp-expl-sec">'
             + '<a href="' + secHref + '" class="pp-expl-sec__head">'
-            + '<div class="pp-expl-sec__left">'
+            + '<div class="pp-expl-sec__row">'
             + '<div class="pp-expl-author">'
             + authorAvatar
             + '<span class="pp-expl-author__name">' + authorName + '</span>'
             + '<span class="pp-expl-author__dot">·</span>'
             + '<span class="pp-expl-author__count">' + (c.places_count || 0) + '개 장소</span>'
+            + moreBtn
+            + '</div>'
+            + '<button type="button" class="pp-expl-sec__save-btn' + savedClass + '" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/c/' + c.id + '?action=save\'">'
+            + '<span>' + savedIcon + ' ' + savedLabel + '</span></button>'
             + '</div>'
             + badgesHtml
             + '<div class="pp-expl-sec__title">' + esc(c.title) + '</div>'
             + (c.description ? '<p class="pp-expl-sec__desc">' + esc(c.description) + '</p>' : '')
             + savesMeta
-            + '</div>'
-            + '<button type="button" class="pp-expl-sec__save-btn' + savedClass + '" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/c/' + c.id + '?action=save\'">'
-            + '<span>' + savedIcon + ' ' + savedLabel + '</span></button>'
             + '</a>'
             + '<div class="pp-expl-scroll"><div class="pp-expl-scroll__track">' + cardsHtml + '</div></div>'
             + '</div>';

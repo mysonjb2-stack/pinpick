@@ -51,6 +51,11 @@
             내가 공유한 링크
             <span class="pp-menu__arrow">›</span>
         </a>
+        <a href="{{ route('mypage.blocked-users') }}" class="pp-menu__item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            차단한 사용자
+            <span class="pp-menu__arrow">›</span>
+        </a>
         <a href="{{ route('notices') }}" class="pp-menu__item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
             공지사항

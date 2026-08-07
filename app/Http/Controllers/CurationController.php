@@ -39,6 +39,13 @@ class CurationController extends Controller
 
         $curation->load(['places', 'author']);
 
+        $isBlockedAuthor = false;
+        if (Auth::check() && $curation->author_user_id) {
+            $isBlockedAuthor = \App\Models\BlockedUser::where('user_id', Auth::id())
+                ->where('blocked_user_id', $curation->author_user_id)
+                ->exists();
+        }
+
         if ($curation->status === 'pending' && $curation->approved_snapshot) {
             $snap = $curation->approved_snapshot;
             $curation->title = $snap['title'] ?? $curation->title;
@@ -66,7 +73,7 @@ class CurationController extends Controller
             ->toArray();
         $googleReviews = GoogleReviewService::getReviewDataBulk($googlePlaceIds);
 
-        return view('curations.show', compact('curation', 'userCategories', 'googleReviews'));
+        return view('curations.show', compact('curation', 'userCategories', 'googleReviews', 'isBlockedAuthor'));
     }
 
     public function saveToMyPinpick(Request $request, int $id)
@@ -211,11 +218,17 @@ class CurationController extends Controller
 
     public function apiList(Request $request)
     {
+        $blockedIds = Auth::check() ? Auth::user()->blockedUserIds() : [];
+
         $category = $request->get('category');
         $curations = Curation::where(function ($q) {
                 $q->where('status', 'approved')
                   ->orWhere(fn($q2) => $q2->where('status', 'pending')->whereNotNull('approved_snapshot'));
             })
+            ->when(!empty($blockedIds), fn($q) => $q->where(function ($q2) use ($blockedIds) {
+                $q2->whereNull('author_user_id')
+                   ->orWhereNotIn('author_user_id', $blockedIds);
+            }))
             ->with(['places' => fn($q) => $q->orderBy('sort_order')->limit(6), 'author:id,name,profile_image'])
             ->withCount('places')
             ->when($category, fn($q) => $q->where('category', $category))
@@ -325,6 +338,7 @@ class CurationController extends Controller
 
             unset($c->places, $c->author, $c->status, $c->approved_snapshot,
                   $c->region_codes, $c->region_label, $c->nights, $c->days);
+            $c->makeVisible('author_user_id');
         });
 
         $lat = (float) $request->query('lat');
@@ -470,7 +484,8 @@ class CurationController extends Controller
                        cp.latitude, cp.longitude, cp.is_overseas,
                        cp.external_place_id, cp.naver_place_id,
                        cp.address, cp.country_code, cp.region_l1, cp.region_l1_key,
-                       c.save_count AS cur_save_count
+                       c.save_count AS cur_save_count,
+                       c.author_user_id
                 FROM curation_places cp
                 JOIN curations c ON c.id = cp.curation_id
                 WHERE c.status = 'approved'
@@ -480,6 +495,16 @@ class CurationController extends Controller
 
         $globalPool = collect($globalPool);
         if ($globalPool->isEmpty()) return [];
+
+        if ($userId) {
+            $blockedIds = \App\Models\BlockedUser::where('user_id', $userId)
+                ->pluck('blocked_user_id')->toArray();
+            if (!empty($blockedIds)) {
+                $globalPool = $globalPool->reject(fn($p) =>
+                    $p['author_user_id'] && in_array($p['author_user_id'], $blockedIds)
+                );
+            }
+        }
 
         if ($userId) {
             $savedExtIds = Place::where('user_id', $userId)
@@ -546,6 +571,7 @@ class CurationController extends Controller
         $cacheKey = $isLocationless ? 'cur_nearby:fallback' : ('cur_nearby:' . round($lat, 2) . ':' . round($lng, 2));
 
         $savedExtIds = [];
+        $blockedIds = [];
         if (Auth::check()) {
             $savedExtIds = Place::where('user_id', Auth::id())
                 ->whereNotNull('kakao_place_id')
@@ -556,6 +582,7 @@ class CurationController extends Controller
                         ->pluck('naver_place_id')
                 )
                 ->toArray();
+            $blockedIds = Auth::user()->blockedUserIds();
         }
 
         $isFallback = false;
@@ -571,6 +598,7 @@ class CurationController extends Controller
                                cp.external_place_id, cp.naver_place_id,
                                cp.dong_label, cp.country_code, cp.region_l1, cp.region_l1_key,
                                c.save_count AS cur_save_count,
+                               c.author_user_id,
                                (6371000 * acos(LEAST(1, cos(radians(?)) * cos(radians(cp.latitude))
                                 * cos(radians(cp.longitude) - radians(?))
                                 + sin(radians(?)) * sin(radians(cp.latitude))))) AS dist
@@ -589,6 +617,12 @@ class CurationController extends Controller
             });
 
             $pool = collect($pool);
+
+            if (!empty($blockedIds)) {
+                $pool = $pool->reject(fn($p) =>
+                    ($p['author_user_id'] ?? null) && in_array($p['author_user_id'], $blockedIds)
+                );
+            }
 
             if (!empty($savedExtIds)) {
                 $pool = $pool->reject(function ($p) use ($savedExtIds) {

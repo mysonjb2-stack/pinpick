@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'profile_image', 'provider', 'provider_id', 'is_operator_persona', 'is_review_account', 'bio', 'persona_scope', 'persona_region_tag'])]
+#[Fillable(['name', 'email', 'password', 'profile_image', 'provider', 'provider_id', 'is_operator_persona', 'is_review_account', 'is_suspended', 'suspended_at', 'suspend_reason', 'bio', 'persona_scope', 'persona_region_tag'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -52,5 +52,16 @@ class User extends Authenticatable
     public function places()
     {
         return $this->hasMany(Place::class);
+    }
+
+    public function blockedUsers()
+    {
+        return $this->belongsToMany(User::class, 'blocked_users', 'user_id', 'blocked_user_id')
+            ->withTimestamps();
+    }
+
+    public function blockedUserIds(): array
+    {
+        return BlockedUser::where('user_id', $this->id)->pluck('blocked_user_id')->toArray();
     }
 }
