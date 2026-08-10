@@ -894,6 +894,33 @@
     }
     msClose.addEventListener('click', closeSheet);
 
+    // 카드 전체 탭 → 상세 이동 (드래그 구분 + 내부 버튼 제외)
+    (function() {
+        let startX, startY;
+        const ignoreEls = [msClose, msCall, msRoute, msDetail, msBadge];
+        function isIgnored(el) { return ignoreEls.some(b => b && b.contains(el)); }
+        sheet.addEventListener('pointerdown', (e) => {
+            if (isIgnored(e.target)) return;
+            startX = e.clientX; startY = e.clientY;
+            sheet.classList.add('is-pressed');
+        });
+        sheet.addEventListener('pointerup', (e) => {
+            if (!sheet.classList.contains('is-pressed')) return;
+            sheet.classList.remove('is-pressed');
+            if (isIgnored(e.target)) return;
+            const dx = Math.abs(e.clientX - startX), dy = Math.abs(e.clientY - startY);
+            if (dx < 10 && dy < 10 && msDetail.href && !msDetail.hidden) {
+                location.href = msDetail.href;
+            }
+        });
+        sheet.addEventListener('pointermove', (e) => {
+            if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+                sheet.classList.remove('is-pressed');
+            }
+        });
+        sheet.addEventListener('pointercancel', () => sheet.classList.remove('is-pressed'));
+    })();
+
     function openRoute(provider, lat, lng, name) {
         const ua = navigator.userAgent || '';
         const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
