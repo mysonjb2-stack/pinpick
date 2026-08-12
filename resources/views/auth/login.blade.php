@@ -8,7 +8,7 @@
     $lastLogin = in_array($lastLogin, ['kakao', 'naver', 'google', 'apple'], true) ? $lastLogin : null;
 @endphp
 <div class="pp-login">
-    <div class="pp-login__logo" id="ppLogo">핀픽</div>
+    <div class="pp-login__logo" id="ppLogo"><img src="/icon-192.png" alt="" class="pp-login__logo-icon">핀픽</div>
     <div class="pp-login__tagline">내가 저장한 장소를 빠르게 꺼내 쓰는<br>나만의 지도</div>
 
     <div class="pp-login__slot">
@@ -53,7 +53,7 @@
         로그인 없이 최대 5개까지 임시 저장 가능해요
     </div>
 
-    <div class="pp-login__terms">
+    <div class="pp-login__terms" style="margin-top:16px">
         로그인 시 <a href="{{ route('terms', ['tab' => 'terms']) }}">이용약관</a>,
         <a href="{{ route('terms', ['tab' => 'privacy']) }}">개인정보처리방침</a>,
         <a href="{{ route('terms', ['tab' => 'location']) }}">위치기반서비스 이용약관</a>에<br>동의하는 것으로 간주됩니다.

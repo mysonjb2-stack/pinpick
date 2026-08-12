@@ -40,6 +40,8 @@ Route::middleware('auth')->group(function () {
 Route::get('/notices', [MyPageController::class, 'notices'])->name('notices');
 Route::get('/faq', [MyPageController::class, 'faq'])->name('faq');
 Route::get('/terms', [MyPageController::class, 'terms'])->name('terms');
+Route::get('/privacy', fn() => app(MyPageController::class)->terms(request()->merge(['tab' => 'privacy'])))->name('privacy');
+Route::get('/location-terms', fn() => app(MyPageController::class)->terms(request()->merge(['tab' => 'location'])))->name('location-terms');
 
 Route::get('/login', fn() => view('auth.login'))->name('login');
 
