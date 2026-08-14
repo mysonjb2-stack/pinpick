@@ -175,26 +175,30 @@
             <button type="button" class="sl__back" id="slBack" aria-label="뒤로">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="m15 18-6-6 6-6"/></svg>
             </button>
-            <span class="sl__title">장소 검색</span>
+            <span class="sl__title">장소 추가</span>
         </div>
 
-        {{-- 국내/해외 토글 --}}
-        <div class="sl__region">
-            <button type="button" class="sl__region-btn is-active" data-region="domestic">🇰🇷 국내</button>
-            <button type="button" class="sl__region-btn" data-region="overseas">🌍 해외</button>
-        </div>
-
-        {{-- 검색창 --}}
+        {{-- 검색창 + 국내/해외 인라인 셀렉터 --}}
         <div class="sl__search">
-            <svg class="sl__search-icon" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-            <input type="text" id="slInput" class="sl__search-input" placeholder="장소명을 입력하세요" autocomplete="off">
+            <svg class="sl__search-icon" viewBox="0 0 24 24" fill="none" stroke="var(--pp-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="text" id="slInput" class="sl__search-input" placeholder="가게 이름이나 주소 검색" autocomplete="off">
             <button type="button" class="sl__search-clear" id="slClear" hidden aria-label="지우기">&times;</button>
+            <span class="sl__search-divider"></span>
+            <button type="button" class="sl__region-sel" id="slRegionSel">
+                <span id="slRegionLabel">국내</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            {{-- 국내/해외 드롭다운 --}}
+            <div class="sl__region-dropdown" id="slRegionDropdown" hidden>
+                <button type="button" class="sl__region-opt is-active" data-region="domestic">국내</button>
+                <button type="button" class="sl__region-opt" data-region="overseas">해외</button>
+            </div>
         </div>
 
-        {{-- 현위치 저장 버튼 --}}
+        {{-- 현위치 저장 — 텍스트 액션 --}}
         <button type="button" class="sl__current-loc" id="slCurrentLoc">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="8"/></svg>
-            <span>지금 이 위치 저장하기</span>
+            <span>지금 있는 곳 저장하기</span>
         </button>
 
         {{-- 탭 (숨김, JS에서 mappin 전환용으로만 사용) --}}
@@ -207,16 +211,21 @@
         <div class="sl__pane is-active" data-pane="keyword">
             {{-- 주변 인기 장소 --}}
             <div class="sl__popular" id="slPopular" hidden>
+                <div class="sl__section-gap"></div>
                 <div class="sl__popular-head">
-                    <span class="sl__popular-title">내 위치 주변 장소 추천</span>
-                    <span class="sl__popular-sub" id="slPopularSub">내 위치 기준</span>
+                    <span class="sl__popular-title">여기 근처예요</span>
+                    <span class="sl__popular-sub" id="slPopularSub">탭하면 바로 저장</span>
                 </div>
                 <div class="sl__popular-scroll" id="slPopularScroll"></div>
             </div>
             {{-- 최근 검색어 --}}
             <div class="sl__recent" id="slRecent">
-                <div class="sl__recent-head">최근 검색어</div>
-                <ul class="sl__recent-list" id="slRecentList"></ul>
+                <div class="sl__section-gap"></div>
+                <div class="sl__recent-head">
+                    <span>최근 검색어</span>
+                    <button type="button" class="sl__recent-clear-all" id="slRecentClearAll">전체 삭제</button>
+                </div>
+                <div class="sl__recent-chips" id="slRecentList"></div>
             </div>
             {{-- 자동완성 결과 리스트 (리스트 뷰) --}}
             <div class="sl__ac" id="slAc" hidden>
@@ -257,15 +266,17 @@
             </button>
             {{-- 결과 없음 --}}
             <div class="sl__empty" id="slEmpty" hidden>
-                <div class="sl__empty-icon">🔍</div>
                 <p class="sl__empty-msg">검색 결과가 없어요</p>
-                <button type="button" class="sl__empty-btn" id="slManual">직접 입력하기</button>
+                <p class="sl__empty-overseas" id="slEmptyOverseas" hidden>
+                    <button type="button" id="slSwitchOverseas">해외에서 찾아볼까요?</button>
+                </p>
+                <div class="sl__empty-actions">
+                    <button type="button" class="sl__empty-action" id="slOpenMappin">지도에서 직접 찍기</button>
+                    <button type="button" class="sl__empty-action" id="slManualEntry">직접 입력해서 추가</button>
+                </div>
             </div>
-            {{-- 하단 보조 링크 --}}
-            <div class="sl__bottom-links" id="slBottomLinks">
-                <button type="button" class="sl__bottom-link" id="slOpenMappin">원하는 곳이 없나요? <strong>지도에서 직접 찍기</strong></button>
-                <button type="button" class="sl__bottom-link" id="slManualEntry">직접 입력해서 추가</button>
-            </div>
+            {{-- 하단 보조 링크 (검색 전 상시 노출 제거 → 빈 상태로 이동) --}}
+            <div class="sl__bottom-links" id="slBottomLinks" hidden></div>
         </div>
 
         {{-- 지도에서 찍기 탭 --}}
@@ -501,7 +512,8 @@ document.getElementById('slBack').addEventListener('click', function() {
 
 // 수정모드 해외 장소 시 토글 초기화
 if (currentRegion === 'overseas') {
-    document.querySelectorAll('.sl__region-btn').forEach(b => {
+    document.getElementById('slRegionLabel').textContent = '해외';
+    document.querySelectorAll('.sl__region-opt').forEach(b => {
         b.classList.toggle('is-active', b.dataset.region === 'overseas');
     });
 }
@@ -521,24 +533,33 @@ slClear.addEventListener('click', () => {
     showKeywordInit();
 });
 
-// 국내/해외 토글
-document.querySelectorAll('.sl__region-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        currentRegion = btn.dataset.region;
-        document.querySelectorAll('.sl__region-btn').forEach(b => b.classList.toggle('is-active', b === btn));
-        document.getElementById('f_overseas').value = currentRegion === 'overseas' ? '1' : '0';
-        const nuf = document.getElementById('naverUrlField');
-        if (nuf) nuf.style.display = currentRegion === 'overseas' ? 'none' : '';
-        // 전환 시 검색 초기화
-        showKeywordInit();
-        slInput.value = '';
-        slClear.hidden = true;
-        // 지도 탭 열려있으면 재초기화
-        const activePane = document.querySelector('.sl__pane.is-active');
-        if (activePane && activePane.dataset.pane === 'mappin') {
-            switchMappinMap();
-        }
-    });
+// 국내/해외 인라인 드롭다운
+const slRegionDropdown = document.getElementById('slRegionDropdown');
+document.getElementById('slRegionSel').addEventListener('click', (e) => {
+    e.stopPropagation();
+    slRegionDropdown.hidden = !slRegionDropdown.hidden;
+});
+document.addEventListener('click', () => { slRegionDropdown.hidden = true; });
+slRegionDropdown.addEventListener('click', (e) => { e.stopPropagation(); });
+
+function switchRegion(region) {
+    currentRegion = region;
+    document.getElementById('slRegionLabel').textContent = region === 'overseas' ? '해외' : '국내';
+    document.querySelectorAll('.sl__region-opt').forEach(b => b.classList.toggle('is-active', b.dataset.region === region));
+    document.getElementById('f_overseas').value = region === 'overseas' ? '1' : '0';
+    const nuf = document.getElementById('naverUrlField');
+    if (nuf) nuf.style.display = region === 'overseas' ? 'none' : '';
+    slRegionDropdown.hidden = true;
+    showKeywordInit();
+    slInput.value = '';
+    slClear.hidden = true;
+    const activePane = document.querySelector('.sl__pane.is-active');
+    if (activePane && activePane.dataset.pane === 'mappin') {
+        switchMappinMap();
+    }
+}
+document.querySelectorAll('.sl__region-opt').forEach(btn => {
+    btn.addEventListener('click', () => switchRegion(btn.dataset.region));
 });
 
 // 탭 전환 (숨김 탭용, 프로그래밍 호출)
@@ -546,8 +567,6 @@ function switchToPane(pane) {
     document.querySelectorAll('.sl__tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab === pane));
     document.querySelectorAll('.sl__pane').forEach(p => p.classList.toggle('is-active', p.dataset.pane === pane));
     if (pane === 'mappin') switchMappinMap();
-    var links = document.getElementById('slBottomLinks');
-    if (links) links.style.display = pane === 'mappin' ? 'none' : '';
     var locBtn = document.getElementById('slCurrentLoc');
     if (locBtn) locBtn.style.display = pane === 'mappin' ? 'none' : '';
 }
@@ -555,14 +574,21 @@ document.querySelectorAll('.sl__tab').forEach(btn => {
     btn.addEventListener('click', () => switchToPane(btn.dataset.tab));
 });
 
-// 하단 링크: 지도에서 직접 찍기
+// 빈 상태: 지도에서 직접 찍기
 document.getElementById('slOpenMappin').addEventListener('click', () => switchToPane('mappin'));
 
-// 하단 링크: 직접 입력해서 추가
+// 빈 상태: 직접 입력해서 추가
 document.getElementById('slManualEntry').addEventListener('click', () => {
     slAutoOpened = false;
     closeSL();
     document.getElementById('f_name').focus();
+});
+
+// 빈 상태: 해외에서 찾아볼까요?
+document.getElementById('slSwitchOverseas').addEventListener('click', () => {
+    switchRegion('overseas');
+    const q = slInput.value.trim();
+    if (q.length >= 2) doSearch(q);
 });
 
 // =========================================
@@ -586,19 +612,18 @@ function renderRecent() {
     const list = getRecent();
     if (!list.length) { slRecent.hidden = true; return; }
     slRecent.hidden = false;
-    slRecentList.innerHTML = list.map(q => `
-        <li class="sl__recent-item">
-            <button type="button" class="sl__recent-keyword" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>
-            <button type="button" class="sl__recent-del" data-q="${escapeHtml(q)}" aria-label="삭제">&times;</button>
-        </li>
-    `).join('');
-    slRecentList.querySelectorAll('.sl__recent-keyword').forEach(el => {
+    slRecentList.innerHTML = list.map(q =>
+        `<button type="button" class="sl__recent-chip" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`
+    ).join('');
+    slRecentList.querySelectorAll('.sl__recent-chip').forEach(el => {
         el.addEventListener('click', () => { slInput.value = el.dataset.q; slClear.hidden = false; doSearch(el.dataset.q); });
     });
-    slRecentList.querySelectorAll('.sl__recent-del').forEach(el => {
-        el.addEventListener('click', () => { removeRecent(el.dataset.q); renderRecent(); });
-    });
 }
+
+document.getElementById('slRecentClearAll').addEventListener('click', () => {
+    localStorage.removeItem(RECENT_KEY);
+    renderRecent();
+});
 
 function showKeywordInit() {
     slAc.hidden = true;
@@ -607,6 +632,7 @@ function showKeywordInit() {
     document.getElementById('slViewToggle').hidden = true;
     document.getElementById('slIw').hidden = true;
     document.getElementById('slResultTop').hidden = true;
+    document.getElementById('slBottomLinks').hidden = true;
     slRecent.hidden = false;
     renderRecent();
     loadPopularPlaces();
@@ -706,6 +732,7 @@ async function doSearch(q) {
             slRecent.hidden = true; slAc.hidden = true;
             document.getElementById('slResult').hidden = true;
             document.getElementById('slViewToggle').hidden = true;
+            document.getElementById('slEmptyOverseas').hidden = isOverseas;
             slEmpty.hidden = false;
             return;
         }
@@ -838,11 +865,7 @@ function applyPickedToForm(d) {
     }
 }
 
-document.getElementById('slManual').addEventListener('click', () => {
-    slAutoOpened = false;
-    closeSL();
-    document.getElementById('f_name').focus();
-});
+// slManual removed — 직접 입력은 빈 상태 slManualEntry로 통합
 
 // =========================================
 // 2-1) 검색 결과 지도 뷰
