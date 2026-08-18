@@ -127,7 +127,7 @@
 
         <div class="pp-field">
             <label class="pp-label">사진 <span class="pp-label-sub" id="imgCount">({{ $editMode ? $place->images->count() : 0 }}/5)</span></label>
-            <input type="file" id="imgFileInput" accept="image/jpeg,image/png,image/webp,image/heic" multiple hidden>
+            <input type="file" id="imgFileInput" accept="image/*" multiple hidden>
             <div class="pp-images" id="imgPreview">
                 @if($editMode)
                     @foreach($place->images as $idx => $img)
@@ -326,7 +326,7 @@
                         <span>사진 등록</span>
                     </button>
                 </div>
-                <input type="file" id="qsPhotoInput" accept="image/jpeg,image/png,image/webp,image/heic" multiple hidden>
+                <input type="file" id="qsPhotoInput" accept="image/*" multiple hidden>
                 <div class="qs__exif-suggest" id="qsExifSuggest" style="display:none"></div>
             </div>
             <div class="qs__field">
@@ -1993,7 +1993,16 @@ catAddBtn.addEventListener('click', async () => {
 // 5) 이미지 첨부 (최대 5장)
 // =========================================
 const IMG_MAX = 5;
+function _mkCameraInput(id) {
+    var el = document.createElement('input');
+    el.type = 'file'; el.id = id; el.accept = 'image/*';
+    el.setAttribute('capture', 'environment');
+    Object.assign(el.style, {position:'fixed',left:'-9999px',top:'-9999px',opacity:'0',width:'1px',height:'1px',pointerEvents:'none'});
+    document.body.appendChild(el);
+    return el;
+}
 const imgFileInput = document.getElementById('imgFileInput');
+const imgCameraInput = _mkCameraInput('imgCameraInput');
 const imgPreview = document.getElementById('imgPreview');
 const imgAddBtn = document.getElementById('imgAddBtn');
 const imgCountEl = document.getElementById('imgCount');
@@ -2042,13 +2051,8 @@ function syncFileInput() {
     imgFileInput.files = dt.files;
 }
 
-imgAddBtn.addEventListener('click', () => {
-    if (totalImgCount() >= IMG_MAX) return;
-    imgFileInput.click();
-});
-
-imgFileInput.addEventListener('change', () => {
-    const files = Array.from(imgFileInput.files);
+function handleImgFiles(input) {
+    const files = Array.from(input.files);
     const remain = IMG_MAX - totalImgCount();
     if (remain <= 0) return;
     const toAdd = files.slice(0, remain);
@@ -2060,7 +2064,19 @@ imgFileInput.addEventListener('change', () => {
     }
     imgFiles.push(...toAdd);
     renderNewImgPreviews();
+    input.value = '';
+}
+
+imgAddBtn.addEventListener('click', () => {
+    if (totalImgCount() >= IMG_MAX) return;
+    ppPhotoSheet(
+        () => imgCameraInput.click(),
+        () => imgFileInput.click()
+    );
 });
+
+imgFileInput.addEventListener('change', () => handleImgFiles(imgFileInput));
+imgCameraInput.addEventListener('change', () => handleImgFiles(imgCameraInput));
 
 // --- 탭 액션 시트 ---
 let activeAction = null;
@@ -2242,10 +2258,8 @@ function readExifDate(file) {
 }
 
 let exifBannerShown = false;
-const origImgChangeHandler = imgFileInput.onchange;
-imgFileInput.addEventListener('change', async () => {
+async function checkExifFromFiles(files) {
     if (exifBannerShown) return;
-    const files = Array.from(imgFileInput.files);
     for (const f of files) {
         const d = await readExifDate(f);
         if (!d) continue;
@@ -2269,7 +2283,9 @@ imgFileInput.addEventListener('change', async () => {
         banner.querySelector('.pp-exif-suggest__no').addEventListener('click', () => banner.remove());
         break;
     }
-});
+}
+imgFileInput.addEventListener('change', () => checkExifFromFiles(Array.from(imgFileInput.files)));
+imgCameraInput.addEventListener('change', () => checkExifFromFiles(Array.from(imgCameraInput.files)));
 
 // =========================================
 // 6-2) 제출 버튼 로딩 상태 + 다중 제출 방지
@@ -2383,13 +2399,11 @@ async function qsCheckExif() {
     }
 }
 
-document.getElementById('qsPhotoAdd').addEventListener('click', () => {
-    if (qsFiles.length >= 5) return;
-    document.getElementById('qsPhotoInput').click();
-});
-document.getElementById('qsPhotoInput').addEventListener('change', () => {
-    const inp = document.getElementById('qsPhotoInput');
-    const files = Array.from(inp.files);
+const qsPhotoInput = document.getElementById('qsPhotoInput');
+const qsCameraInput = _mkCameraInput('qsCameraInput');
+
+function handleQsFiles(input) {
+    const files = Array.from(input.files);
     const remain = 5 - qsFiles.length;
     if (remain <= 0) return;
     const toAdd = files.slice(0, remain);
@@ -2399,8 +2413,18 @@ document.getElementById('qsPhotoInput').addEventListener('change', () => {
     qsFiles.push(...toAdd);
     qsRenderPhotos();
     qsCheckExif();
-    inp.value = '';
+    input.value = '';
+}
+
+document.getElementById('qsPhotoAdd').addEventListener('click', () => {
+    if (qsFiles.length >= 5) return;
+    ppPhotoSheet(
+        () => qsCameraInput.click(),
+        () => qsPhotoInput.click()
+    );
 });
+qsPhotoInput.addEventListener('change', () => handleQsFiles(qsPhotoInput));
+qsCameraInput.addEventListener('change', () => handleQsFiles(qsCameraInput));
 document.getElementById('qsPhotos').addEventListener('click', (e) => {
     const del = e.target.closest('.qs__photo-thumb__del');
     if (!del) return;

@@ -25,10 +25,10 @@
                 <span class="pp-profile-edit__avatar-ph">😀</span>
             @endif
         </div>
-        <label class="pp-profile-edit__camera" for="ppAvatarInput" aria-label="프로필 사진 변경">
+        <button type="button" class="pp-profile-edit__camera" id="ppAvatarBtn" aria-label="프로필 사진 변경">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="4"/></svg>
-        </label>
-        <input type="file" name="avatar" id="ppAvatarInput" accept="image/jpeg,image/png,image/webp" hidden>
+        </button>
+        <input type="file" name="avatar" id="ppAvatarInput" accept="image/*" hidden>
     </div>
 
     <div class="pp-profile-edit__field">
@@ -91,11 +91,30 @@
 (function(){
     const input = document.getElementById('ppAvatarInput');
     const preview = document.getElementById('ppAvatarPreview');
-    input.addEventListener('change', (e) => {
-        const file = e.target.files[0];
+    var camEl = document.createElement('input');
+    camEl.type = 'file'; camEl.accept = 'image/*';
+    camEl.setAttribute('capture', 'environment');
+    Object.assign(camEl.style, {position:'fixed',left:'-9999px',top:'-9999px',opacity:'0',width:'1px',height:'1px',pointerEvents:'none'});
+    document.body.appendChild(camEl);
+    function handleAvatar(inp) {
+        const file = inp.files[0];
         if (!file) return;
         const url = URL.createObjectURL(file);
         preview.innerHTML = `<img src="${url}" alt="" id="ppAvatarImg">`;
+        if (inp !== input) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+        }
+        inp.value = '';
+    }
+    input.addEventListener('change', () => handleAvatar(input));
+    camEl.addEventListener('change', () => handleAvatar(camEl));
+    document.getElementById('ppAvatarBtn').addEventListener('click', () => {
+        ppPhotoSheet(
+            function() { camEl.click(); },
+            function() { input.click(); }
+        );
     });
 
     const logoutModal = document.getElementById('ppLogoutModal');

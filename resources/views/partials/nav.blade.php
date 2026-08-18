@@ -18,7 +18,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         <span>탐색</span>
     </a>
-    <a href="{{ route('mypage') }}" class="pp-nav__item {{ str_starts_with($current, 'mypage') ? 'is-active' : '' }}">
+    <a href="{{ route('mypage') }}" class="pp-nav__item {{ (str_starts_with($current, 'mypage') || $current === 'login') ? 'is-active' : '' }}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
         <span>MY</span>
     </a>

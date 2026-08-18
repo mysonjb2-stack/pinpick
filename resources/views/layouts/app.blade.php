@@ -141,5 +141,54 @@ window.ppPrompt = function(msg) {
     });
 };
 </script>
+<div class="pp-photo-sheet" id="ppPhotoSheet">
+    <div class="pp-photo-sheet__backdrop" id="ppPhotoSheetBackdrop"></div>
+    <div class="pp-photo-sheet__panel">
+        <div class="pp-photo-sheet__handle"></div>
+        <button type="button" class="pp-photo-sheet__btn" id="ppPhotoSheetCamera">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            사진 찍기
+        </button>
+        <button type="button" class="pp-photo-sheet__btn" id="ppPhotoSheetAlbum">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            앨범에서 선택
+        </button>
+        <div class="pp-photo-sheet__divider"></div>
+        <button type="button" class="pp-photo-sheet__btn pp-photo-sheet__btn--cancel" id="ppPhotoSheetCancel">취소</button>
+    </div>
+</div>
+<script>
+(function(){
+    var ua = navigator.userAgent || '';
+    var _isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var _isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
+
+    window.ppPhotoSheet = function(onCamera, onAlbum) {
+        if (_isIOS || !_isMobile) {
+            onAlbum();
+            return;
+        }
+        var sheet = document.getElementById('ppPhotoSheet');
+        var camBtn = document.getElementById('ppPhotoSheetCamera');
+        var albBtn = document.getElementById('ppPhotoSheetAlbum');
+        var canBtn = document.getElementById('ppPhotoSheetCancel');
+        var bdrop = document.getElementById('ppPhotoSheetBackdrop');
+        sheet.classList.add('is-open');
+        function cleanup() {
+            camBtn.removeEventListener('click', handleCamera);
+            albBtn.removeEventListener('click', handleAlbum);
+            canBtn.removeEventListener('click', handleCancel);
+            bdrop.removeEventListener('click', handleCancel);
+        }
+        function handleCamera() { cleanup(); onCamera(); sheet.classList.remove('is-open'); }
+        function handleAlbum() { cleanup(); onAlbum(); sheet.classList.remove('is-open'); }
+        function handleCancel() { cleanup(); sheet.classList.remove('is-open'); }
+        camBtn.addEventListener('click', handleCamera);
+        albBtn.addEventListener('click', handleAlbum);
+        canBtn.addEventListener('click', handleCancel);
+        bdrop.addEventListener('click', handleCancel);
+    };
+})();
+</script>
 </body>
 </html>

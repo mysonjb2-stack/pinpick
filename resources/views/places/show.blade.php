@@ -41,11 +41,11 @@
         @if($place->images->count() < 5)
         <form class="pp-show-images__add" action="{{ route('api.places.quick-images', $place) }}" method="POST" enctype="multipart/form-data" id="ppQuickImgForm">
             @csrf
-            <label class="pp-show-images__add-btn" aria-label="이미지 추가">
-                <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+            <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+            <button type="button" class="pp-show-images__add-btn" aria-label="이미지 추가" onclick="ppShowPhotoSheet()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="24" height="24"><path d="M12 5v14M5 12h14"/></svg>
                 <span class="pp-show-images__add-label">사진 등록</span>
-            </label>
+            </button>
         </form>
         @endif
     </div>
@@ -56,22 +56,22 @@
         </div>
         <form class="pp-show-images__add" action="{{ route('api.places.quick-images', $place) }}" method="POST" enctype="multipart/form-data" id="ppQuickImgForm">
             @csrf
-            <label class="pp-show-images__add-btn" aria-label="이미지 추가">
-                <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+            <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+            <button type="button" class="pp-show-images__add-btn" aria-label="이미지 추가" onclick="ppShowPhotoSheet()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="24" height="24"><path d="M12 5v14M5 12h14"/></svg>
                 <span class="pp-show-images__add-label">사진 등록</span>
-            </label>
+            </button>
         </form>
     </div>
     @else
     <div class="pp-show-images pp-show-images--empty">
         <form class="pp-show-images__add pp-show-images__add--solo" action="{{ route('api.places.quick-images', $place) }}" method="POST" enctype="multipart/form-data" id="ppQuickImgForm">
             @csrf
-            <label class="pp-show-images__add-btn" aria-label="이미지 추가">
-                <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+            <input type="file" name="images[]" multiple accept="image/*" hidden id="ppQuickImgInput">
+            <button type="button" class="pp-show-images__add-btn" aria-label="이미지 추가" onclick="ppShowPhotoSheet()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="28" height="28"><path d="M12 5v14M5 12h14"/></svg>
                 <span class="pp-show-images__add-label">사진 추가</span>
-            </label>
+            </button>
         </form>
     </div>
     @endif
@@ -349,12 +349,28 @@
     const input = document.getElementById('ppQuickImgInput');
     const form = document.getElementById('ppQuickImgForm');
     if (!input || !form) return;
-    input.addEventListener('change', function(){
-        if (!this.files.length) return;
-        const btn = form.querySelector('.pp-show-images__add-btn');
+    var camEl = document.createElement('input');
+    camEl.type = 'file'; camEl.accept = 'image/*';
+    camEl.setAttribute('capture', 'environment');
+    Object.assign(camEl.style, {position:'fixed',left:'-9999px',top:'-9999px',opacity:'0',width:'1px',height:'1px',pointerEvents:'none'});
+    document.body.appendChild(camEl);
+    function doUpload(inp) {
+        if (!inp.files.length) return;
+        var btn = form.querySelector('.pp-show-images__add-btn');
         btn.classList.add('is-uploading');
+        var dt = new DataTransfer();
+        Array.from(inp.files).forEach(function(f){ dt.items.add(f); });
+        input.files = dt.files;
         form.submit();
-    });
+    }
+    input.addEventListener('change', function(){ doUpload(this); });
+    camEl.addEventListener('change', function(){ doUpload(this); });
+    window.ppShowPhotoSheet = function() {
+        ppPhotoSheet(
+            function() { camEl.click(); },
+            function() { input.click(); }
+        );
+    };
 })();
 
 // 헤더 더보기 메뉴 (수정/삭제)
