@@ -2298,6 +2298,7 @@ imgCameraInput.addEventListener('change', () => checkExifFromFiles(Array.from(im
     form.addEventListener('submit', (e) => {
         if (submitted) { e.preventDefault(); return; }
         submitted = true;
+        syncFileInput();
         btn.disabled = true;
         btn.dataset.origText = btn.textContent;
         btn.textContent = '저장 중…';
@@ -2361,6 +2362,7 @@ const THEME_AUTO_MAP = {
 let qsData = null;
 let qsCatId = null;
 let qsStatus = 'planned';
+let qsVisitedAt = '';
 let qsFiles = [];
 
 function qsRenderPhotos() {
@@ -2391,6 +2393,7 @@ async function qsCheckExif() {
         banner.style.display = 'flex';
         banner.querySelector('#qsExifYes').addEventListener('click', () => {
             qsStatus = 'visited';
+            qsVisitedAt = d;
             document.querySelectorAll('#qsStatus .qs__status-btn').forEach(b => b.classList.toggle('is-active', b.dataset.st === 'visited'));
             banner.style.display = 'none';
         });
@@ -2440,6 +2443,7 @@ function openQuickSave(d, opts) {
     if (!restore) {
         qsCatId = null;
         qsStatus = 'planned';
+        qsVisitedAt = '';
         qsFiles = [];
         qsExifChecked = false;
         document.getElementById('qsExifSuggest').style.display = 'none';
@@ -2657,7 +2661,7 @@ function qsPushToForm() {
         document.querySelectorAll('.pp-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.status === qsStatus));
         if (qsStatus === 'visited') {
             document.getElementById('visitedDateField').style.display = 'block';
-            if (!visitedDateInput.value) visitedDateInput.value = new Date().toISOString().slice(0, 10);
+            visitedDateInput.value = qsVisitedAt || new Date().toISOString().slice(0, 10);
         }
     }
     // 상세 상태 복원
@@ -2687,6 +2691,7 @@ function qsPullFromForm() {
     if (formCatId) qsCatId = parseInt(formCatId);
     // 폼 상태 → 퀵시트 상태 동기화
     qsStatus = document.getElementById('f_status').value || 'planned';
+    qsVisitedAt = visitedDateInput.value;
     // imgFiles → qsFiles 역동기화
     qsFiles = [...imgFiles];
 }
